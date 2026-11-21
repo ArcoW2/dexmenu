@@ -21,8 +21,9 @@ which item goes where, or is hidden, in every program, while every item still do
 Windows keeps building its menu as it does now, every extension adding its items; Dexmenu changes only how it is
 shown. A small shell extension of Dexmenu's own is loaded with every right-click menu; it notes which menu is being
 built, and when the program shows that menu, Dexmenu lays the same items out by the user's layout and shows that
-instead, as a normal Windows menu. The item chosen is handed back by its own id, so the program runs it on the menu
-Windows built, exactly as before. A separate settings app edits the layout from the items Dexmenu has actually seen.
+instead, as a normal Windows menu. What the program changes on its menu while it is shown (Explorer settles some items'
+states only then) is made on the arranged menu too. The item chosen is handed back by its own id, so the program runs
+it on the menu Windows built, exactly as before. A separate settings app edits the layout from the items Dexmenu has actually seen.
 On any doubt, Windows' own menu is shown untouched.
 
 ## Status
@@ -37,7 +38,7 @@ On any doubt, Windows' own menu is shown untouched.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Spike, Explorer and Open dialog | the same, by hand, in Explorer's full menu and an Open dialog: in Explorer the states set after the show onto the moved items | Open questions 1, 2, 6 | 3.1; 3.2; 6.1; 6.2 |
+| Spike, Explorer and Open dialog | the same, by hand, in Explorer's full menu (with the states Explorer sets after the show) and an Open dialog | Open questions 1, 2 | 3.1; 3.2; 3.4; 6.2 |
 | Layout engine | the layout file as planned (`layout.json`, kinds of right-click, items in submenus by path, Hidden, Other, groups) | -- | 3.3; 3.4 |
 | Showing it | the arranged menu shown, lazy submenus and self-drawn items working, the choice handed back | Spike | 3.4; 3.5 |
 | Seen items | each item seen recorded per kind of right-click, for the settings app | Layout engine | 3.6 |
@@ -70,8 +71,10 @@ On any doubt, Windows' own menu is shown untouched.
   (`IExplorerCommand`, as LexPen's items) is put in disabled, and its state (shown, hidden, enabled) is asked for in
   the background and set on the menu while it is open. Seen in Explorer: every LexPen item disabled when the menu is
   shown, the hidden ones included. A program that builds the menu without that flag (Foldex, the test host) has
-  every state before the show call. How Explorer sets the states later (which calls, by id or by position): [not yet
-  checked]; Open question 6.
+  every state before the show call. Explorer sets the states later on the thread showing the menu, on its own menu,
+  by id: `SetMenuItemInfoW` with `MIIM_STATE` for an item shown, `DeleteMenu` for one hidden (seen in the trace,
+  6.2). Dexmenu makes those calls on the arranged menu (3.4). This is where tools that rearrange the menu fall short
+  (section 1).
 - Explorer's full menu has every item owner-drawn by the time it is shown (Explorer draws them itself); each item
   keeps its text, so it is named as any other.
 
@@ -103,6 +106,11 @@ On any doubt, Windows' own menu is shown untouched.
 - On the caught call: Windows' menu read into a tree (each item: text, id, state, bitmap, submenu handle, self-drawn
   or not), the layout applied, and a new `HMENU` built from it with the same ids. The original show call is then made
   with the new menu, so Windows draws it: its look, dark mode, keys, the `&` letters, nothing of Dexmenu's own to draw.
+- Changes while shown: a call by id on Windows' menu (`EnableMenuItem`, `SetMenuItemInfoW`, `CheckMenuItem`,
+  `ModifyMenuW`, `DeleteMenu`, `RemoveMenu`), from the thread showing it, is made on the arranged menu instead, where
+  the item now is (a search by id covers the user's submenus), and the saved item follows it: changed, or gone. So
+  Windows' menu is put back with the change, as if it had been shown itself. A user's submenu left empty goes. A call
+  by position on Windows' menu cannot be mapped (the positions moved) and is left as it is; none seen from Explorer.
 - Submenus are moved, not copied: a submenu handle of Windows' menu is taken out of it (`RemoveMenu`, not destroyed)
   and put into the new one, so the extension that owns it still recognises it (3.5). After the call everything is put
   back where it was, so the program destroys its menu as it always does.
@@ -182,10 +190,6 @@ On any doubt, Windows' own menu is shown untouched.
    per machine covers them and needs an installer with administrator rights.
 5. **Windows 11's short menu.** Switch Windows to the full menu (the settings app sets the switch), or arrange only
    under "Show more options"?
-6. **States set after the show (Explorer).** Explorer sets an Explorer command's state on its own menu while it is
-   open (3.1), so a moved item keeps the disabled state it had at the show. Follow Explorer's changes onto the moved
-   items (hook the menu calls Explorer makes, once the trace has shown which), or wait for the states before
-   arranging, or leave Explorer commands where Explorer put them?
 
 ## 6. As built
 
@@ -227,9 +231,17 @@ On any doubt, Windows' own menu is shown untouched.
   command failed with "Windows cannot find ..." also without Dexmenu (`DexmenuTest --invoke LexPen.CompareLeft`:
   `0x80070002`): LexPen's `HKCU\Software\Classes\LexPen.Shell` key, which holds its exe, is missing on this computer.
 - Explorer (full menu): the show call is made with the noted `HMENU`, so the hook works there. Every item is
-  owner-drawn by then; the DLL reads their text too. "from LexPen" is shown, but LexPen's items in it stay disabled
-  and the hidden ones show: Explorer's later state changes (3.1) reach its own menu, not the moved items. Open
-  question 6.
+  owner-drawn by then; the DLL reads their text too. Without following changes (3.4), LexPen's items in "from LexPen"
+  stayed disabled and the hidden ones showed. The trace of the menu calls while shown: on Windows' menu, by id, on
+  the showing thread, `SetMenuItemInfoW` (`MIIM_STATE`, enabled) for "Select left side to compare", "Edit in LexPen",
+  "View in LexPen", `DeleteMenu` for "Compare", "Compare to", "Delete .bak file"; all failed, the items being elsewhere.
+  Explorer also makes the "from LexPen" item owner-drawn (`SetMenuItemInfoW` on the arranged menu), so it is drawn
+  as its own items.
+- Following changes (3.4) built after that. The test host's `--late` makes Explorer's calls on Windows' menu while
+  shown (the first LexPen item disabled, the last deleted); the host then checks the shown menu and Windows' menu
+  after the call against Windows' menu with those changes. `run-tests.ps1` runs every case also with `--late`, off and
+  on. Against the DLL without following changes it failed (the submenu and the put-back menu without the changes);
+  with it, all cases passed. Not covered by a test: a user's submenu left empty; a change by position.
 - The trace (`HKCU\Software\Dexmenu` `Trace` 1): each menu noted, each show call and each item in
   `%LOCALAPPDATA%\Dexmenu\dexmenu.log`. `DEXMENU=0` forces the DLL off in a process, so the tests hold while the
   registry has Dexmenu on.

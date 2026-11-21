@@ -190,6 +190,27 @@ struct Item
 
 const UINT Mask = MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_DATA | MIIM_BITMAP | MIIM_CHECKMARKS;
 
+// One item, by position or by its id (searched in submenus too, as Windows does).
+bool ReadItem(HMENU menu, UINT at, bool byPosition, Item& item)
+{
+    item = Item();
+    item.info.fMask = Mask | MIIM_STRING;
+    item.info.dwTypeData = nullptr;
+    if (!GetMenuItemInfoW(menu, at, byPosition, &item.info)) return false;
+    // Owner-drawn items too: Explorer's full menu makes every item owner-drawn before showing it, and the text stays
+    // with the item apart from its type.
+    if (!(item.info.fType & (MFT_SEPARATOR | MFT_BITMAP)) && item.info.cch > 0)
+    {
+        item.text.resize(item.info.cch + 1);
+        item.info.cch++;
+        item.info.dwTypeData = item.text.data();
+        if (!GetMenuItemInfoW(menu, at, byPosition, &item.info)) return false;
+        item.text.resize(wcslen(item.text.c_str()));
+        item.hasText = true;
+    }
+    return true;
+}
+
 bool Read(HMENU menu, std::vector<Item>& items)
 {
     const int count = GetMenuItemCount(menu);
@@ -197,20 +218,7 @@ bool Read(HMENU menu, std::vector<Item>& items)
     for (int i = 0; i < count; i++)
     {
         Item item;
-        item.info.fMask = Mask | MIIM_STRING;
-        item.info.dwTypeData = nullptr;
-        if (!GetMenuItemInfoW(menu, i, TRUE, &item.info)) return false;
-        // Owner-drawn items too: Explorer's full menu makes every item owner-drawn before showing it, and the text
-        // stays with the item apart from its type.
-        if (!(item.info.fType & (MFT_SEPARATOR | MFT_BITMAP)) && item.info.cch > 0)
-        {
-            item.text.resize(item.info.cch + 1);
-            item.info.cch++;
-            item.info.dwTypeData = item.text.data();
-            if (!GetMenuItemInfoW(menu, i, TRUE, &item.info)) return false;
-            item.text.resize(wcslen(item.text.c_str()));
-            item.hasText = true;
-        }
+        if (!ReadItem(menu, i, true, item)) return false;
         items.push_back(item);
     }
     return true;
@@ -360,14 +368,59 @@ using TrackPopupMenuFn = BOOL(WINAPI*)(HMENU, UINT, int, int, int, HWND, const R
 TrackPopupMenuExFn realTrackPopupMenuEx = nullptr;
 TrackPopupMenuFn realTrackPopupMenu = nullptr;
 
-// ---- trace of menu changes while an arranged menu is shown (plan 01, Open question 6) -----------------------------
-// Which calls a program makes on its menu after the show (Explorer sets Explorer commands' states then). Traced only:
-// nothing is changed or redirected yet.
+// ---- changes made while an arranged menu is shown (plan 01 3.1) ---------------------------------------------------
+// Explorer sets Explorer commands' states after the show, on its own menu, by id: SetMenuItemInfoW (MIIM_STATE) for an
+// item shown, DeleteMenu for one hidden. Those items are in the arranged menu then, so such a call by id on Windows'
+// menu, from the thread showing it, is made on the arranged menu instead (a search by id covers the user's submenus),
+// and the saved item follows it, so Windows' menu is put back with the change. A group left empty goes. Calls by
+// position on Windows' menu cannot be mapped and are left as they are. With Trace on, every call is in the log.
 
 SRWLOCK activeLock = SRWLOCK_INIT;
-const Arranged* active = nullptr;     // the arranged menu being shown, if any
+Arranged* active = nullptr;           // the arranged menu being shown, if any
+DWORD activeThread = 0;               // the thread showing it
 bool activeTrace = false;
-thread_local bool own = false;        // Dexmenu's own menu calls (arranging, putting back): not traced
+thread_local bool own = false;        // Dexmenu's own menu calls (arranging, putting back): not traced or redirected
+
+// The menu a call is made on: the arranged one for a by-id call on Windows' menu while it is shown arranged.
+HMENU Target(HMENU m, bool byPosition)
+{
+    if (own || byPosition || GetCurrentThreadId() != activeThread) return m;
+    AcquireSRWLockShared(&activeLock);
+    const HMENU target = active && m == active->original ? active->shown : m;
+    ReleaseSRWLockShared(&activeLock);
+    return target;
+}
+
+// After a redirected call on item `id`: the saved item as the arranged menu now has it, or gone; an empty group gone.
+void Follow(UINT id, bool gone)
+{
+    Arranged* a = active;   // only the showing thread redirects, and only while it shows
+    if (!a) return;
+    own = true;
+    for (size_t i = 0; i < a->items.size(); i++)
+    {
+        if (IsSeparator(a->items[i]) || a->items[i].info.wID != id) continue;
+        if (gone) a->items.erase(a->items.begin() + i);
+        else
+        {
+            Item now;
+            if (ReadItem(a->shown, id, false, now)) a->items[i] = now;
+        }
+        break;
+    }
+    if (gone)
+        for (size_t g = 1; g < a->made.size(); g++)
+        {
+            const HMENU group = a->made[g];
+            if (GetMenuItemCount(group) != 0) continue;
+            for (int p = GetMenuItemCount(a->shown) - 1; p >= 0; p--)
+                if (GetSubMenu(a->shown, p) == group) RemoveMenu(a->shown, p, MF_BYPOSITION);
+            DestroyMenu(group);
+            a->made.erase(a->made.begin() + g);
+            g--;
+        }
+    own = false;
+}
 
 std::wstring RoleOf(HMENU m)
 {
@@ -417,17 +470,23 @@ DeleteMenuFn realRemoveMenu = nullptr;
 ModifyMenuWFn realModifyMenuW = nullptr;
 CheckMenuItemFn realCheckMenuItem = nullptr;
 
+// Each call: made on its target (Target), traced, and for a redirected one the saved item follows (Follow).
 BOOL WINAPI HookEnableMenuItem(HMENU m, UINT item, UINT flags)
 {
-    const BOOL r = realEnableMenuItem(m, item, flags);
-    TraceCall(L"EnableMenuItem", m, item, (flags & MF_BYPOSITION) != 0, L"flags=0x" + std::to_wstring(flags), r);
+    const bool byPosition = (flags & MF_BYPOSITION) != 0;
+    const HMENU t = Target(m, byPosition);
+    const BOOL r = realEnableMenuItem(t, item, flags);
+    TraceCall(L"EnableMenuItem", m, item, byPosition, L"flags=0x" + std::to_wstring(flags) + (t != m ? L" redirected" : L""), r);
+    if (t != m && r != -1) Follow(item, false);
     return r;
 }
 
 BOOL WINAPI HookSetMenuItemInfoW(HMENU m, UINT item, BOOL byPosition, LPCMENUITEMINFOW info)
 {
-    const BOOL r = realSetMenuItemInfoW(m, item, byPosition, info);
-    TraceCall(L"SetMenuItemInfoW", m, item, byPosition != 0, InfoText(info), r);
+    const HMENU t = Target(m, byPosition != 0);
+    const BOOL r = realSetMenuItemInfoW(t, item, byPosition, info);
+    TraceCall(L"SetMenuItemInfoW", m, item, byPosition != 0, InfoText(info) + (t != m ? L" redirected" : L""), r);
+    if (t != m && r) Follow(info && (info->fMask & MIIM_ID) ? info->wID : item, false);
     return r;
 }
 
@@ -440,29 +499,41 @@ BOOL WINAPI HookInsertMenuItemW(HMENU m, UINT item, BOOL byPosition, LPCMENUITEM
 
 BOOL WINAPI HookDeleteMenu(HMENU m, UINT item, UINT flags)
 {
-    const BOOL r = realDeleteMenu(m, item, flags);
-    TraceCall(L"DeleteMenu", m, item, (flags & MF_BYPOSITION) != 0, L"", r);
+    const bool byPosition = (flags & MF_BYPOSITION) != 0;
+    const HMENU t = Target(m, byPosition);
+    const BOOL r = realDeleteMenu(t, item, flags);
+    TraceCall(L"DeleteMenu", m, item, byPosition, t != m ? L"redirected" : L"", r);
+    if (t != m && r) Follow(item, true);
     return r;
 }
 
 BOOL WINAPI HookRemoveMenu(HMENU m, UINT item, UINT flags)
 {
-    const BOOL r = realRemoveMenu(m, item, flags);
-    TraceCall(L"RemoveMenu", m, item, (flags & MF_BYPOSITION) != 0, L"", r);
+    const bool byPosition = (flags & MF_BYPOSITION) != 0;
+    const HMENU t = Target(m, byPosition);
+    const BOOL r = realRemoveMenu(t, item, flags);
+    TraceCall(L"RemoveMenu", m, item, byPosition, t != m ? L"redirected" : L"", r);
+    if (t != m && r) Follow(item, true);
     return r;
 }
 
 BOOL WINAPI HookModifyMenuW(HMENU m, UINT item, UINT flags, UINT_PTR id, LPCWSTR text)
 {
-    const BOOL r = realModifyMenuW(m, item, flags, id, text);
-    TraceCall(L"ModifyMenuW", m, item, (flags & MF_BYPOSITION) != 0, L"flags=0x" + std::to_wstring(flags) + L" newid=" + std::to_wstring(id), r);
+    const bool byPosition = (flags & MF_BYPOSITION) != 0;
+    const HMENU t = Target(m, byPosition);
+    const BOOL r = realModifyMenuW(t, item, flags, id, text);
+    TraceCall(L"ModifyMenuW", m, item, byPosition, L"flags=0x" + std::to_wstring(flags) + L" newid=" + std::to_wstring(id) + (t != m ? L" redirected" : L""), r);
+    if (t != m && r) Follow((flags & MF_POPUP) ? item : static_cast<UINT>(id), false);
     return r;
 }
 
 DWORD WINAPI HookCheckMenuItem(HMENU m, UINT item, UINT flags)
 {
-    const DWORD r = realCheckMenuItem(m, item, flags);
-    TraceCall(L"CheckMenuItem", m, item, (flags & MF_BYPOSITION) != 0, L"flags=0x" + std::to_wstring(flags), static_cast<BOOL>(r));
+    const bool byPosition = (flags & MF_BYPOSITION) != 0;
+    const HMENU t = Target(m, byPosition);
+    const DWORD r = realCheckMenuItem(t, item, flags);
+    TraceCall(L"CheckMenuItem", m, item, byPosition, L"flags=0x" + std::to_wstring(flags) + (t != m ? L" redirected" : L""), static_cast<BOOL>(r));
+    if (t != m && r != static_cast<DWORD>(-1)) Follow(item, false);
     return r;
 }
 
@@ -493,11 +564,13 @@ BOOL ShowArranged(HMENU menu, Show show)
     }
     AcquireSRWLockExclusive(&activeLock);
     active = &a;
+    activeThread = GetCurrentThreadId();
     activeTrace = trace;
     ReleaseSRWLockExclusive(&activeLock);
     const BOOL result = show(a.shown);
     AcquireSRWLockExclusive(&activeLock);
     active = nullptr;
+    activeThread = 0;
     ReleaseSRWLockExclusive(&activeLock);
     if (trace) Log(L"show " + Hex(menu) + L" closed, returned " + std::to_wstring(result));
     own = true;

@@ -2,6 +2,8 @@
 # Dexmenu off and on. LexPen decides per selection which of its items show and with which title
 # (..\LexPen\src\shell\LexPenShell.cpp GetState, GetTitle); this checks that, with Dexmenu on, exactly the items LexPen
 # gave for that selection are in "from LexPen", as LexPen gave them, and that LexPen gives the same items either way.
+# Each also with --late: Windows' menu changed by id while shown, as Explorer does (plan 01 3.1); the change must be in
+# the shown menu and stay in Windows' menu after it.
 # Needs register.ps1 run first. The left side case writes HKCU\Software\Classes\LexPen.Shell LeftFile for the run and
 # puts the key back as it was.
 param([string]$Work = (Join-Path $env:TEMP 'dexmenu-tests'))
@@ -18,9 +20,9 @@ Set-Content "$Work\b.txt" 'b'
 Set-Content "$Work\b.txt.bak" 'b'
 Set-Content "$Work\left.txt" 'left'
 
-function Run($paths, [bool]$on) {
+function Run($paths, [bool]$on, [switch]$Late) {
     $env:DEXMENU = if ($on) { '1' } else { '0' }   # 0: off, also when the registry has it on
-    $out = & $host_ @paths
+    $out = if ($Late) { & $host_ --late @paths } else { & $host_ @paths }
     [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out; LexPen = ($out | Where-Object { $_ -like '== Items with verb*' }) }
 }
 
@@ -49,6 +51,8 @@ foreach ($c in $cases) {
         }
         $off = Run $c.Paths $false
         $on = Run $c.Paths $true
+        $offLate = Run $c.Paths $false -Late
+        $onLate = Run $c.Paths $true -Late
     }
     finally {
         if ($c.Left) {
@@ -61,6 +65,8 @@ foreach ($c in $cases) {
     $problems = @()
     if ($off.Code -ne 0) { $problems += 'Dexmenu off: host checks failed' }
     if ($on.Code -ne 0) { $problems += 'Dexmenu on: host checks failed' }
+    if ($offLate.Code -ne 0) { $problems += 'Dexmenu off, changes while shown: host checks failed' }
+    if ($onLate.Code -ne 0) { $problems += 'Dexmenu on, changes while shown: host checks failed' }
     # Ids are Windows' per menu built (another handler's items can shift them), so across runs: titles and verbs only.
     # Within one run the host compares ids exactly.
     $withoutIds = { param($line) $line -replace ' id=\d+', '' }
@@ -70,7 +76,7 @@ foreach ($c in $cases) {
         $failed++
         Write-Output "FAIL $($c.Name)"
         $problems | ForEach-Object { Write-Output "     $_" }
-        $off.Out + $on.Out | Where-Object { $_ -like 'FAIL *' } | ForEach-Object { Write-Output "     $_" }
+        $off.Out + $on.Out + $offLate.Out + $onLate.Out | Where-Object { $_ -like 'FAIL *' } | ForEach-Object { Write-Output "     $_" }
     }
     else { Write-Output "PASS $($c.Name): from LexPen = [$($got -join '; ')]" }
 }

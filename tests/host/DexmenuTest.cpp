@@ -8,7 +8,9 @@
 // so the check does not lean on the layout's patterns. With DEXMENU=1 (Dexmenu on) the shown menu must hold those
 // items, exactly as Windows' menu has them (text, id, state, type, bitmap, submenu), in a submenu named --group, and
 // every other item as in Windows' menu, in its order. Without it, the shown menu must be Windows' menu. Either way,
-// after the call Windows' menu must be as it was. Exit code 0: pass. Run it with DEXMENU set to 1 or 0: without it
+// after the call Windows' menu must be as it was. With --late, while the menu is shown the host makes Explorer's
+// later calls on Windows' menu by id (the first item under test disabled, the last deleted): the shown menu and
+// Windows' menu after the call must have those changes. Exit code 0: pass. Run it with DEXMENU set to 1 or 0: without it
 // the DLL follows the registry (HKCU\Software\Dexmenu Enabled), and the host's checks for "off" would not hold.
 
 #define NOMINMAX
@@ -35,6 +37,8 @@ struct Node
 
 IContextMenu* menu = nullptr;
 IContextMenu3* menu3 = nullptr;
+HMENU windowsMenu = nullptr;
+UINT lateDisable = 0, lateDelete = 0;   // --late: what is changed on Windows' menu while it is shown
 HMENU shownTop = nullptr;
 std::vector<Node> shown;
 bool sawShown = false;
@@ -130,6 +134,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         sawShown = true;
         shownTop = reinterpret_cast<HMENU>(wp);
+        // --late: as Explorer sets an Explorer command's state after the show: on Windows' menu, by id.
+        if (lateDisable)
+        {
+            MENUITEMINFOW info = { sizeof(info), MIIM_STATE };
+            info.fState = MFS_DISABLED;
+            SetMenuItemInfoW(windowsMenu, lateDisable, FALSE, &info);
+        }
+        if (lateDelete) DeleteMenu(windowsMenu, lateDelete, MF_BYCOMMAND);
         shown = Tree(shownTop, 1);
         SetTimer(hwnd, 1, 50, nullptr);
         return 0;
@@ -143,6 +155,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 int wmain(int argc, wchar_t** argv)
 {
     std::wstring group = L"from LexPen", prefix = L"LexPen.", invoke;
+    bool late = false;
     std::vector<std::wstring> paths;
     for (int i = 1; i < argc; i++)
     {
@@ -150,6 +163,7 @@ int wmain(int argc, wchar_t** argv)
         if (a == L"--group" && i + 1 < argc) group = argv[++i];
         else if (a == L"--prefix" && i + 1 < argc) prefix = argv[++i];
         else if (a == L"--invoke" && i + 1 < argc) invoke = argv[++i];
+        else if (a == L"--late") late = true;
         else paths.push_back(a);
     }
     if (paths.empty()) { fwprintf(stderr, L"usage: DexmenuTest [--group name] [--prefix verb-prefix] path...\n"); return 2; }
@@ -202,9 +216,23 @@ int wmain(int argc, wchar_t** argv)
         return SUCCEEDED(hr) ? 0 : 1;
     }
 
-    const auto windows = Tree(hmenu, 1);
+    auto windows = Tree(hmenu, 1);
     wprintf(L"== Windows' menu\n");
     Print(windows, 2);
+
+    // --late: the first item under test disabled, the last (when there are two or more) deleted, while shown; what
+    // Windows' menu is expected to be from then on, shown and after.
+    windowsMenu = hmenu;
+    if (late)
+    {
+        std::vector<UINT> ids;
+        for (const auto& n : windows) if (!IsLine(n) && n.verb.rfind(prefix, 0) == 0) ids.push_back(n.id);
+        if (!ids.empty()) lateDisable = ids.front();
+        if (ids.size() > 1) lateDelete = ids.back();
+        for (auto& n : windows) if (lateDisable && n.id == lateDisable && !IsLine(n)) n.state |= MFS_DISABLED;
+        std::erase_if(windows, [](const Node& n) { return lateDelete && n.id == lateDelete && !IsLine(n); });
+        wprintf(L"== Late: id %u disabled, id %u deleted, while shown\n", lateDisable, lateDelete);
+    }
 
     // Shown away from the mouse, so a real click while the test runs does not land on it.
     POINT cursor = {};
