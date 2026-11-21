@@ -68,9 +68,8 @@ Checked in the Delphi 10.4 on this machine: `Winapi.D2D1` (Direct2D 1.0 with Dir
   in memory (`ID2D1DCRenderTarget`, premultiplied alpha), which `UpdateLayeredWindow` shows. So a theme can have no
   menu background at all: cards "in space", what is behind the menu visible between them and around their rounded
   corners. Checked with a probe built with the Delphi here: three rounded cards (one with a gradient) over a coloured
-  window, that colour seen in the gaps and at the corners, edges smooth. A fully transparent pixel lets a click
-  through to the window behind; a pixel at alpha 1/255 looks the same but keeps the click (`WindowFromPoint`, in the
-  same probe). Dexmenu draws the gaps of its menu at that alpha, so a click between cards stays in the menu.
+  window, that colour seen in the gaps and at the corners, edges smooth. The gaps are fully see-through; a click
+  there goes to the window behind, as a click outside the menu, and closes the menu.
 - **Targets:** a window's own surface (the menu) and an image in memory (the preview's pictures for tests, plan 02
   3.12). The same drawing code for both.
 - **Window:** a layered popup window (see-through, above); its corners, border and shadow drawn by Dexmenu (3.4),
@@ -134,8 +133,11 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
     so text stays readable;
   - layered: a colour under an image under a tint.
 - **No background:** `menu.background` can be `none`: only the cards, dividers and rows are drawn, with the
-  theme's `gap` between them, the rest see-through (3.1). With a background, the menu is the same layered window,
-  its background drawn as any other.
+  theme's `gap` between them, the rest see-through (3.1). Cards are then always opaque: a card's background is drawn
+  without its alpha, and a card without a background gets the theme's card background. The settings app says so when
+  a theme or card asks for a see-through card on a menu without a background.
+- **With a background:** the menu is the same layered window, its background drawn first. A card can then be
+  transparent (`background: none`, or a colour with alpha), showing the menu's background through it.
 - **The frame:** the menu's corners from the theme's `radius`, its border from the theme; drawn by Dexmenu, as the
   layered window gets no corners or shadow from DWM. A shadow, per card or for the menu, drawn by Dexmenu too:
   Direct2D 1.0 has no blur, so a soft shadow is built from layered translucent shapes or a prepared image; how
@@ -168,7 +170,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   corner.
 - **Overflow:** a title that does not fit ends in an ellipsis; the full text as a tooltip.
 - **Its own look:** a card in the layout (plan 02 3.5) can overrule the theme for itself: `background` (colour,
-  gradient, image), `foreground`, `border`, `radius`, `height`, `minWidth`, `weight`. Per state where wanted
+  gradient, image; `none` or alpha only on a menu with a background, 3.4), `foreground`, `border`, `radius`, `height`, `minWidth`, `weight`. Per state where wanted
   (`hover` of its own).
 - **An action or a submenu:** the same card; the mark and the click differ (plan 02 3.3: one item found is an action,
   several a submenu).
@@ -226,6 +228,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - Every state of a card and their combinations; a card's own background (colour, gradient, image) and colours; the
   extra text above and below the title.
 - Dividers: without a label, with a label left, middle and right; own height, background and label colour.
+- A menu without a background: the gaps and corners see-through, a card asking for alpha drawn opaque and reported;
+  with a background, a transparent card showing it.
 - Themes: a theme on a base with only palette changes recolours every element using them; an unknown property or a
   bad colour reported, the base's value used.
 - By hand: Explorer and the settings app's preview side by side, the same layout and theme, the same picture.
