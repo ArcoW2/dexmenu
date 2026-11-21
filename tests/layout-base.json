@@ -1,0 +1,2 @@
+// The base layout as a file (the same as the DLL's built-in one): Windows' menu as cards.
+{ "default": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }

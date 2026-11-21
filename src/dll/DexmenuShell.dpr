@@ -12,7 +12,9 @@ uses
   Dexmenu.Tree in 'Dexmenu.Tree.pas',
   Dexmenu.Place in 'Dexmenu.Place.pas',
   Dexmenu.Draw in 'Dexmenu.Draw.pas',
+  Dexmenu.Seen in 'Dexmenu.Seen.pas',
   Dexmenu.Menu in 'Dexmenu.Menu.pas',
+  Dexmenu.Preview in 'Dexmenu.Preview.pas',
   Dexmenu.Hook in 'Dexmenu.Hook.pas',
   Dexmenu.Handler in 'Dexmenu.Handler.pas';
 
@@ -20,7 +22,10 @@ exports
   DllGetClassObject,
   DllCanUnloadNow,
   DllRegisterServer,
-  DllUnregisterServer;
+  DllUnregisterServer,
+  DexmenuPreviewCreate,
+  DexmenuPreviewSet,
+  DexmenuBaseLayout;
 
 begin
 end.

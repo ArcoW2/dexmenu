@@ -26,12 +26,23 @@ type
     class function Current: TLook; static;
   end;
 
+  // A level drawn into a 32-bit image with a transparency per pixel (premultiplied).
+  TPicture = record
+    DC: HDC;
+    Bitmap, Old: HBITMAP;
+    Width, Height: Integer;   // pixels
+    procedure PaintOnto(Target: HDC; X, Y: Integer);
+    procedure Free;
+  end;
+
 // The level laid out: every card's box.
 function Measure(Level: TViewLevel): TGeometry;
 // The level drawn and shown in a layered window at a screen position (pixels); Selected: a box index or -1;
 // ScrollY: DIP scrolled down; Scale: the monitor's DPI / 96. The window's size is set to the picture's.
 procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Selected: Integer; ScrollY, Scale: Single;
   VisibleHeight: Single);
+// The level drawn into a picture; the caller frees it.
+function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single): TPicture;
 // The box at a point (DIP within the level, scroll applied), or -1.
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
 
@@ -273,59 +284,82 @@ begin
   T.PopAxisAlignedClip;
 end;
 
-procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Selected: Integer; ScrollY, Scale: Single;
-  VisibleHeight: Single);
+function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single): TPicture;
 var
-  W, H: Integer;
   BMI: TBitmapInfo;
   Bits: Pointer;
-  ScreenDC, MemDC: HDC;
-  Bmp, Old: HBITMAP;
+  ScreenDC: HDC;
   Props: TD2D1RenderTargetProperties;
   Target: ID2D1DCRenderTarget;
-  Blend: TBlendFunction;
-  Pos, Src: TPoint;
-  Size: TSize;
   Rect: TRect;
 begin
   EnsureFactories;
-  W := Ceil(G.Width * Scale);
-  H := Ceil(VisibleHeight * Scale);
+  Result.Width := Max(1, Ceil(G.Width * Scale));
+  Result.Height := Max(1, Ceil(VisibleHeight * Scale));
   FillChar(BMI, SizeOf(BMI), 0);
   BMI.bmiHeader.biSize := SizeOf(BMI.bmiHeader);
-  BMI.bmiHeader.biWidth := W;
-  BMI.bmiHeader.biHeight := -H;
+  BMI.bmiHeader.biWidth := Result.Width;
+  BMI.bmiHeader.biHeight := -Result.Height;
   BMI.bmiHeader.biPlanes := 1;
   BMI.bmiHeader.biBitCount := 32;
   ScreenDC := GetDC(0);
-  MemDC := CreateCompatibleDC(ScreenDC);
-  Bmp := CreateDIBSection(MemDC, BMI, DIB_RGB_COLORS, Bits, 0, 0);
-  Old := SelectObject(MemDC, Bmp);
+  Result.DC := CreateCompatibleDC(ScreenDC);
+  ReleaseDC(0, ScreenDC);
+  Result.Bitmap := CreateDIBSection(Result.DC, BMI, DIB_RGB_COLORS, Bits, 0, 0);
+  Result.Old := SelectObject(Result.DC, Result.Bitmap);
+  Props := D2D1RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
+    D2D1PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96 * Scale, 96 * Scale);
+  if Succeeded(D2D.CreateDCRenderTarget(Props, Target)) then
+  begin
+    Rect := System.Types.Rect(0, 0, Result.Width, Result.Height);
+    Target.BindDC(Result.DC, Rect);
+    Target.BeginDraw;
+    DrawLevel(Target, G, Selected, ScrollY, VisibleHeight, TLook.Current);
+    Target.EndDraw;
+  end;
+end;
+
+procedure TPicture.Free;
+begin
+  SelectObject(DC, Old);
+  DeleteObject(Bitmap);
+  DeleteDC(DC);
+end;
+
+function BlendFunction: TBlendFunction;
+begin
+  Result.BlendOp := AC_SRC_OVER;
+  Result.BlendFlags := 0;
+  Result.SourceConstantAlpha := 255;
+  Result.AlphaFormat := AC_SRC_ALPHA;
+end;
+
+procedure TPicture.PaintOnto(Target: HDC; X, Y: Integer);
+begin
+  Winapi.Windows.AlphaBlend(Target, X, Y, Width, Height, DC, 0, 0, Width, Height, BlendFunction);
+end;
+
+procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Selected: Integer; ScrollY, Scale: Single;
+  VisibleHeight: Single);
+var
+  P: TPicture;
+  ScreenDC: HDC;
+  Blend: TBlendFunction;
+  Pos, Src: TPoint;
+  Size: TSize;
+begin
+  P := Render(G, Selected, ScrollY, Scale, VisibleHeight);
+  ScreenDC := GetDC(0);
   try
-    Props := D2D1RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
-      D2D1PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96 * Scale, 96 * Scale);
-    if Succeeded(D2D.CreateDCRenderTarget(Props, Target)) then
-    begin
-      Rect := System.Types.Rect(0, 0, W, H);
-      Target.BindDC(MemDC, Rect);
-      Target.BeginDraw;
-      DrawLevel(Target, G, Selected, ScrollY, VisibleHeight, TLook.Current);
-      Target.EndDraw;
-    end;
-    Blend.BlendOp := AC_SRC_OVER;
-    Blend.BlendFlags := 0;
-    Blend.SourceConstantAlpha := 255;
-    Blend.AlphaFormat := AC_SRC_ALPHA;
+    Blend := BlendFunction;
     Pos := ScreenPos;
     Src := Point(0, 0);
-    Size.cx := W;
-    Size.cy := H;
-    UpdateLayeredWindow(Wnd, ScreenDC, @Pos, @Size, MemDC, @Src, 0, @Blend, ULW_ALPHA);
+    Size.cx := P.Width;
+    Size.cy := P.Height;
+    UpdateLayeredWindow(Wnd, ScreenDC, @Pos, @Size, P.DC, @Src, 0, @Blend, ULW_ALPHA);
   finally
-    SelectObject(MemDC, Old);
-    DeleteObject(Bmp);
-    DeleteDC(MemDC);
     ReleaseDC(0, ScreenDC);
+    P.Free;
   end;
 end;
 

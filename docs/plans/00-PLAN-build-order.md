@@ -6,6 +6,7 @@ Status: partly executed; see Status.
 - 2026-11-21: partly executed: step 1.
 - 2026-11-21: partly executed: step 2.
 - 2026-11-21: partly executed: step 3 (by hand in Explorer, an Open dialog and Foldex still to do).
+- 2026-11-21: partly executed: step 4.
 
 Orders the parts of plan 01 (`01-PLAN-dexmenu.md`: the DLL, the hook, install), plan 02 (`02-PLAN-own-menu.md`:
 cards, rules, layouts, the editor) and plan 03 (`03-PLAN-menu-look.md`: themes and the look) into steps. Each step
@@ -35,12 +36,12 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 | Step 1: Delphi DLL | the spike in Delphi: handler, hook, late changes, the test host's checks passing (Explorer by hand with step 3) | 3.1; plan 01 6.3 |
 | Step 2: the base layout | the layout file (JSON with comments) with the remaining card; read, checked, read again on change; unit tests | 3.2; 6.2 |
 | Step 3: plain cards | Dexmenu's own menu drawn by the DLL: every item a card, submenus opened from their card and filled when opened, keys and mouse, the id handed back, late changes followed, Windows' menu on a broken layout; tested in the test host (by hand: still to do) | 3.3; 6.3 |
+| Step 4: the editor's frame | the settings app (.NET 10, WebView2): the layout pane, the kind of right-click, the preview drawn by the DLL from the seen items, redrawn when the layout or seen items change | 3.4; 6.4 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Step 4: the editor's frame | the settings app: two panes, the preview on the right drawn by the DLL | Step 3 | 3.4 |
 | Step 5: editing | cards, rules, titles, dragging, the remaining card moved; the preview following every change | Step 4 | 3.5 |
 | Step 6: the look | themes, colours, the card's structure, lines of cards, dividers | Step 5 | 3.6 |
 | Step 7: extras and install | icons, use counts and the most used row, search, "Edit menu...", the installer | Step 6 | 3.7 |
@@ -172,3 +173,26 @@ None.
   "View in LexPen" (its id returned); "Send to" opened from its card and filled when opened; a broken layout file
   giving Windows' own menu. All passed. A screenshot of the menu held open (`DexmenuTest --hold`): Windows 11's look.
 - Not yet: by hand in Explorer, an Open dialog and Foldex.
+
+### 6.4 Step 4
+
+- The kind of right-click: the handler tells it from the items (`file`, `folder`, `several`, `background`, `drive`,
+  else `default`); the menu uses that kind's lines in the layout (the default's when it has none).
+- Seen items (`src/dll/Dexmenu.Seen.pas`): after each menu Dexmenu showed, the items of that right-click, with the
+  Windows submenus that were opened, in `%APPDATA%\Dexmenu\seen\<kind>.json` (`DEXMENU_SEEN_FOLDER` for the tests).
+  The last right-click of a kind for now; merging what every right-click showed is left for later (the preview's
+  stripes, plan 03 3.10, need it).
+- The preview (`src/dll/Dexmenu.Preview.pas`, exported `DexmenuPreviewCreate`, `DexmenuPreviewSet`,
+  `DexmenuBaseLayout`): a child window of the settings app; the seen items made into a real Windows menu again, then
+  the same tree, placement and drawing as a right-click (the drawing split into rendering a level into an image and
+  showing it: a layered window for the menu, painted into the preview). Live: hover, submenus open next to their
+  card after Windows' delay or on a click, Esc; a choice does nothing. It writes the same dump as the menu.
+- The settings app (`src/settings`, .NET 10, WinForms, WebView2 1.0.4258.31 as LexPen, built by `build.cmd` into
+  `bin` next to the DLL): left, `web\index.html` with the kind of right-click and the layout's cards as a tree (read
+  only); right, the preview. The layout file (`DEXMENU_LAYOUT_FILE`, else `settings.json`'s, else the built-in base),
+  `settings.json` and the seen items are watched; a change redraws both panes.
+- Tested (`tests/run-tests.ps1`): a right-click recorded, the app started on it: the preview's cards are the menu's
+  (text, order, state, submenu mark); the layout file changed while it runs: the preview shows the new layout. The
+  host's output is UTF-8 now, so titles beyond ASCII compare. Each host run is guarded (killed and failed after a
+  minute), and on its own time-out the host closes Dexmenu's menu itself.
+- Seen by hand: a screenshot of the app with the preview of a file's menu.

@@ -45,6 +45,7 @@ type
     FOwner: HWND;
     FFlags: UINT;
     FLayout: ILayout;
+    FKind: string;
     FTop: TNodes;
     FPlacement: TPlacement;
     FLevels: TObjectList<TLevelWindow>;
@@ -66,7 +67,7 @@ type
     procedure Dump;
     function IsOurs(Wnd: HWND): Boolean;
   public
-    constructor Create(Original: HMENU; Owner: HWND; Flags: UINT; const Layout: ILayout);
+    constructor Create(Original: HMENU; Owner: HWND; Flags: UINT; const Layout: ILayout; const Kind: string);
     destructor Destroy; override;
     // Shows the menu and returns as TrackPopupMenuEx would.
     function Run(X, Y: Integer; Params: PTPMParams): BOOL;
@@ -82,7 +83,7 @@ threadvar
 implementation
 
 uses
-  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log;
+  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen;
 
 const
   MenuClassName = 'DexmenuMenu';
@@ -148,9 +149,11 @@ end;
 
 // ---- the session -----------------------------------------------------------------------------------------------------
 
-constructor TMenuSession.Create(Original: HMENU; Owner: HWND; Flags: UINT; const Layout: ILayout);
+constructor TMenuSession.Create(Original: HMENU; Owner: HWND; Flags: UINT; const Layout: ILayout;
+  const Kind: string);
 begin
   inherited Create;
+  FKind := Kind;
   FOriginal := Original;
   FOwner := Owner;
   FFlags := Flags;
@@ -276,7 +279,7 @@ begin
     SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(FOriginal), MakeLParam(0, 0));
   end;
   FTop := ReadLevel(FOriginal, '');
-  FPlacement := TPlacement.Create(FLayout, 'default', FTop);
+  FPlacement := TPlacement.Create(FLayout, FKind, FTop);
 
   L := TLevelWindow.Create;
   L.Session := Self;
@@ -314,6 +317,7 @@ begin
   end;
 
   FLevels.Clear;   // the windows gone
+  WriteSeen(FKind, FTop);   // for the settings app's preview (Dexmenu.Seen)
   if Notify then
   begin
     SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(FOriginal), 0);
@@ -577,7 +581,7 @@ begin
   if FLevels.Count = 0 then
     Exit;
   NewTop := ReadLevel(FOriginal, '');
-  NewPlacement := TPlacement.Create(FLayout, 'default', NewTop);
+  NewPlacement := TPlacement.Create(FLayout, FKind, NewTop);
   OldViews := TObjectList<TViewLevel>.Create;
   try
     for I := 0 to FLevels.Count - 1 do

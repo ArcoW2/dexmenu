@@ -13,7 +13,7 @@ uses
   Winapi.Windows;
 
 // A shell right-click menu being built (the handler's QueryContextMenu). Sets the hooks the first time.
-procedure NoteMenu(Menu: HMENU; Flags: UINT);
+procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind: string);
 
 implementation
 
@@ -50,14 +50,24 @@ var
 
   NotedLock: TCriticalSection;
   Noted: TList<HMENU>;
+  NotedKinds: TList<string>;   // the kind of right-click of each noted menu
   HooksLock: TCriticalSection;
   HooksTried, HooksSet: Boolean;
 
-function TakeNoted(Menu: HMENU): Boolean;
+function TakeNoted(Menu: HMENU; out Kind: string): Boolean;
+var
+  I: Integer;
 begin
   NotedLock.Enter;
   try
-    Result := Noted.Remove(Menu) >= 0;
+    I := Noted.IndexOf(Menu);
+    Result := I >= 0;
+    if Result then
+    begin
+      Kind := NotedKinds[I];
+      Noted.Delete(I);
+      NotedKinds.Delete(I);
+    end;
   finally
     NotedLock.Leave;
   end;
@@ -128,10 +138,11 @@ var
   Layout: ILayout;
   Error: string;
   Session: TMenuSession;
+  Kind: string;
 begin
   Result := False;
   Shown := False;
-  if not TakeNoted(Menu) or not Enabled or (ActiveSession <> nil) then
+  if not TakeNoted(Menu, Kind) or not Enabled or (ActiveSession <> nil) then
   begin
     if Tracing then
       Log(Format('show %s (%d items): not noted, passed through', [Hex(Menu), GetMenuItemCount(Menu)]));
@@ -144,8 +155,9 @@ begin
     Exit;
   end;
   if Tracing then
-    Log(Format('show %s (%d items): Dexmenu''s menu, layout %s', [Hex(Menu), GetMenuItemCount(Menu), Layout.Source]));
-  Session := TMenuSession.Create(Menu, Owner, Flags, Layout);
+    Log(Format('show %s (%d items): Dexmenu''s menu, kind %s, layout %s', [Hex(Menu), GetMenuItemCount(Menu), Kind,
+      Layout.Source]));
+  Session := TMenuSession.Create(Menu, Owner, Flags, Layout, Kind);
   try
     Shown := True;
     Result := Session.Run(X, Y, Params);
@@ -226,7 +238,7 @@ begin
   end;
 end;
 
-procedure NoteMenu(Menu: HMENU; Flags: UINT);
+procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind: string);
 var
   I: Integer;
 begin
@@ -236,19 +248,29 @@ begin
   try
     for I := Noted.Count - 1 downto 0 do
       if not IsMenu(Noted[I]) then
+      begin
         Noted.Delete(I);
-    if Noted.IndexOf(Menu) < 0 then
+        NotedKinds.Delete(I);
+      end;
+    I := Noted.IndexOf(Menu);
+    if I < 0 then
+    begin
       Noted.Add(Menu);
+      NotedKinds.Add(Kind);
+    end
+    else
+      NotedKinds[I] := Kind;
   finally
     NotedLock.Leave;
   end;
   if Tracing then
-    Log(Format('noted %s (%d items so far, flags %u)', [Hex(Menu), GetMenuItemCount(Menu), Flags]));
+    Log(Format('noted %s (%d items so far, flags %u, kind %s)', [Hex(Menu), GetMenuItemCount(Menu), Flags, Kind]));
 end;
 
 initialization
   NotedLock := TCriticalSection.Create;
   Noted := TList<HMENU>.Create;
+  NotedKinds := TList<string>.Create;
   HooksLock := TCriticalSection.Create;
 
 end.

@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: the item tree and the window's first form (plan 00 steps 2 and 3).
+- 2026-11-21: partly executed: the preview's first form (plan 00 step 4).
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -39,6 +40,7 @@ the preview is the result.
 |---|---|---|
 | Item tree | Windows' menu read into a tree (names, paths, ids, states), a submenu read when opened, read again on a change while shown | 3.2; plan 00 6.3 |
 | Window, first form | Dexmenu's own window: plain cards one per line, keys, mouse, submenus, closing, the id handed back; the remaining card only; one built-in look | 3.6; 3.7; plan 00 6.3 |
+| Preview, first form | the DLL draws the menu in the settings app from the seen items and the layout, live, redrawn on a change | 3.8; plan 00 6.4 |
 
 ### Not yet built
 

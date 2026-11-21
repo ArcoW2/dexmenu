@@ -26,6 +26,8 @@
 #include <shlobj.h>
 #include <shobjidl_core.h>
 #include <cstdio>
+#include <fcntl.h>
+#include <io.h>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -265,6 +267,15 @@ bool OwnMenuVisible()
     return found;
 }
 
+// Every visible DexmenuMenu window of this thread gets Esc (the way out when the dump cannot be read).
+BOOL CALLBACK EscapeOwnMenu(HWND wnd, LPARAM)
+{
+    wchar_t cls[64] = {};
+    GetClassNameW(wnd, cls, 64);
+    if (IsWindowVisible(wnd) && wcscmp(cls, L"DexmenuMenu") == 0) PostMessageW(wnd, WM_KEYDOWN, VK_ESCAPE, 0);
+    return TRUE;
+}
+
 void ApplyLate()
 {
     if (lateDisable)
@@ -295,8 +306,12 @@ void Tick(HWND hwnd)
     {
         timedOut = true;
         finished = true;
+        const auto levels = ParseDump(ReadUtf8(dumpPath));
+        fwprintf(stderr, L"timed out: state %d, own menu %s, %zu level(s) in the dump\n", state,
+            OwnMenuVisible() ? L"visible" : L"not visible", levels.size());
         EndMenu();
-        Escape(ParseDump(ReadUtf8(dumpPath)));
+        EnumThreadWindows(GetCurrentThreadId(), EscapeOwnMenu, 0);
+        EnumThreadWindows(GetCurrentThreadId(), EscapeOwnMenu, 0);
         return;
     }
     if (WindowsMenuVisible())
@@ -412,6 +427,7 @@ int wmain(int argc, wchar_t** argv)
         else if (a == L"--expect-windows") expectWindows = true;
         else paths.push_back(a);
     }
+    _setmode(_fileno(stdout), _O_U8TEXT);   // UTF-8, so titles beyond ASCII survive a redirect
     if (paths.empty()) { fwprintf(stderr, L"usage: see the comment at the top of DexmenuTest.cpp\n"); return 2; }
     wchar_t env[8] = {};
     on = GetEnvironmentVariableW(L"DEXMENU", env, 8) && wcscmp(env, L"1") == 0;

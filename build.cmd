@@ -33,6 +33,9 @@ call "%VS%\VC\Auxiliary\Build\vcvars64.bat" >nul 2>nul || exit /b 1
 cl /nologo /O2 /EHsc /std:c++20 /W4 /WX /MT /Fo"%OBJ%\host\\" "%ROOT%tests\host\DexmenuTest.cpp" ^
   /link /OUT:"%OUT%\DexmenuTest.exe" shell32.lib ole32.lib user32.lib shlwapi.lib || exit /b 1
 
+rem The settings app (.NET 10), into bin next to the DLL it loads.
+dotnet build "%ROOT%src\settings\Dexmenu.Settings.csproj" -c Release --nologo -v q || exit /b 1
+
 del /q "%OUT%\DexmenuShell.*.old" 2>nul
 copy /y "%OBJ%\dll\DexmenuShell.dll" "%OUT%\DexmenuShell.dll" >nul 2>nul && exit /b 0
 ren "%OUT%\DexmenuShell.dll" "DexmenuShell.%RANDOM%%RANDOM%.old" || exit /b 1
