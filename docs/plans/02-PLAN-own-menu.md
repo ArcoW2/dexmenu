@@ -43,7 +43,7 @@ the preview is the result.
 |---|---|---|---|
 | Item tree | Windows' menu read into a tree with names and paths, kept live while shown | plan 01 Delphi DLL | 3.1; 3.2 |
 | Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the rules' priority list, several found, the remaining card | Item tree | 3.3 |
-| Layout editing | dragging cards: onto a card makes a menu (its rules kept in a first card), moving, the remaining card | Rules; plan 01 Settings app | 3.5 |
+| Layout editing | the cards view and the rules view (priority list, draggable); dragging cards: onto a card makes a menu (its rules kept in a first card), moving, the remaining card; preview and editor tied (an item shows the card and rule that placed it) | Rules; plan 01 Settings app | 3.5 |
 | Settings and layouts | global settings; layouts per kind of right-click, saved under a name; JSON with comments | Rules | 3.4; 3.5 |
 | Window | Dexmenu's own window, drawn by the Delphi DLL: lines of cards, keys, mouse, closing, the id handed back | Settings and layouts | 3.6; 3.7; 3.8 |
 | Submenus | next to, half under, or in place of the menu; on hover or on click; filled when opened (Send to) | Window | 3.7 |
@@ -185,8 +185,16 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   - dragging the last card out of a submenu: it keeps its rules, and the parent becomes a card with rules that has
     none. It stays in the layout, finds nothing and is not shown in the menu;
   - the remaining card is moved as any other, never deleted;
-  - the rules' priority list (3.3) in a list of its own beside the cards, ordered by dragging; selecting a rule there
-    marks its card in the editor and the preview, and the other way round;
+  - the editor's left pane shows two views of one layout:
+    - **the cards:** the layout's cards as a tree of lines and submenus, as they stand; clicking a card opens it: its
+      title, extra text, kind (rules or a menu), its rules, its look. Each rule on a card shows its number in the
+      priority list, so the order is visible throughout the cards;
+    - **the rules:** the priority list (3.3): one row per rule, in order, with its number, the card it belongs to
+      and the rule itself; the order changed by dragging a row. The remaining card's rule shown last, fixed.
+    Selecting a card or a rule in one view selects it in the other;
+  - the preview and the editor are tied: clicking or hovering over an item in the preview selects the layout card
+    that placed it, and the rule that found it (the DLL reports which card and rule placed each item); selecting a
+    card in the editor marks the items it placed in the preview;
   - cards that can never show anything are marked in the editor and the preview with a red outline (plan 03 3.10):
     a card with no rules, and a card with a rule that is invalid (a bad regex, a scope and a path both given). The
     layout is still saved and used; such a card is left out of the menu.
@@ -337,6 +345,9 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
   expected and several found,
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
+- Editor views: a rule dragged in the rules view changes the order, its number on its card, and the preview; an
+  item clicked or hovered in the preview selects the card and rule that placed it; a card selected marks its items
+  in the preview.
 - Editing: a card dropped onto a card with rules makes a card with a menu whose first card has those rules; onto a
   card with a menu, it joins it; the last card of a submenu deleted, its parent a card with rules with its rules;
   the last card dragged out, its parent a card without rules, outlined red; an invalid rule outlined red; the

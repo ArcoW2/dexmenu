@@ -89,8 +89,11 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 
 ### 3.5 Step 5: editing
 
-- What: plan 02 3.3 and 3.5 in the editor: cards added, removed, titled; rules on a card (name, scope or path, match
-  kinds, states); cards with a menu; dragging cards onto cards and between lines (rules kept as plan 02 3.5 says);
+- What: plan 02 3.3 and 3.5 in the editor: the cards view (click a card, set its title and rules; each rule showing
+  its number in the priority list) and the rules view (the priority list: number, card, rule; draggable); the
+  preview tied to both (an item clicked or hovered shows the card and rule that placed it); cards added, removed,
+  titled; rules on a card (name, scope or path, match kinds, states); subitems following a found item; cards with a
+  menu; dragging cards onto cards and between lines (rules kept as plan 02 3.5 says);
   the remaining card moved but never deleted; red outlines for useless cards; the extra text; named layouts (save,
   save as, active); per kind of right-click. Every change shown at once in the preview (the editor tells the DLL).
 - Done when: plan 02 3.12's rule and editing tests pass; a layout made in the editor shows in Explorer as in the
