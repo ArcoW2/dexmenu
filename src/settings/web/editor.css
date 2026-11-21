@@ -48,6 +48,7 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .card.over { box-shadow: 0 0 0 2px var(--accent) inset; }
 .card.useless { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
 .card.remaining { border-style: dashed; }
+.card.hidden { opacity: .55; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px), var(--card); }
 .card .title { font-weight: 600; display: flex; gap: 6px; align-items: baseline; }
 .card .what { color: var(--dim); font-size: 12px; }
 .badge { font-size: 11px; font-weight: normal; color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 0 5px; }

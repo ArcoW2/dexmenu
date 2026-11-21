@@ -123,6 +123,9 @@ in the layout is where its items show.
   its own line at the card's place, in the order found: one item, several, or none (then nothing shows). The card's
   title is the item's when it found one. So a card with a menu holds an unknown number of found items beside cards
   of its own (a menu "Open..." with a card finding the items of Windows' "Open with" and a card of the user's own).
+- **Hidden:** a card with `hidden: true` shows nothing, while its rules (and those of the cards in its menu) still
+  take their items: a way to leave items out of the menu, the remaining card included. The editor draws a hidden
+  card with diagonal stripes. The remaining card cannot be hidden.
 - **Templates for items placed in a submenu:** items that Dexmenu puts in a submenu itself (the subitems following a
   found item) are cards that are not in the layout; they get their look from
   a template card. A layout has one template card for them; it has no rules, only a look (plan 03 3.6). A card can

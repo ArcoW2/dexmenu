@@ -13,7 +13,8 @@ unit Dexmenu.Place;
 // A card with rules places what it found where it stands, as the remaining card does: each found item a card of its
 // own on its own line, in the order found (one item: the card's title, when it has one, is the item's); found none:
 // nothing. So a card with a menu holds an unknown number of found items beside cards of its own. A card with a menu
-// opens its lines. A Windows submenu opened from a card shows its items,
+// opens its lines. A hidden card ("hidden": true) shows nothing, while its rules (and those in its menu) still take
+// their items: a way to leave items out, even of the remaining card. The remaining card cannot be hidden. A Windows submenu opened from a card shows its items,
 // less those a rule took directly.
 //
 // Items are keyed by the menu they sit in and their id, not by object: a submenu's items are read again when it opens.
@@ -420,7 +421,9 @@ begin
   begin
     Out := nil;
     for Card in Line.Cards do
-      if Card.IsRemaining then
+      if Card.Hidden and not Card.IsRemaining then
+        Continue
+      else if Card.IsRemaining then
       begin
         Out := nil;   // the remaining items each take a line of their own
         for N in P.Remaining do

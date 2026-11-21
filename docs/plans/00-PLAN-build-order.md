@@ -255,6 +255,9 @@ None.
   for the tests. Tested: a suite case (a file in the work folder: LexPen's items, 7-Zip's submenu filled; a folder's
   empty part: a menu); by a run here, this repository's empty part shows TortoiseGit's Pull, Push and Commit, a
   folder outside it Clone and Create repository. The bar itself only started, not driven by a test.
+- Hidden cards (plan 02 3.3): `"hidden": true` on a card; a checkbox in the card's panel, the card striped and
+  dimmed in the cards view. Tested: unit tests (its items nowhere, also not in the remaining card; a hidden card with
+  a menu; the remaining card not hidden).
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

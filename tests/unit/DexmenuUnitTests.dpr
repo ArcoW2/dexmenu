@@ -374,6 +374,14 @@ begin
     'title: a card''s own title for its one item');
   Expect(Shows('[ ' + Card('Nothing', '{ "name": { "equals": "No such item" } }') + ', ' + Rest + ' ]'), AllRest,
     'found none: the card is not shown');
+  Expect(Shows('[ ' + Card('Skip', '{ "name": { "contains": "LexPen" } }', ', "hidden": true') + ', ' + Rest + ' ]'),
+    'I:Open / I:Open with / - / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties',
+    'hidden: its items show nowhere, not in the remaining card either');
+  Expect(Shows('[ { "line": [ { "card": "More", "hidden": true, "menu": [ ' + Card('Clip', '{ "name": { "any": [ "Cut", "Copy" ] } }') +
+    ' ] } ] }, ' + Rest + ' ]'), 'I:Open / I:Open with / - / I:Edit in LexPen / I:View in LexPen / I:Disabled thing / I:7-Zip / - / I:Delete / I:Properties',
+    'a hidden card with a menu: the rules in it still take their items');
+  Expect(Shows('[ { "line": [ { "card": "Rest", "hidden": true, "rules": [ "remaining" ] } ] } ]'), AllRest,
+    'the remaining card cannot be hidden');
 end;
 
 // The seen items merged (Dexmenu.Seen): names, '*' for "sometimes", a submenu's items in [ ], '-' a separator.

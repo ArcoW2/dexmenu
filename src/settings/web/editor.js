@@ -50,6 +50,7 @@ function ruleBadges(card) {
 }
 
 function describeCard(card) {
+  if (card.hidden && !M.isRemaining(card)) return "hidden: what it finds is left out of the menu";
   if (card.menu) return "a card with a menu";
   if (M.isRemaining(card)) return "the remaining card: every item no rule took, each a card of its own here";
   const n = (card.rules || []).length;
@@ -91,6 +92,7 @@ function renderCard(card) {
   if (card.id === hoverId) classes.push("hover");
   if (M.useless(card)) classes.push("useless");
   if (M.isRemaining(card)) classes.push("remaining");
+  if (card.hidden && !M.isRemaining(card)) classes.push("hidden");
   const box = el("div", classes.join(" "));
   box.draggable = true;
   box.dataset.id = card.id;
@@ -247,6 +249,17 @@ function renderCardPane() {
     card.menu ? "(its name)" : "(the item's own text for one item)"));
   box.append(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
     "(shown with the look, step 6)"));
+  if (!M.isRemaining(card)) {
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.checked = !!card.hidden;
+    cb.addEventListener("change", () => { if (cb.checked) card.hidden = true; else delete card.hidden; changed(); });
+    const l = el("label", "field");
+    l.title = "Its rules still take their items, so they show nowhere, not in the remaining card either";
+    l.append(el("span", "", "Hidden"), el("span"));
+    l.lastChild.append(cb, " not shown: what it finds is left out of the menu");
+    box.append(l);
+  }
   if (!card.menu)
     box.append(textField("Rename (regex)", card.rename && card.rename.regex, v => {
       if (v) card.rename = { regex: v, replace: (card.rename && card.rename.replace) || "" }; else delete card.rename;
