@@ -9,7 +9,10 @@ uses
   Dexmenu.Menus in 'Dexmenu.Menus.pas',
   Dexmenu.Json in 'Dexmenu.Json.pas',
   Dexmenu.Layout in 'Dexmenu.Layout.pas',
-  Dexmenu.Arrange in 'Dexmenu.Arrange.pas',
+  Dexmenu.Tree in 'Dexmenu.Tree.pas',
+  Dexmenu.Place in 'Dexmenu.Place.pas',
+  Dexmenu.Draw in 'Dexmenu.Draw.pas',
+  Dexmenu.Menu in 'Dexmenu.Menu.pas',
   Dexmenu.Hook in 'Dexmenu.Hook.pas',
   Dexmenu.Handler in 'Dexmenu.Handler.pas';
 

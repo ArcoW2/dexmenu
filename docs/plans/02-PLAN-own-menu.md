@@ -1,8 +1,9 @@
 # Plan 02: Dexmenu's own menu: drawn by Dexmenu, cards and rows, every item found by rules
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-21: draft.
+- 2026-11-21: partly executed: the item tree and the window's first form (plan 00 steps 2 and 3).
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -36,12 +37,13 @@ the preview is the result.
 
 | Part | What | Reference |
 |---|---|---|
+| Item tree | Windows' menu read into a tree (names, paths, ids, states), a submenu read when opened, read again on a change while shown | 3.2; plan 00 6.3 |
+| Window, first form | Dexmenu's own window: plain cards one per line, keys, mouse, submenus, closing, the id handed back; the remaining card only; one built-in look | 3.6; 3.7; plan 00 6.3 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Item tree | Windows' menu read into a tree with names and paths, kept live while shown | plan 01 Delphi DLL | 3.1; 3.2 |
 | Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the rules' priority list, several found, the remaining card | Item tree | 3.3 |
 | Layout editing | the cards view and the rules view (priority list, draggable); dragging cards: onto a card makes a menu (its rules kept in a first card), moving, the remaining card; preview and editor tied (an item shows the card and rule that placed it) | Rules; plan 01 Settings app | 3.5 |
 | Settings and layouts | global settings; layouts per kind of right-click, saved under a name; JSON with comments | Rules | 3.4; 3.5 |

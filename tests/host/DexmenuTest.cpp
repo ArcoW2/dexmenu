@@ -1,23 +1,33 @@
-// DexmenuTest.exe: the test host of docs/plans/01-PLAN-dexmenu.md 3.11. Builds Windows' right-click menu for the given
-// files and folders as Explorer does (the parent folder's IContextMenu, QueryContextMenu), reads it, then shows it with
-// TrackPopupMenuEx and reads the menu actually shown (the HMENU of the first WM_INITMENUPOPUP) before closing it.
+// DexmenuTest.exe: the test host (docs/plans/01-PLAN-dexmenu.md 3.11, 02-PLAN-own-menu.md 3.12, plan 00 step 3).
+// Builds Windows' right-click menu for the given files and folders as Explorer does (the parent folder's IContextMenu,
+// QueryContextMenu), reads it, then shows it with TrackPopupMenuEx as Explorer does.
 //
-//   DexmenuTest.exe [--group "from LexPen"] [--prefix LexPen.] <path> [<path> ...]   (all in one folder)
+//   DexmenuTest.exe [--prefix LexPen.] [--late] [--choose <verb>] [--open <text>] [--expect-windows] <path> [...]
+//   DexmenuTest.exe --invoke <verb> <path> [...]
 //
-// The items under test are identified by their verb (GetCommandString GCS_VERBW starting with --prefix), not by text,
-// so the check does not lean on the layout's patterns. With DEXMENU=1 (Dexmenu on) the shown menu must hold those
-// items, exactly as Windows' menu has them (text, id, state, type, bitmap, submenu), in a submenu named --group, and
-// every other item as in Windows' menu, in its order. Without it, the shown menu must be Windows' menu. Either way,
-// after the call Windows' menu must be as it was. With --late, while the menu is shown the host makes Explorer's
-// later calls on Windows' menu by id (the first item under test disabled, the last deleted): the shown menu and
-// Windows' menu after the call must have those changes. Exit code 0: pass. Run it with DEXMENU set to 1 or 0: without it
-// the DLL follows the registry (HKCU\Software\Dexmenu Enabled), and the host's checks for "off" would not hold.
+// DEXMENU=0 (off): the shown menu (the HMENU of the first WM_INITMENUPOPUP) must be Windows' menu.
+// DEXMENU=1 (on): Dexmenu's own menu must show (a DexmenuMenu window, no Windows menu window); it is read from the
+// file DEXMENU_DUMP names, which the DLL writes after each redraw. With the base layout every top-level item of
+// Windows' menu must be a card, in Windows' order, with its id, text, state and submenu mark. The host acts on the
+// real window from a timer (which runs inside the menu's loop): Esc, a click on a card (--choose: the card of that
+// verb; the call must return its id), or a click on a submenu card (--open: the card of that text; its level must
+// show with items, filled when opened as Send to is). --expect-windows: Windows' own menu must show instead (a broken
+// layout).
+//
+// --late, either way: while the menu is shown, Explorer's later calls are made on Windows' menu by id (the first item
+// whose verb starts with --prefix disabled, the last deleted); the shown menu and Windows' menu after the call must have
+// those changes.
+//
+// The items under test are found by their verb (GetCommandString GCS_VERBW), not their text. Exit code 0: pass. Run it
+// with DEXMENU set to 1 or 0: without it the DLL follows the registry.
 
 #define NOMINMAX
 #include <windows.h>
 #include <shlobj.h>
 #include <shobjidl_core.h>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -29,19 +39,41 @@ struct Node
 {
     std::wstring text, verb;
     UINT id = 0, state = 0, type = 0;
-    HBITMAP bitmap = nullptr;
-    ULONG_PTR data = 0;
     HMENU sub = nullptr;
     std::vector<Node> children;
+};
+
+// A card as the DLL's dump has it.
+struct Card
+{
+    std::wstring kind, text;
+    UINT id = 0;
+    bool enabled = false, sub = false;
+    int x = 0, y = 0;   // its middle, screen pixels
+};
+
+struct Level
+{
+    int index = 0, x = 0, y = 0;
+    HWND wnd = nullptr;
+    std::vector<Card> cards;
 };
 
 IContextMenu* menu = nullptr;
 IContextMenu3* menu3 = nullptr;
 HMENU windowsMenu = nullptr;
-UINT lateDisable = 0, lateDelete = 0;   // --late: what is changed on Windows' menu while it is shown
-HMENU shownTop = nullptr;
-std::vector<Node> shown;
-bool sawShown = false;
+bool on = false;
+UINT lateDisable = 0, lateDelete = 0;
+std::wstring dumpPath, chooseVerb, openText;
+int holdMs = 0;   // --hold: the menu left open this long before the test acts (for a screenshot)
+UINT chooseId = 0;
+
+// What happened while the menu was shown.
+bool sawWindowsMenu = false, sawOwnMenu = false, lateApplied = false, finished = false, timedOut = false;
+std::vector<Node> shownWindows;       // off: the Windows menu shown
+std::vector<Level> ownFirst, ownLate, ownOpened;
+int ticks = 0, state = 0;
+std::wstring lastDump;
 
 std::wstring VerbOf(UINT id)
 {
@@ -51,13 +83,28 @@ std::wstring VerbOf(UINT id)
     return verb;
 }
 
+// The text without & and the accelerator, as the DLL names items.
+std::wstring NameOf(const std::wstring& text)
+{
+    std::wstring name;
+    for (size_t i = 0; i < text.size() && text[i] != L'\t'; i++)
+    {
+        if (text[i] == L'&' && i + 1 < text.size() && text[i + 1] != L'&') continue;
+        if (text[i] == L'&') i++;
+        if (i < text.size()) name += text[i];
+    }
+    while (!name.empty() && name.back() == L' ') name.pop_back();
+    while (!name.empty() && name.front() == L' ') name.erase(0, 1);
+    return name;
+}
+
 std::vector<Node> Tree(HMENU m, int depth)
 {
     std::vector<Node> nodes;
     const int count = GetMenuItemCount(m);
     for (int i = 0; i < count; i++)
     {
-        MENUITEMINFOW info = { sizeof(info), MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_BITMAP | MIIM_DATA | MIIM_STRING };
+        MENUITEMINFOW info = { sizeof(info), MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_STRING };
         wchar_t text[512] = {};
         info.dwTypeData = text;
         info.cch = 512;
@@ -66,10 +113,8 @@ std::vector<Node> Tree(HMENU m, int depth)
         n.type = info.fType;
         n.state = info.fState & (MFS_DISABLED | MFS_CHECKED | MFS_DEFAULT);
         n.id = info.wID;
-        n.bitmap = info.hbmpItem;
-        n.data = info.dwItemData;
         n.sub = info.hSubMenu;
-        if (!(info.fType & (MFT_SEPARATOR | MFT_OWNERDRAW | MFT_BITMAP))) n.text = text;
+        if (!(info.fType & (MFT_SEPARATOR | MFT_BITMAP))) n.text = text;
         if (!n.sub && !(info.fType & MFT_SEPARATOR)) n.verb = VerbOf(n.id);
         if (n.sub && depth > 0) n.children = Tree(n.sub, depth - 1);
         nodes.push_back(n);
@@ -86,7 +131,6 @@ std::wstring Describe(const Node& n)
     if (n.state & MFS_DISABLED) s += L" disabled";
     if (n.state & MFS_CHECKED) s += L" checked";
     if (n.state & MFS_DEFAULT) s += L" default";
-    if (n.type & MFT_OWNERDRAW) s += L" ownerdraw";
     if (n.sub) s += L" submenu";
     if (!n.verb.empty()) s += L" verb=" + n.verb;
     return s;
@@ -101,11 +145,9 @@ void Print(const std::vector<Node>& nodes, int indent)
     }
 }
 
-// The same item: everything Windows' menu has for it (the submenu by handle: moved, not copied).
 bool Same(const Node& a, const Node& b)
 {
-    return a.text == b.text && a.id == b.id && a.state == b.state && a.type == b.type && a.bitmap == b.bitmap
-        && a.data == b.data && a.sub == b.sub;
+    return a.text == b.text && a.id == b.id && a.state == b.state && a.type == b.type && a.sub == b.sub;
 }
 
 bool SameList(const std::vector<Node>& a, const std::vector<Node>& b)
@@ -117,10 +159,217 @@ bool SameList(const std::vector<Node>& a, const std::vector<Node>& b)
 
 int failures = 0;
 
-void Check(bool ok, const wchar_t* what)
+void Check(bool ok, const std::wstring& what)
 {
-    wprintf(L"%s %s\n", ok ? L"PASS" : L"FAIL", what);
+    wprintf(L"%s %s\n", ok ? L"PASS" : L"FAIL", what.c_str());
     if (!ok) failures++;
+}
+
+// ---- the DLL's dump -----------------------------------------------------------------------------------------------
+
+std::wstring ReadUtf8(const std::wstring& path)
+{
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+    std::stringstream ss;
+    ss << f.rdbuf();
+    std::string bytes = ss.str();
+    if (bytes.size() >= 3 && static_cast<unsigned char>(bytes[0]) == 0xEF) bytes.erase(0, 3);
+    const int n = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), nullptr, 0);
+    std::wstring text(n, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), text.data(), n);
+    return text;
+}
+
+std::wstring Field(const std::wstring& line, const std::wstring& name)
+{
+    const auto at = line.find(L" " + name + L"=");
+    if (at == std::wstring::npos) return {};
+    const auto start = at + name.size() + 2;
+    if (name == L"text") return line.substr(start);
+    const auto end = line.find(L' ', start);
+    return line.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+}
+
+std::vector<Level> ParseDump(const std::wstring& text)
+{
+    std::vector<Level> levels;
+    std::wistringstream in(text);
+    std::wstring line;
+    while (std::getline(in, line))
+    {
+        if (!line.empty() && line.back() == L'\r') line.pop_back();
+        if (line.rfind(L"level ", 0) == 0)
+        {
+            Level l;
+            l.index = _wtoi(line.c_str() + 6);
+            l.wnd = reinterpret_cast<HWND>(static_cast<INT_PTR>(_wtoi64(Field(line, L"wnd").c_str())));
+            l.x = _wtoi(Field(line, L"x").c_str());
+            l.y = _wtoi(Field(line, L"y").c_str());
+            levels.push_back(l);
+        }
+        else if (line.rfind(L"card ", 0) == 0 && !levels.empty())
+        {
+            Card c;
+            c.kind = line.substr(5, line.find(L' ', 5) - 5);
+            c.id = static_cast<UINT>(_wtoi(Field(line, L"id").c_str()));
+            c.enabled = Field(line, L"enabled") == L"1";
+            c.sub = Field(line, L"sub") == L"1";
+            c.x = _wtoi(Field(line, L"x").c_str());
+            c.y = _wtoi(Field(line, L"y").c_str());
+            c.text = Field(line, L"text");
+            levels.back().cards.push_back(c);
+        }
+    }
+    return levels;
+}
+
+void PrintLevels(const std::vector<Level>& levels)
+{
+    for (const auto& l : levels)
+    {
+        wprintf(L"  level %d\n", l.index);
+        for (const auto& c : l.cards)
+            wprintf(L"    %s \"%s\" id=%u%s%s\n", c.kind.c_str(), c.text.c_str(), c.id, c.enabled ? L"" : L" disabled",
+                c.sub ? L" submenu" : L"");
+    }
+}
+
+BOOL CALLBACK FindWindowsMenu(HWND wnd, LPARAM found)
+{
+    wchar_t cls[64] = {};
+    GetClassNameW(wnd, cls, 64);
+    if (IsWindowVisible(wnd) && wcscmp(cls, L"#32768") == 0) *reinterpret_cast<bool*>(found) = true;
+    return TRUE;
+}
+
+bool WindowsMenuVisible()
+{
+    bool found = false;
+    EnumThreadWindows(GetCurrentThreadId(), FindWindowsMenu, reinterpret_cast<LPARAM>(&found));
+    return found;
+}
+
+BOOL CALLBACK FindOwnMenu(HWND wnd, LPARAM found)
+{
+    wchar_t cls[64] = {};
+    GetClassNameW(wnd, cls, 64);
+    if (IsWindowVisible(wnd) && wcscmp(cls, L"DexmenuMenu") == 0) *reinterpret_cast<bool*>(found) = true;
+    return TRUE;
+}
+
+bool OwnMenuVisible()
+{
+    bool found = false;
+    EnumThreadWindows(GetCurrentThreadId(), FindOwnMenu, reinterpret_cast<LPARAM>(&found));
+    return found;
+}
+
+void ApplyLate()
+{
+    if (lateDisable)
+    {
+        MENUITEMINFOW info = { sizeof(info), MIIM_STATE };
+        info.fState = MFS_DISABLED;
+        SetMenuItemInfoW(windowsMenu, lateDisable, FALSE, &info);
+    }
+    if (lateDelete) DeleteMenu(windowsMenu, lateDelete, MF_BYCOMMAND);
+    lateApplied = true;
+}
+
+void Click(const Level& l, const Card& c)
+{
+    PostMessageW(l.wnd, WM_LBUTTONUP, 0, MAKELPARAM(c.x - l.x, c.y - l.y));
+}
+
+void Escape(const std::vector<Level>& levels)
+{
+    if (!levels.empty()) PostMessageW(levels.front().wnd, WM_KEYDOWN, VK_ESCAPE, 0);
+}
+
+// The steps while Dexmenu's menu is shown, one per timer tick.
+void Tick(HWND hwnd)
+{
+    if (finished) return;
+    if (++ticks > 150 + holdMs / 60)   // the menu never did what was expected
+    {
+        timedOut = true;
+        finished = true;
+        EndMenu();
+        Escape(ParseDump(ReadUtf8(dumpPath)));
+        return;
+    }
+    if (WindowsMenuVisible())
+    {
+        sawWindowsMenu = true;
+        finished = true;
+        EndMenu();
+        return;
+    }
+    if (!OwnMenuVisible()) return;
+    sawOwnMenu = true;
+    const std::wstring text = ReadUtf8(dumpPath);
+    const auto levels = ParseDump(text);
+    if (levels.empty()) return;
+    switch (state)
+    {
+    case 0:   // the first picture
+        if (ticks * 60 < holdMs) return;
+        ownFirst = levels;
+        lastDump = text;
+        if (lateDisable || lateDelete)
+        {
+            ApplyLate();
+            state = 1;
+            return;
+        }
+        state = 2;
+        [[fallthrough]];
+    case 2:   // act
+        if (state == 1) return;
+        if (!chooseVerb.empty())
+        {
+            for (const auto& c : levels.front().cards)
+                if (c.id == chooseId && chooseId != 0)
+                {
+                    Click(levels.front(), c);
+                    finished = true;
+                    return;
+                }
+            finished = true;   // not there: the check fails
+            Escape(levels);
+            return;
+        }
+        if (!openText.empty())
+        {
+            for (const auto& c : levels.front().cards)
+                if (c.text == openText && c.sub)
+                {
+                    Click(levels.front(), c);
+                    state = 3;
+                    return;
+                }
+            finished = true;
+            Escape(levels);
+            return;
+        }
+        finished = true;
+        Escape(levels);
+        return;
+    case 1:   // waiting for the redraw after the late changes
+        if (text == lastDump) return;
+        ownLate = levels;
+        state = 2;
+        Tick(hwnd);
+        return;
+    case 3:   // waiting for the opened submenu
+        if (levels.size() < 2 || levels[1].cards.empty()) return;
+        ownOpened = levels;
+        finished = true;
+        PostMessageW(levels.front().wnd, WM_KEYDOWN, VK_ESCAPE, 0);
+        PostMessageW(levels.front().wnd, WM_KEYDOWN, VK_ESCAPE, 0);
+        return;
+    }
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -130,23 +379,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         LRESULT result = 0;
         if (SUCCEEDED(menu3->HandleMenuMsg2(msg, wp, lp, &result)) && msg != WM_INITMENUPOPUP) return result;
     }
-    if (msg == WM_INITMENUPOPUP && !sawShown)
+    if (msg == WM_INITMENUPOPUP && !on && shownWindows.empty() && reinterpret_cast<HMENU>(wp) == windowsMenu)
     {
-        sawShown = true;
-        shownTop = reinterpret_cast<HMENU>(wp);
-        // --late: as Explorer sets an Explorer command's state after the show: on Windows' menu, by id.
-        if (lateDisable)
-        {
-            MENUITEMINFOW info = { sizeof(info), MIIM_STATE };
-            info.fState = MFS_DISABLED;
-            SetMenuItemInfoW(windowsMenu, lateDisable, FALSE, &info);
-        }
-        if (lateDelete) DeleteMenu(windowsMenu, lateDelete, MF_BYCOMMAND);
-        shown = Tree(shownTop, 1);
+        // Off: Windows' menu is being shown; the late changes as Explorer makes them, then its items as shown.
+        if (lateDisable || lateDelete) ApplyLate();
+        shownWindows = Tree(windowsMenu, 1);
+        sawWindowsMenu = true;
         SetTimer(hwnd, 1, 50, nullptr);
         return 0;
     }
-    if (msg == WM_TIMER) { KillTimer(hwnd, static_cast<UINT_PTR>(wp)); EndMenu(); return 0; }
+    if (msg == WM_TIMER && wp == 1) { KillTimer(hwnd, 1); EndMenu(); return 0; }
+    if (msg == WM_TIMER && wp == 2) { Tick(hwnd); return 0; }
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
@@ -154,21 +397,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 int wmain(int argc, wchar_t** argv)
 {
-    std::wstring group = L"from LexPen", prefix = L"LexPen.", invoke;
-    bool late = false;
+    std::wstring prefix = L"LexPen.", invoke;
+    bool late = false, expectWindows = false;
     std::vector<std::wstring> paths;
     for (int i = 1; i < argc; i++)
     {
         const std::wstring a = argv[i];
-        if (a == L"--group" && i + 1 < argc) group = argv[++i];
-        else if (a == L"--prefix" && i + 1 < argc) prefix = argv[++i];
+        if (a == L"--prefix" && i + 1 < argc) prefix = argv[++i];
         else if (a == L"--invoke" && i + 1 < argc) invoke = argv[++i];
+        else if (a == L"--choose" && i + 1 < argc) chooseVerb = argv[++i];
+        else if (a == L"--open" && i + 1 < argc) openText = argv[++i];
         else if (a == L"--late") late = true;
+        else if (a == L"--hold" && i + 1 < argc) holdMs = _wtoi(argv[++i]);
+        else if (a == L"--expect-windows") expectWindows = true;
         else paths.push_back(a);
     }
-    if (paths.empty()) { fwprintf(stderr, L"usage: DexmenuTest [--group name] [--prefix verb-prefix] path...\n"); return 2; }
+    if (paths.empty()) { fwprintf(stderr, L"usage: see the comment at the top of DexmenuTest.cpp\n"); return 2; }
     wchar_t env[8] = {};
-    const bool on = GetEnvironmentVariableW(L"DEXMENU", env, 8) && wcscmp(env, L"1") == 0;
+    on = GetEnvironmentVariableW(L"DEXMENU", env, 8) && wcscmp(env, L"1") == 0;
+    wchar_t temp[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, temp);
+    dumpPath = std::wstring(temp) + L"dexmenu-dump-" + std::to_wstring(GetCurrentProcessId()) + L".txt";
+    SetEnvironmentVariableW(L"DEXMENU_DUMP", dumpPath.c_str());
+    DeleteFileW(dumpPath.c_str());
 
     if (FAILED(OleInitialize(nullptr))) return 2;
     WNDCLASSW wc = {};
@@ -197,6 +448,7 @@ int wmain(int argc, wchar_t** argv)
         reinterpret_cast<void**>(&menu)))) return 2;
     menu->QueryInterface(IID_PPV_ARGS(&menu3));
     const HMENU hmenu = CreatePopupMenu();
+    windowsMenu = hmenu;
     if (FAILED(menu->QueryContextMenu(hmenu, 0, First, Last, CMF_NORMAL | CMF_CANRENAME))) return 2;
 
     // --invoke verb: the item run as a program runs a choice (by its id), no UI; its result printed, nothing shown.
@@ -219,10 +471,10 @@ int wmain(int argc, wchar_t** argv)
     auto windows = Tree(hmenu, 1);
     wprintf(L"== Windows' menu\n");
     Print(windows, 2);
+    for (const auto& n : windows) if (n.verb == chooseVerb && !chooseVerb.empty()) chooseId = n.id;
 
     // --late: the first item under test disabled, the last (when there are two or more) deleted, while shown; what
-    // Windows' menu is expected to be from then on, shown and after.
-    windowsMenu = hmenu;
+    // Windows' menu is expected to be from then on.
     if (late)
     {
         std::vector<UINT> ids;
@@ -242,61 +494,83 @@ int wmain(int argc, wchar_t** argv)
     const auto& work = mi.rcWork;
     const POINT at = { cursor.x < (work.left + work.right) / 2 ? work.right - 1 : work.left,
                        cursor.y < (work.top + work.bottom) / 2 ? work.bottom - 1 : work.top };
+    if (on) SetTimer(hwnd, 2, 60, nullptr);
     const BOOL chosen = TrackPopupMenuEx(hmenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, at.x, at.y, hwnd, nullptr);
-    wprintf(L"== Shown menu (Dexmenu %s)\n", on ? L"on" : L"off");
-    Print(shown, 2);
-
-    Check(sawShown, L"the menu was shown");
+    KillTimer(hwnd, 2);
     wprintf(L"returned: %d\n", chosen);
-    Check(chosen == 0, L"closed without a choice: 0 returned");
-    const auto after = Tree(hmenu, 1);
-    Check(SameList(after, windows), L"after the call Windows' menu is as it was");
 
-    std::vector<Node> tested, others;   // Windows' top level: the items under test, the rest without lines
-    size_t othersBefore = SIZE_MAX;
-    for (const auto& n : windows)
-    {
-        if (IsLine(n)) continue;
-        if (!n.verb.empty() && n.verb.rfind(prefix, 0) == 0)
-        {
-            if (othersBefore == SIZE_MAX) othersBefore = others.size();
-            tested.push_back(n);
-        }
-        else others.push_back(n);
-    }
+    std::vector<Node> tested;
+    for (const auto& n : windows) if (!IsLine(n) && n.verb.rfind(prefix, 0) == 0) tested.push_back(n);
     wprintf(L"== Items with verb %s* in Windows' menu: ", prefix.c_str());
     for (const auto& n : tested) wprintf(L"[%s] ", Describe(n).c_str());
     wprintf(L"\n");
 
-    if (!on || tested.empty())
+    Check(SameList(Tree(hmenu, 1), windows), L"after the call Windows' menu is as expected (as it was, or with the late changes)");
+
+    if (!on || expectWindows)
     {
-        Check(shownTop == hmenu || SameList(shown, windows), on ? L"nothing to arrange: Windows' menu shown as it is" : L"Dexmenu off: Windows' menu shown as it is");
-        Check(SameList(shown, windows), L"the shown items are Windows' items");
+        Check(sawWindowsMenu, L"Windows' own menu was shown");
+        Check(!sawOwnMenu, L"Dexmenu's menu was not shown");
+        if (!on)
+        {
+            wprintf(L"== Shown menu (Dexmenu off)\n");
+            Print(shownWindows, 2);
+            Check(SameList(shownWindows, windows), L"the shown items are Windows' items");
+        }
+        Check(chosen == 0, L"closed without a choice: 0 returned");
     }
     else
     {
-        Check(shownTop != hmenu, L"an arranged menu was shown, not Windows' own");
-        std::vector<Node> shownOthers;
-        const Node* sub = nullptr;
-        size_t subAt = SIZE_MAX;
-        for (const auto& n : shown)
+        Check(sawOwnMenu && !sawWindowsMenu, L"Dexmenu's own menu was shown, not Windows' menu");
+        Check(!timedOut, L"the menu did what the test asked in time");
+        const auto& shown = ownLate.empty() ? ownFirst : ownLate;
+        wprintf(L"== Dexmenu's menu%s\n", ownLate.empty() ? L"" : L" after the late changes");
+        PrintLevels(shown);
+        // The base layout: every top-level item with a text a card, in Windows' order, as Windows' menu has it.
+        std::vector<Card> expected;
+        for (const auto& n : windows)
         {
             if (IsLine(n)) continue;
-            if (n.text == group && n.sub && !sub) { sub = &n; subAt = shownOthers.size(); continue; }
-            shownOthers.push_back(n);
+            const auto name = NameOf(n.text);
+            if (name.empty() && !n.sub) continue;
+            Card c;
+            c.kind = L"item";
+            c.id = n.id;
+            c.text = name;
+            c.enabled = !(n.state & MFS_DISABLED);
+            c.sub = n.sub != nullptr;
+            expected.push_back(c);
         }
-        Check(sub != nullptr, (L"a submenu \"" + group + L"\" is there").c_str());
-        if (sub)
+        std::vector<Card> got;
+        if (!shown.empty()) for (const auto& c : shown.front().cards) if (c.kind != L"separator") got.push_back(c);
+        bool same = got.size() == expected.size();
+        for (size_t i = 0; same && i < got.size(); i++)
+            same = got[i].id == expected[i].id && got[i].text == expected[i].text &&
+                got[i].enabled == expected[i].enabled && got[i].sub == expected[i].sub;
+        Check(same, L"every item of Windows' menu a card, in its order, with its id, text, state and submenu mark");
+        if (late)
         {
-            std::vector<Node> inSub;
-            for (const auto& n : sub->children) if (!IsLine(n)) inSub.push_back(n);
-            Check(SameList(inSub, tested), L"the submenu holds exactly those items, each as Windows' menu has it (text, id, state, type, bitmap, data, submenu), in Windows' order");
-            Check(subAt == othersBefore, L"the submenu sits where the first of them was");
+            Check(lateApplied && !ownLate.empty(), L"the menu was drawn again after the late changes");
+            bool deletedGone = true, disabledShown = !lateDisable;
+            for (const auto& c : got)
+            {
+                if (lateDelete && c.id == lateDelete) deletedGone = false;
+                if (lateDisable && c.id == lateDisable) disabledShown = !c.enabled;
+            }
+            Check(deletedGone, L"the item deleted while shown is gone");
+            Check(disabledShown, L"the item disabled while shown is shown disabled");
         }
-        Check(SameList(shownOthers, others), L"every other item as in Windows' menu, in its order");
-        bool lines = !shown.empty() && !IsLine(shown.front()) && !IsLine(shown.back());
-        for (size_t i = 1; i < shown.size(); i++) if (IsLine(shown[i]) && IsLine(shown[i - 1])) lines = false;
-        Check(lines, L"no line at the start or end, none twice");
+        if (!chooseVerb.empty())
+            Check(chooseId != 0 && static_cast<UINT>(chosen) == chooseId,
+                L"a click on the card of " + chooseVerb + L" returned its id " + std::to_wstring(chooseId));
+        else if (!openText.empty())
+        {
+            Check(ownOpened.size() >= 2 && !ownOpened[1].cards.empty(), L"the submenu \"" + openText + L"\" opened with items");
+            if (ownOpened.size() >= 2) PrintLevels(ownOpened);
+            Check(chosen == 0, L"closed without a choice: 0 returned");
+        }
+        else
+            Check(chosen == 0, L"closed without a choice: 0 returned");
     }
 
     menu->Release();
@@ -305,6 +579,7 @@ int wmain(int argc, wchar_t** argv)
     for (auto p : absolute) CoTaskMemFree(p);
     DestroyMenu(hmenu);
     OleUninitialize();
+    DeleteFileW(dumpPath.c_str());
     wprintf(L"%s\n", failures ? L"FAILED" : L"OK");
     return failures ? 1 : 0;
 }

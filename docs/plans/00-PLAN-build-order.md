@@ -5,6 +5,7 @@ Status: partly executed; see Status.
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: step 1.
 - 2026-11-21: partly executed: step 2.
+- 2026-11-21: partly executed: step 3 (by hand in Explorer, an Open dialog and Foldex still to do).
 
 Orders the parts of plan 01 (`01-PLAN-dexmenu.md`: the DLL, the hook, install), plan 02 (`02-PLAN-own-menu.md`:
 cards, rules, layouts, the editor) and plan 03 (`03-PLAN-menu-look.md`: themes and the look) into steps. Each step
@@ -33,12 +34,12 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 |---|---|---|
 | Step 1: Delphi DLL | the spike in Delphi: handler, hook, late changes, the test host's checks passing (Explorer by hand with step 3) | 3.1; plan 01 6.3 |
 | Step 2: the base layout | the layout file (JSON with comments) with the remaining card; read, checked, read again on change; unit tests | 3.2; 6.2 |
+| Step 3: plain cards | Dexmenu's own menu drawn by the DLL: every item a card, submenus opened from their card and filled when opened, keys and mouse, the id handed back, late changes followed, Windows' menu on a broken layout; tested in the test host (by hand: still to do) | 3.3; 6.3 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Step 3: plain cards | the DLL draws its own menu: every item a plain card, submenus as cards that open, the id handed back | Steps 1, 2 | 3.3 |
 | Step 4: the editor's frame | the settings app: two panes, the preview on the right drawn by the DLL | Step 3 | 3.4 |
 | Step 5: editing | cards, rules, titles, dragging, the remaining card moved; the preview following every change | Step 4 | 3.5 |
 | Step 6: the look | themes, colours, the card's structure, lines of cards, dividers | Step 5 | 3.6 |
@@ -149,3 +150,25 @@ None.
   `tests/run-tests.ps1`): comments, valid and invalid layouts, the built-in base, reading, reading again on a change,
   a broken file. All passed; the menu cases still pass.
 - Not yet: the DLL uses the layout from step 3 on (the arranged spike menu still uses its text layout).
+
+### 6.3 Step 3
+
+- `src/dll`: `Dexmenu.Tree` (Windows' items as a tree, a submenu read when opened), `Dexmenu.Place` (the layout
+  applied: the remaining card's items each a card on its own line, Windows' separators as thin lines, a card with a
+  menu opening its lines, a Windows submenu as its items), `Dexmenu.Draw` (Direct2D and DirectWrite into a 32-bit
+  image shown by a layered window; one built-in look, light or dark as Windows' apps; check marks and submenu chevrons
+  from Segoe MDL2 Assets; the default item semi-bold), `Dexmenu.Menu` (a window per level, the modal loop, placement
+  as Windows' menu with the alignment flags and flipping at the work area's edges, scrolling when taller than the
+  screen, hover with Windows' menu delay, click, arrows, Home / End, Enter, Esc, Left / Right, the `&` letters;
+  closing when another window is activated; WM_ENTERMENULOOP, WM_INITMENUPOPUP for the top menu and each Windows
+  submenu opened, WM_UNINITMENUPOPUP, WM_EXITMENULOOP as Windows' menu sends them; the id returned or posted as
+  WM_COMMAND). `Dexmenu.Hook` now shows Dexmenu's menu; calls changing a menu while it is shown are made as always and
+  make it read Windows' menu again and redraw. The spike's arranged menu, its text layout and `tests/layout-lexpen.txt`
+  are gone.
+- The DLL leaves its Direct2D and DirectWrite objects unreleased at process exit (it is pinned; releasing them then
+  crashed the test host on exit).
+- For the tests: `DEXMENU_DUMP` names a file the DLL writes every shown level and card to after each redraw.
+- Tested: `tests/run-tests.ps1`, each selection off, on, off and on with the late changes, and on with a click on
+  "View in LexPen" (its id returned); "Send to" opened from its card and filled when opened; a broken layout file
+  giving Windows' own menu. All passed. A screenshot of the menu held open (`DexmenuTest --hold`): Windows 11's look.
+- Not yet: by hand in Explorer, an Open dialog and Foldex.
