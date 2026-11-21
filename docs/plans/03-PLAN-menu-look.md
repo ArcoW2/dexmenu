@@ -240,10 +240,16 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
    last ones onto a new line, or make that level wider for this menu?
 2. **Cards of different heights on a line.** Stretch every card to the line's height, or keep each card's own height
    (aligned to the top)?
-3. **A blurred background (Acrylic / Mica) for the menu**, as Windows 11's own menus: wanted? DWM gives that to a
-   normal window, not to the layered window that cards in space need (3.1, 3.4), so it would be a second kind of
-   window for themes with a full menu background, and whether DWM gives it to a popup in another program's process
-   is still to be tried.
+3. **A blurred background.** Three ways, none tried yet:
+   - DWM's backdrop (Acrylic), documented in Windows 11: live, but for a normal window's whole rectangle, not the
+     layered window of cards in space (3.1, 3.4); a second kind of window, for themes with a full menu background;
+   - the undocumented `SetWindowCompositionAttribute` blur: also on popups, also the whole window, can break with a
+     Windows update;
+   - Dexmenu's own: the screen behind the menu copied just before it shows, blurred by Dexmenu's code (Direct2D 1.0
+     has no blur), and used as a background image for the menu or per card; fits the layered window and cards in
+     space, documented calls only, but a still picture (what moves behind the menu does not move in it), and its
+     speed: [not yet checked].
+   Which one, if any (the last is the one that fits cards in space)?
 4. **Animation.** Submenus and the `replace` change: none (as Windows' classic menus), or a short slide or fade?
 5. **LexPen's themes.** Carry every LexPen theme over (its app colours mapped onto the palette), as Foldex did, or ship
    only `light`, `dark` and a few of Dexmenu's own?
