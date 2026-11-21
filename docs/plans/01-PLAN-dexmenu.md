@@ -5,6 +5,7 @@ Status: partly executed; see Status.
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: the spike in a test host (DLL, hook, a minimal layout, LexPen's items into a submenu).
 - 2026-11-21: partly executed: the spike in Explorer (states set after the show followed); the full menu at once.
+- 2026-11-21: partly executed: the DLL in Delphi (plan 00 step 1).
 
 Dexmenu arranges the menu for every program that shows Windows' right-click menu for files and folders: Explorer, the
 Open and Save dialogs, other file managers.
@@ -35,6 +36,7 @@ On any doubt, Windows' own menu is shown untouched.
 |---|---|---|
 | Spike, test host | the shell extension loaded, the show call caught, the top level arranged into a submenu of the user's own with Windows' items moved (same ids), put back after; checked in a test host | 3.1 - 3.4; 6.1 |
 | Spike, Explorer | the same in Explorer's full menu, with the states Explorer sets after the show; LexPen's items in "from LexPen" shown, hidden and run as without Dexmenu | 3.1; 3.4; 6.2 |
+| Delphi DLL | the DLL in Delphi 10.4 with DDetours: handler, hook, following changes, trace; `build.cmd`; the C++ spike retired | 3.2; 6.3 |
 | Full menu at once | Windows 11 switched to the full menu (`register.ps1 -FullMenu` / `-ShortMenu` until the settings app) | 3.10 |
 
 ### Not yet built
@@ -42,7 +44,6 @@ On any doubt, Windows' own menu is shown untouched.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Spike, Open dialog | the same in an Open or Save dialog | -- | 3.1; 3.2 |
-| Delphi DLL | the spike's DLL in Delphi 10.4 with DDetours (handler, hook, following changes, trace), a build script; the C++ spike retired once its tests pass on it | -- | 3.2; 6.1; 6.2 |
 | Seen items | each item seen recorded per kind of right-click, for the settings app | plan 02 Item tree | 3.6 |
 | Settings app | .NET 10 and WebView2: the layout edited from the seen items, a preview of the menu, on and off | Seen items | 3.7 |
 | Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | plan 02 Window | 3.8 |
@@ -263,3 +264,19 @@ None.
 - The trace (`HKCU\Software\Dexmenu` `Trace` 1): each menu noted, each show call and each item in
   `%LOCALAPPDATA%\Dexmenu\dexmenu.log`. `DEXMENU=0` forces the DLL off in a process, so the tests hold while the
   registry has Dexmenu on.
+
+### 6.3 The DLL in Delphi
+
+- `src/dll`: `DexmenuShell.dpr` and its units: `Dexmenu.Log` (on / off, trace, log), `Dexmenu.Menus` (items read and
+  written whole, owner-drawn texts included), `Dexmenu.Arrange` (the spike's arranged menu and text layout, until
+  plan 02's window replaces it), `Dexmenu.Hook` (noted menus, the show hooks, changes followed while shown),
+  `Dexmenu.Handler` (the COM class, `TComObject` with `System.Win.ComServ`, same CLSID as the spike). DDetours in
+  `src/vendor/DDetours`, unchanged, with its licence. Delphi 10.4 does not declare `GetModuleHandleEx` and
+  `RegGetValueW`; the units declare them.
+- `build.cmd`: the DLL with `dcc64` (the Delphi folder from `DELPHI_ROOT` or the registry), the test host with
+  Visual Studio's C++ tools, as before. The C++ DLL (`src/shell`) and MinHook removed.
+- Tested: `tests/run-tests.ps1` against the Delphi DLL, every case off and on, with and without `--late`: all passed.
+  The script now sets LexPen's left side for every case (none, or the case's) and puts LexPen's own value back, so a
+  left side chosen in LexPen does not change the expected items.
+- Not yet: Explorer by hand with the Delphi DLL (Explorer still held the C++ DLL during the tests); done with plan 00
+  step 3.

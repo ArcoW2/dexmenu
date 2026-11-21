@@ -1,8 +1,9 @@
 # Plan 00: Build order: from one card to the full menu
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-21: draft.
+- 2026-11-21: partly executed: step 1.
 
 Orders the parts of plan 01 (`01-PLAN-dexmenu.md`: the DLL, the hook, install), plan 02 (`02-PLAN-own-menu.md`:
 cards, rules, layouts, the editor) and plan 03 (`03-PLAN-menu-look.md`: themes and the look) into steps. Each step
@@ -29,12 +30,12 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 
 | Part | What | Reference |
 |---|---|---|
+| Step 1: Delphi DLL | the spike in Delphi: handler, hook, late changes, the test host's checks passing (Explorer by hand with step 3) | 3.1; plan 01 6.3 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Step 1: Delphi DLL | the spike in Delphi: handler, hook, late changes, the test host's checks passing | -- | 3.1 |
 | Step 2: the base layout | the layout file with one card, the remaining card | -- | 3.2 |
 | Step 3: plain cards | the DLL draws its own menu: every item a plain card, submenus as cards that open, the id handed back | Steps 1, 2 | 3.3 |
 | Step 4: the editor's frame | the settings app: two panes, the preview on the right drawn by the DLL | Step 3 | 3.4 |

@@ -43,23 +43,21 @@ $failed = 0
 foreach ($c in $cases) {
     $hadKey = Test-Path $lexKey
     $oldLeft = if ($hadKey) { (Get-ItemProperty $lexKey -Name LeftFile -ErrorAction SilentlyContinue).LeftFile } else { $null }
+    # Every case sets LexPen's left side itself (an empty file: none chosen), so a left side the user chose in LexPen
+    # does not change what LexPen shows here; LexPen's own value is put back after.
     try {
-        if ($c.Left) {
-            Set-Content "$Work\left-side.txt" $c.Left -Encoding utf8
-            New-Item -Force $lexKey -ErrorAction SilentlyContinue | Out-Null
-            Set-ItemProperty $lexKey LeftFile "$Work\left-side.txt"
-        }
+        Set-Content "$Work\left-side.txt" $(if ($c.Left) { $c.Left } else { '' }) -Encoding utf8
+        New-Item -Force $lexKey -ErrorAction SilentlyContinue | Out-Null
+        Set-ItemProperty $lexKey LeftFile "$Work\left-side.txt"
         $off = Run $c.Paths $false
         $on = Run $c.Paths $true
         $offLate = Run $c.Paths $false -Late
         $onLate = Run $c.Paths $true -Late
     }
     finally {
-        if ($c.Left) {
-            if (-not $hadKey) { Remove-Item -Recurse -Force $lexKey }
-            elseif ($null -eq $oldLeft) { Remove-ItemProperty $lexKey LeftFile -ErrorAction SilentlyContinue }
-            else { Set-ItemProperty $lexKey LeftFile $oldLeft }
-        }
+        if (-not $hadKey) { Remove-Item -Recurse -Force $lexKey }
+        elseif ($null -eq $oldLeft) { Remove-ItemProperty $lexKey LeftFile -ErrorAction SilentlyContinue }
+        else { Set-ItemProperty $lexKey LeftFile $oldLeft }
     }
     $got = @(Titles $off.LexPen)
     $problems = @()

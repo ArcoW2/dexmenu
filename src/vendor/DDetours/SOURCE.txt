@@ -1,0 +1,1 @@
+DDetours by Mahdi Safsafi, https://github.com/MahdiSafsafi/DDetours, commit 0083d1e, files unchanged (MPL 2.0, see LICENSE).
