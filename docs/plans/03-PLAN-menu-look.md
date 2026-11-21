@@ -195,6 +195,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   gradient, image; `none` or alpha only on a menu with a background, 3.4), `foreground`, `border`, `radius`,
   `height`, `minWidth`, `weight`, `cardFit` (3.5). Per state where wanted
   (`hover` of its own).
+- **Template cards:** items Dexmenu places in a submenu itself are drawn with a template card's look (plan 02 3.3):
+  the layout's, or a card's own submenu template. A template has the same look settings as a card, no rules.
 - **An action or a submenu:** the same card; the mark and the click differ (plan 02 3.3: one item found is an action,
   several a submenu).
 

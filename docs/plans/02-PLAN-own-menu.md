@@ -113,7 +113,13 @@ in the layout is where its items show.
 - **Also:** a rule with `also: true` takes items even when an earlier rule has taken them, and shows them in its card
   as well (a favourite in the icon row that also stays in its group); both hand back the same id.
 - **One expected, several found:** a card is an action when its rules find one item, and a card with a submenu
-  holding all of them when they find more, without a change to the layout. A rule written for one item ("Open") that
+  holding all of them, under its own title, when they find more, without a change to the layout.
+- **Templates for items placed in a submenu:** items that Dexmenu puts in a submenu itself (the items of a card that
+  found several, the subitems following a found item) are cards that are not in the layout; they get their look from
+  a template card. A layout has one template card for them; it has no rules, only a look (plan 03 3.6). A card can
+  overrule it with a submenu template card of its own, used for every item placed in its submenu, deeper levels
+  included, unless a card further down has its own. The remaining card's items take the remaining card's own look
+  (below). A rule written for one item ("Open") that
   also finds "Open with" and "Open in new window" therefore still works. Found none: the card is not shown (the
   preview shows it striped, 3.8).
 - **Items no card took: the remaining card.** Every layout has exactly one card with the rule `remaining`; it cannot
@@ -168,6 +174,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   - `card`: a title; an optional extra text; an optional icon; either its rules or its menu (3.3); optionally its
     own way of opening a submenu; its own look where wanted (plan 03 3.6: where the extra text goes, height, minimum
     width, background, colours).
+  - `template`: the layout's template card for items placed in a submenu (3.3): no rules, only a look; exactly one.
+    A card's own submenu template is a `template` inside that card (`submenuTemplate`).
   - `divider`: between lines, with an optional label; its look (label alignment, height, background, colours) is
     plan 03 3.8.
   - `row`: items as icons in one line, the text as tooltip (Windows 11's Cut / Copy / Paste row).
@@ -187,7 +195,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   - the remaining card is moved as any other, never deleted;
   - the editor's left pane shows two views of one layout:
     - **the cards:** the layout's cards as a tree of lines and submenus, as they stand; clicking a card opens it: its
-      title, extra text, kind (rules or a menu), its rules, its look. Each rule on a card shows its number in the
+      title, extra text, kind (rules or a menu), its rules, its look, its own submenu template if it has one. The
+      layout's template card is shown apart, edited as a card without rules. Each rule on a card shows its number in the
       priority list, so the order is visible throughout the cards;
     - **the rules:** the priority list (3.3): one row per rule, in order, with its number, the card it belongs to
       and the rule itself; the order changed by dragging a row. The remaining card's rule shown last, fixed.
@@ -345,6 +354,9 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
   expected and several found,
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
+- Templates: items a card found and its found items' subitems drawn with the layout's template; a card's own
+  submenu template used instead, deeper levels included until a card with its own; the remaining card's items in
+  its own look.
 - Editor views: a rule dragged in the rules view changes the order, its number on its card, and the preview; an
   item clicked or hovered in the preview selects the card and rule that placed it; a card selected marks its items
   in the preview.
@@ -370,7 +382,4 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 ## 4. Open questions
 
-1. **Ordinary cards with several items.** The remaining card places its items at its own place, each as a card in
-   its style (3.3). Is that so for every card with rules too (a card "Open" finding "Open" and "Open with" puts both
-   there as cards, its title not shown), or does an ordinary card keep the rule written now: one item an action, more
-   a submenu under the card's title?
+None.
