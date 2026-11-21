@@ -43,15 +43,16 @@ On any doubt, Windows' own menu is shown untouched.
 |---|---|---|---|
 | Spike, Open dialog | the same in an Open or Save dialog | -- | 3.1; 3.2 |
 | Delphi DLL | the spike's DLL in Delphi 10.4 with DDetours (handler, hook, following changes, trace), a build script; the C++ spike retired once its tests pass on it | -- | 3.2; 6.1; 6.2 |
-| Showing it | the arranged menu shown, lazy submenus and self-drawn items working, the choice handed back | Spike | 3.4; 3.5 |
 | Seen items | each item seen recorded per kind of right-click, for the settings app | plan 02 Item tree | 3.6 |
 | Settings app | .NET 10 and WebView2: the layout edited from the seen items, a preview of the menu, on and off | Seen items | 3.7 |
-| Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | Showing it | 3.8 |
+| Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | plan 02 Window | 3.8 |
 | Install | per machine registration by an installer, settings per user, off by default, removal | Delphi DLL | 3.9 |
 | Windows 11 menu | the full-menu switch in the settings app | Settings app | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
 
-Moved out: the layout engine (the layout file, finding items, places) to plan 02, which draws the menu itself.
+Moved out: the layout engine (the layout file, finding items, places) and showing the menu to plan 02, which draws
+the menu itself; the arranged Windows menu of 3.3 - 3.5 stays as the spike that proved the hook and the late changes,
+not as a fallback (the fallback is Windows' own menu).
 
 ## 3. Details
 
