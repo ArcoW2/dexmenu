@@ -22,7 +22,8 @@ window of its own, drawn by Dexmenu from a layout file. The layout is a tree of 
 grid of cards, a card that opens a submenu); each place takes Windows' items by rules on their text and path, its
 state and where it sits, and a place for the rest catches every item no rule took. The window follows the
 program's changes while it is open and returns the chosen item's id exactly as Windows' menu would, so every item
-still does what it does now. On any error the arranged Windows menu of plan 01 is shown, or Windows' own.
+still does what it does now. On any error the arranged Windows menu of plan 01 is shown, or Windows' own. The
+settings app shows the menu while the layout is edited, drawn by the same code, so the preview is the result.
 
 ## Status
 
@@ -37,11 +38,12 @@ still does what it does now. On any error the arranged Windows menu of plan 01 i
 |---|---|---|---|
 | Item tree | Windows' menu read into a tree with names and paths, kept live while shown | plan 01 spike | 3.1; 3.2 |
 | Rules | finding items: match kinds, fields, states, scope, first match, the rest | Item tree | 3.3 |
-| Layout file | places, cards, rows, lists, submenu cards, per kind of right-click; read and checked | Rules; Open question 2 | 3.4 |
-| Window | Dexmenu's own window: drawing, keys, mouse, closing, the id handed back | Open question 1 | 3.5; 3.6 |
-| Submenus | Windows' submenus opened from a card, filled when opened (Send to, Open with) | Window; Open question 3 | 3.6 |
-| Icons | an icon per item, also for Explorer's self-drawn items | Window; Open question 4 | 3.7 |
-| Default layouts | the suggested layouts shipped as examples | Layout file; Open question 6 | 3.8 |
+| Layout file | places, cards, rows, lists, submenu cards, per kind of right-click; read and checked | Rules; Open question 1 | 3.4 |
+| Window | Dexmenu's own window, drawn by the Delphi DLL: drawing, keys, mouse, closing, the id handed back | plan 01 Delphi DLL | 3.5; 3.6; 3.7 |
+| Preview | the same window drawn by the DLL inside the settings app, from the seen items and the layout being edited | Window; plan 01 Settings app | 3.7 |
+| Submenus | Windows' submenus opened from a card, filled when opened (Send to, Open with) | Window; Open question 2 | 3.6 |
+| Icons | an icon per item, also for Explorer's self-drawn items | Window; Open question 3 | 3.7 |
+| Default layouts | the suggested layouts shipped as examples | Layout file; Open question 5 | 3.8 |
 | Safety | fallback to plan 01's arranged menu or Windows' own; a key for Windows' menu | Window | 3.9 |
 | Tests | 3.10 | -- | 3.10 |
 
@@ -94,7 +96,7 @@ A rule picks items of the tree. Each place in the layout has one or more rules.
 
 ### 3.4 The layout file
 
-- One file of the user's, `%APPDATA%\Dexmenu\layout.json` (format: Open question 2), read again when it changes.
+- One file of the user's, `%APPDATA%\Dexmenu\layout.json` (format: Open question 1), read again when it changes.
   An invalid file: the error in the log, plan 01's arranged menu or Windows' own shown (3.9).
 - Per kind of right-click: one file, several items, a folder, a folder's empty part, a drive; by extension where
   wanted (`.zip`). A kind without a layout of its own uses the default one.
@@ -132,7 +134,7 @@ A rule picks items of the tree. Each place in the layout has one or more rules.
 - **Disabled items:** shown greyed, or left out, per place (`disabled` in 3.3); a greyed item says why it cannot be
   chosen only if the program says so (it does not: [not yet checked] whether anything can be had).
 - **Late changes:** an item that Explorer enables or removes while the window is open changes in place; the layout
-  does not jump under the mouse (a removed card leaves its space until the mouse moves on: Open question 5).
+  does not jump under the mouse (a removed card leaves its space until the mouse moves on: Open question 4).
 - **Closing:** a click outside, the window losing focus, Esc, Alt: closed without a choice, as Windows' menu.
 - **Changing the layout from the menu (suggestion):** right-click an item in Dexmenu's window: Pin to the icon row,
   Move to..., Hide, Rename. It writes the layout file; no settings app needed for small changes.
@@ -140,7 +142,7 @@ A rule picks items of the tree. Each place in the layout has one or more rules.
 
 ### 3.6 Submenus
 
-- A card or line standing for a Windows submenu opens it the way the user picks (Open question 3):
+- A card or line standing for a Windows submenu opens it the way the user picks (Open question 2):
   - **Flyout:** a panel to the side, as a menu.
   - **In place:** the card opens downward, its items under it, the rest moves down.
   - **Drill in:** the window shows the submenu with a Back item; the path at the top.
@@ -153,7 +155,14 @@ A rule picks items of the tree. Each place in the layout has one or more rules.
 
 - In the program's process (Explorer first), so no .NET, WebView2 or other runtime (plan 01 3.8): a native popup
   window in the Delphi DLL (plan 01 3.2), drawn with Direct2D and DirectWrite, per-monitor DPI, light and dark as
-  Windows has it, the accent colour. Open question 1 weighs a separate process instead.
+  Windows has it, the accent colour. A right-click needs no other process.
+- One drawing engine for the menu and its preview. The settings app (plan 01 3.7, .NET 10 and WebView2) loads the same
+  DLL and gives it a window of its own next to the editor; the DLL draws the menu there from the seen items (plan 01
+  3.6) and the layout being edited, and draws it again on every change. The preview is the real window, live: hover,
+  keys, typing to search and submenus work as at a right-click; choosing an item does nothing, there being no program
+  to run it. Late changes (plan 01 3.1) can be played in the preview to see how the layout takes them.
+- In the settings app the DLL sets no hook: it only draws. The DLL is 64-bit, so the settings app runs 64-bit.
+- A preview drawn by the settings app itself (in HTML) is not made: it would drift from the real menu.
 - A window of Dexmenu's own replaces the show call: the hook runs its own message loop until a choice or close, so
   the program waits as it does for Windows' menu.
 - Icons:
@@ -167,7 +176,7 @@ A rule picks items of the tree. Each place in the layout has one or more rules.
 
 ### 3.8 Suggested layouts
 
-Shipped as examples; the user starts from one (Open question 6).
+Shipped as examples; the user starts from one (Open question 5).
 
 - **A. Classic plus.** An icon row on top (Cut, Copy, Paste, Rename, Delete, Properties); a list with Open and Open
   with; one card per program with a submenu of its items (LexPen, 7-Zip, TortoiseGit); "More" with the rest.
@@ -216,27 +225,22 @@ Shipped as examples; the user starts from one (Open question 6).
   hands back the right id (the host clicks or presses Enter through the window, not through Windows' menu).
 - Late changes (`--late` of plan 01): an item enabled and one removed while the window is open, the window updated,
   the right id handed back after.
+- The preview: the same tree and layout drawn in the test host's menu window and in the preview window give the same
+  picture (both captured and compared); a layout edit redraws the preview; a choice in the preview runs nothing.
 - By hand in Explorer, an Open dialog and Foldex: each suggested layout, lazy submenus (Send to, Open with), icons,
   dark and light, a second monitor with another DPI.
 
 ## 4. Open questions
 
-1. **Where the window runs.** In the program's process, native (the Delphi DLL of plan 01, Direct2D), fast, no
-   runtime, all drawing written by hand; or a separate Dexmenu process the DLL talks to on every right-click, which
-   can use WebView2 and makes cards and animation easy, at the cost of starting or waking it on the right-click
-   ([not yet checked] how long that takes)? The settings app (plan 01 3.7) is .NET 10 with WebView2 and previews the
-   menu: with the window in WebView2 too, preview and menu are the same page; with a native window, the preview is
-   either a second rendering in HTML that can drift from the real one, or the DLL draws the preview into an image
-   for the settings app.
-2. **The file format.** JSON (as plan 01 said), or a format with comments and less punctuation (JSON5, YAML, TOML),
+1. **The file format.** JSON (as plan 01 said), or a format with comments and less punctuation (JSON5, YAML, TOML),
    since the user edits it by hand?
-3. **Submenus.** Flyout, open in place, or drill in; one for all, or per card in the layout?
-4. **Icons in Explorer.** Ask Explorer to draw each item and cut the icon out (to be tried), or only icons the
+2. **Submenus.** Flyout, open in place, or drill in; one for all, or per card in the layout?
+3. **Icons in Explorer.** Ask Explorer to draw each item and cut the icon out (to be tried), or only icons the
    layout gives, plus the first letter?
-5. **Late removals.** A card Explorer removes while the window is open: leave its space until the mouse moves, or
+4. **Late removals.** A card Explorer removes while the window is open: leave its space until the mouse moves, or
    close up at once?
-6. **The starting layout.** Which of 3.8 A - D is the default for a new user?
-7. **Plan 01's arranged Windows menu.** Kept as the fallback when Dexmenu's window cannot be shown, or dropped (the
+5. **The starting layout.** Which of 3.8 A - D is the default for a new user?
+6. **Plan 01's arranged Windows menu.** Kept as the fallback when Dexmenu's window cannot be shown, or dropped (the
    fallback then being Windows' own menu)?
-8. **Changing the layout from the menu.** Pin / Move / Hide / Rename on a right-click in Dexmenu's window, and the
+7. **Changing the layout from the menu.** Pin / Move / Hide / Rename on a right-click in Dexmenu's window, and the
    Recent row: wanted?

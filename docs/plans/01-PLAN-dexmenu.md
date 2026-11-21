@@ -154,8 +154,8 @@ Moved out: the layout engine (the layout file, finding items, places) to plan 02
 - Shows, per kind of right-click, the places of the layout and the items in them; items are dragged between places,
   into a submenu of their own, or into Hidden; groups and submenus added, renamed, ordered.
 - Dexmenu on and off for the user (3.9), and Windows' full menu at once (3.10).
-- A preview of the resulting menu: the layout applied to the seen items of a kind of right-click, shown as the menu
-  will look, updated while editing.
+- A preview of the resulting menu: the layout applied to the seen items of a kind of right-click, updated while
+  editing, drawn by the DLL itself in a window of the settings app, so it is the menu as it will be (plan 02 3.7).
 - A separate program, not loaded into Explorer: .NET 10, a WinForms window hosting WebView2, as LexPen and Foldex.
 
 ### 3.8 Safety
