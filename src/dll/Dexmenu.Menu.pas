@@ -15,7 +15,7 @@ unit Dexmenu.Menu;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.Types, System.Generics.Collections, Dexmenu.Tree, Dexmenu.Place,
+  Winapi.Windows, Winapi.Messages, System.Types, System.Generics.Collections, System.JSON, Dexmenu.Tree, Dexmenu.Place,
   Dexmenu.Layout, Dexmenu.Draw;
 
 type
@@ -47,6 +47,7 @@ type
     FLayout: ILayout;
     FKind: string;
     FTop: TNodes;
+    FSeen: TJSONArray;    // every item seen while shown, also those Windows' menu lost (Dexmenu.Seen)
     FPlacement: TPlacement;
     FLevels: TObjectList<TLevelWindow>;
     FDone: Boolean;
@@ -64,6 +65,7 @@ type
     procedure KeyDown(Key: WPARAM);
     procedure CharKey(Ch: Char);
     procedure Refresh;
+    procedure KeepSeen;
     procedure Dump;
     function IsOurs(Wnd: HWND): Boolean;
   public
@@ -166,6 +168,7 @@ begin
   FLevels.Free;        // the views first: they point into the nodes
   FPlacement.Free;
   FTop.Free;
+  FSeen.Free;
   inherited;
 end;
 
@@ -317,7 +320,8 @@ begin
   end;
 
   FLevels.Clear;   // the windows gone
-  WriteSeen(FKind, FTop);   // for the settings app's preview (Dexmenu.Seen)
+  KeepSeen;
+  WriteSeen(FKind, FSeen);   // for the settings app's preview (Dexmenu.Seen)
   if Notify then
   begin
     SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(FOriginal), 0);
@@ -566,6 +570,22 @@ begin
   PostMessage(FLevels[0].Wnd, WM_DEXMENU_REFRESH, 0, 0);
 end;
 
+// What the menu holds now merged into what it held before in this right-click: an item Windows' menu lost while shown
+// (Explorer deletes the items it hides after the show) is kept, marked "sometimes".
+procedure TMenuSession.KeepSeen;
+var
+  Now, Merged: TJSONArray;
+begin
+  Now := SeenJson(FTop);
+  try
+    Merged := MergeSeen(FSeen, Now, False);
+  finally
+    Now.Free;
+  end;
+  FSeen.Free;
+  FSeen := Merged;
+end;
+
 // Windows' items read again after a change, every open level placed again; a level whose opener is gone closes.
 procedure TMenuSession.Refresh;
 var
@@ -645,6 +665,7 @@ begin
         Break;
       end;
     end;
+    KeepSeen;
     FPlacement.Free;
     FTop.Free;
     FPlacement := NewPlacement;

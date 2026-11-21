@@ -4,22 +4,36 @@ unit Dexmenu.Seen;
 // right-click written per kind of right-click to <SeenFolder>\<kind>.json, with the submenus that were
 // opened (an extension may fill one only then). The settings app's preview shows them: they are made into a real
 // Windows menu again (MenuFromSeen), so the preview runs through the same tree, layout and drawing as a right-click.
-// For now the file holds the last right-click of a kind; merging what every right-click showed comes later.
+//
+// The file is merged, not replaced: every item any right-click of that kind showed stays in it, so items an extension
+// hides for some selections can be placed too (plan 02 3.8). An item that was not there every time is marked
+// "sometimes": an item of an earlier right-click missing from this one, one of this right-click missing from earlier
+// ones, and one Windows' menu lost while it was shown (Explorer deletes the items it hides after the show). Items are
+// matched per level by name; a submenu not opened this time keeps what was seen in it before. The preview draws the
+// "sometimes" items striped (Dexmenu.Draw, the preview only).
 
 interface
 
 uses
-  Winapi.Windows, Dexmenu.Tree;
+  Winapi.Windows, System.JSON, Dexmenu.Tree;
 
-procedure WriteSeen(const Kind: string; Top: TNodes);
+// The items of a menu as written to the seen file.
+function SeenJson(Top: TNodes): TJSONArray;
+// Old and New merged into a new array (neither freed): New's items in New's order, Old's items missing from New
+// inserted after the item they followed in Old, marked "sometimes"; MarkNew: New's items missing from Old marked too
+// (only where Old had items at that level).
+function MergeSeen(Old, New: TJSONArray; MarkNew: Boolean): TJSONArray;
+// Items merged into <SeenFolder>\<kind>.json (the caller frees Items).
+procedure WriteSeen(const Kind: string; Items: TJSONArray);
 // A popup menu built from a seen file's text (its own ids, from 1); 0 and Error set when the text is not valid.
+// "sometimes" items get SometimesData as their item data (TNode.Sometimes).
 function MenuFromSeen(const Text: string; out Error: string): HMENU;
 function SeenFolder: string;
 
 implementation
 
 uses
-  System.SysUtils, System.Classes, System.JSON, Dexmenu.Log, Dexmenu.Json, Dexmenu.Menus;
+  System.SysUtils, System.Classes, System.IOUtils, System.Generics.Collections, Dexmenu.Log, Dexmenu.Json, Dexmenu.Menus;
 
 // DEXMENU_SEEN_FOLDER (the tests), else %APPDATA%\Dexmenu\seen.
 function SeenFolder: string;
@@ -31,13 +45,13 @@ begin
   Result := RoamingAppData + '\Dexmenu\seen';
 end;
 
-function NodesToJson(Nodes: TNodes): TJSONArray;
+function SeenJson(Top: TNodes): TJSONArray;
 var
   N: TNode;
   O: TJSONObject;
 begin
   Result := TJSONArray.Create;
-  for N in Nodes do
+  for N in Top do
   begin
     O := TJSONObject.Create;
     Result.AddElement(O);
@@ -58,24 +72,173 @@ begin
     begin
       O.AddPair('submenu', TJSONBool.Create(True));
       if N.Children <> nil then
-        O.AddPair('items', NodesToJson(N.Children));
+        O.AddPair('items', SeenJson(N.Children));
     end;
   end;
 end;
 
-procedure WriteSeen(const Kind: string; Top: TNodes);
+function BoolOf(O: TJSONObject; const Name: string; Default: Boolean): Boolean; forward;
+
+function IsSeparatorJson(V: TJSONValue): Boolean;
+begin
+  Result := (V is TJSONObject) and BoolOf(TJSONObject(V), 'separator', False);
+end;
+
+function NameJson(V: TJSONValue): string;
+var
+  N: TJSONValue;
+begin
+  N := TJSONObject(V).GetValue('name');
+  if N is TJSONString then
+    Result := N.Value
+  else
+    Result := '';
+end;
+
+procedure MarkSometimes(O: TJSONObject);
+begin
+  if O.GetValue('sometimes') = nil then
+    O.AddPair('sometimes', TJSONBool.Create(True));
+end;
+
+// The key of each item of a level, its name and which of that name it is (a level may hold two of one name).
+function Keys(Items: TJSONArray): TArray<string>;
+var
+  Count: TDictionary<string, Integer>;
+  I, N: Integer;
+  Name: string;
+begin
+  SetLength(Result, 0);
+  if Items = nil then
+    Exit;
+  SetLength(Result, Items.Count);
+  Count := TDictionary<string, Integer>.Create;
+  try
+    for I := 0 to Items.Count - 1 do
+    begin
+      if not (Items.Items[I] is TJSONObject) or IsSeparatorJson(Items.Items[I]) then
+        Continue;
+      Name := NameJson(Items.Items[I]);
+      if not Count.TryGetValue(Name, N) then
+        N := 0;
+      Count.AddOrSetValue(Name, N + 1);
+      Result[I] := Name + #9 + IntToStr(N);
+    end;
+  finally
+    Count.Free;
+  end;
+end;
+
+function MergeSeen(Old, New: TJSONArray; MarkNew: Boolean): TJSONArray;
+var
+  OldKeys, NewKeys: TArray<string>;
+  OldByKey: TDictionary<string, TJSONObject>;
+  NewByKey: TDictionary<string, TJSONObject>;
+  List: TList<TJSONObject>;
+  OldHasItems: Boolean;
+  I, InsertAt: Integer;
+  C, M: TJSONObject;
+  OldSub, NewSub: TJSONValue;
+  Merged: TJSONArray;
+begin
+  Result := TJSONArray.Create;
+  OldKeys := Keys(Old);
+  NewKeys := Keys(New);
+  OldByKey := TDictionary<string, TJSONObject>.Create;
+  NewByKey := TDictionary<string, TJSONObject>.Create;
+  List := TList<TJSONObject>.Create;
+  try
+    OldHasItems := False;
+    if Old <> nil then
+      for I := 0 to Old.Count - 1 do
+        if OldKeys[I] <> '' then
+        begin
+          OldByKey.AddOrSetValue(OldKeys[I], TJSONObject(Old.Items[I]));
+          OldHasItems := True;
+        end;
+    // New's items, in New's order, with what Old knew of them
+    if New <> nil then
+      for I := 0 to New.Count - 1 do
+      begin
+        if not (New.Items[I] is TJSONObject) then
+          Continue;
+        C := TJSONObject(New.Items[I].Clone);
+        List.Add(C);
+        if NewKeys[I] = '' then
+          Continue;   // a separator
+        NewByKey.AddOrSetValue(NewKeys[I], C);
+        if not OldByKey.TryGetValue(NewKeys[I], M) then
+        begin
+          if MarkNew and OldHasItems then
+            MarkSometimes(C);
+          Continue;
+        end;
+        if BoolOf(M, 'sometimes', False) then
+          MarkSometimes(C);
+        OldSub := M.GetValue('items');
+        NewSub := C.GetValue('items');
+        if not (OldSub is TJSONArray) or not BoolOf(C, 'submenu', False) then
+          Continue;
+        if NewSub is TJSONArray then
+        begin
+          Merged := MergeSeen(TJSONArray(OldSub), TJSONArray(NewSub), MarkNew);
+          C.RemovePair('items').Free;
+          C.AddPair('items', Merged);
+        end
+        else
+          C.AddPair('items', TJSONArray(OldSub.Clone));   // not opened this time: what was seen in it before
+      end;
+    // Old's items missing from New, after the item they followed
+    InsertAt := 0;
+    if Old <> nil then
+      for I := 0 to Old.Count - 1 do
+      begin
+        if OldKeys[I] = '' then
+          Continue;
+        if NewByKey.TryGetValue(OldKeys[I], C) then
+          InsertAt := List.IndexOf(C) + 1
+        else
+        begin
+          // after a separator in Old: after the separator here too, with the items it followed
+          if (I > 0) and IsSeparatorJson(Old.Items[I - 1]) then
+            while (InsertAt < List.Count) and IsSeparatorJson(List[InsertAt]) do
+              Inc(InsertAt);
+          C := TJSONObject(Old.Items[I].Clone);
+          MarkSometimes(C);
+          List.Insert(InsertAt, C);
+          Inc(InsertAt);
+        end;
+      end;
+    for C in List do
+      Result.AddElement(C);
+  finally
+    List.Free;
+    NewByKey.Free;
+    OldByKey.Free;
+  end;
+end;
+
+procedure WriteSeen(const Kind: string; Items: TJSONArray);
 var
   Root: TJSONObject;
+  Before: TJSONValue;
+  OldItems: TJSONArray;
   Lines: TStringList;
-  Path: string;
+  Path, Error: string;
 begin
   try
     ForceDirectories(SeenFolder);
     Path := SeenFolder + '\' + Kind + '.json';
+    Before := nil;
+    if FileExists(Path) then
+      Before := ParseWithComments(TFile.ReadAllText(Path, TEncoding.UTF8), Error);
     Root := TJSONObject.Create;
     try
+      OldItems := nil;
+      if (Before is TJSONObject) and (TJSONObject(Before).GetValue('items') is TJSONArray) then
+        OldItems := TJSONArray(TJSONObject(Before).GetValue('items'));
       Root.AddPair('kind', Kind);
-      Root.AddPair('items', NodesToJson(Top));
+      Root.AddPair('items', MergeSeen(OldItems, Items, True));
       Lines := TStringList.Create;
       try
         Lines.Text := Root.Format(2);
@@ -85,6 +248,7 @@ begin
       end;
     finally
       Root.Free;
+      Before.Free;
     end;
     MoveFileEx(PChar(Path + '.tmp'), PChar(Path), MOVEFILE_REPLACE_EXISTING);
   except
@@ -136,6 +300,8 @@ begin
     if O.GetValue('text') is TJSONString then
       Item.Text := O.GetValue('text').Value;
     Item.HasText := Item.Text <> '';
+    if BoolOf(O, 'sometimes', False) then
+      Item.Info.dwItemData := SometimesData;
     if BoolOf(O, 'submenu', False) then
     begin
       Sub := CreatePopupMenu;

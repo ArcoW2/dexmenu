@@ -24,9 +24,15 @@ type
     function Enabled: Boolean;
     function Checked: Boolean;
     function IsDefault: Boolean;
+    // Not in every right-click of its kind (the seen items, Dexmenu.Seen): only in the settings app's preview.
+    function Sometimes: Boolean;
   end;
 
   TNodes = TObjectList<TNode>;
+
+const
+  // The item data the preview's menu (Dexmenu.Seen.MenuFromSeen) gives an item marked "sometimes".
+  SometimesData = NativeUInt($D3C5E7E5);
 
 // The items of a menu, one level; Path is the path of the submenu they are in.
 function ReadLevel(Menu: HMENU; const Path: string): TNodes;
@@ -72,6 +78,11 @@ end;
 function TNode.IsDefault: Boolean;
 begin
   Result := Item.Info.fState and MFS_DEFAULT <> 0;
+end;
+
+function TNode.Sometimes: Boolean;
+begin
+  Result := Item.Info.dwItemData = SometimesData;
 end;
 
 function ReadLevel(Menu: HMENU; const Path: string): TNodes;

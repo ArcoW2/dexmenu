@@ -221,7 +221,7 @@ begin
     S := Scale;
     for L in Levels do
     begin
-      P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked);
+      P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked, True);
       try
         P.PaintOnto(MemDC, Round(L.X * S), Round(L.Y * S));
       finally
@@ -272,8 +272,9 @@ begin
         else
           Kind := 'separator';
         end;
-        Lines.Add(Format('card %s id=%u enabled=%d checked=%d default=%d sub=%d selected=%d placed=%s/%d x=%d y=%d text=%s',
-          [Kind, Id, Ord(V.Enabled), Ord(V.Checked), Ord(V.IsDefault), Ord(V.HasSubmenu), Ord(B = L.Selected), V.CardId, V.RuleIndex,
+        Lines.Add(Format('card %s id=%u enabled=%d checked=%d default=%d sub=%d selected=%d sometimes=%d placed=%s/%d x=%d y=%d text=%s',
+          [Kind, Id, Ord(V.Enabled), Ord(V.Checked), Ord(V.IsDefault), Ord(V.HasSubmenu), Ord(B = L.Selected), Ord(V.Sometimes),
+          V.CardId, V.RuleIndex,
           Round((L.X + (R.left + R.right) / 2) * S), Round((L.Y + (R.top + R.bottom) / 2) * S), V.Title]));
       end;
     end;

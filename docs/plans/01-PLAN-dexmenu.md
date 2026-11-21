@@ -38,6 +38,7 @@ On any doubt, Windows' own menu is shown untouched.
 | Spike, Explorer | the same in Explorer's full menu, with the states Explorer sets after the show; LexPen's items in "from LexPen" shown, hidden and run as without Dexmenu | 3.1; 3.4; 6.2 |
 | Delphi DLL | the DLL in Delphi 10.4 with DDetours: handler, hook, following changes, trace; `build.cmd`; the C++ spike retired | 3.2; 6.3 |
 | Register in the settings app | Register / Unregister for the current user, Explorer restarted when asked; also `--register` / `--unregister` (`src/settings/Registration.cs`) | 3.9 |
+| Seen items | each item seen recorded per kind of right-click, merged across right-clicks, those not always there marked, for the settings app | 3.6; plan 00 6.4, 6.5 |
 | Full menu at once | Windows 11 switched to the full menu (`register.ps1 -FullMenu` / `-ShortMenu` until the settings app) | 3.10 |
 
 ### Not yet built
@@ -45,8 +46,7 @@ On any doubt, Windows' own menu is shown untouched.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Spike, Open dialog | the same in an Open or Save dialog | -- | 3.1; 3.2 |
-| Seen items | each item seen recorded per kind of right-click, for the settings app | plan 02 Item tree | 3.6 |
-| Settings app | .NET 10 and WebView2: the layout edited from the seen items, a preview of the menu, on and off | Seen items | 3.7 |
+| Settings app | .NET 10 and WebView2: the layout edited from the seen items, a preview of the menu, on and off | -- | 3.7 |
 | Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | plan 02 Window | 3.8 |
 | Install | per machine registration by an installer, settings per user, off by default, removal | Delphi DLL | 3.9 |
 | Windows 11 menu | the full-menu switch in the settings app | Settings app | 3.10 |

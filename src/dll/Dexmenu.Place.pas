@@ -41,6 +41,8 @@ type
     function HasSubmenu: Boolean;
     function Checked: Boolean;
     function IsDefault: Boolean;
+    // Not always there (TNode.Sometimes): an item that is, or a card that found only such items.
+    function Sometimes: Boolean;
     function CardId: string;
     function RuleIndex: Integer;   // -1: none
   end;
@@ -156,6 +158,24 @@ end;
 function TViewCard.IsDefault: Boolean;
 begin
   Result := (Kind = vkItem) and Node.IsDefault;
+end;
+
+function TViewCard.Sometimes: Boolean;
+var
+  F: TFound;
+begin
+  case Kind of
+    vkItem: Result := Node.Sometimes;
+    vkGroup:
+      begin
+        for F in Items do
+          if not F.Node.Sometimes then
+            Exit(False);
+        Result := Items.Count > 0;
+      end;
+  else
+    Result := False;
+  end;
 end;
 
 function TViewCard.CardId: string;

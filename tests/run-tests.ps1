@@ -13,7 +13,10 @@ param([string]$Work = (Join-Path $env:TEMP 'dexmenu-tests'))
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot
 $host_ = Join-Path $root 'bin\DexmenuTest.exe'
-$env:DEXMENU_LAYOUT_FILE = $null   # the built-in base layout unless a case says otherwise
+# The base layout unless a case says otherwise; named, not left unset, as the user's own chosen layout
+# (%APPDATA%\Dexmenu\settings.json) would be used then.
+$baseLayout = Join-Path $root 'tests\layout-base.json'
+$env:DEXMENU_LAYOUT_FILE = $baseLayout
 $env:DEXMENU_SEEN_FOLDER = Join-Path $Work 'seen'   # the seen items of the tests' right-clicks, not the user's
 
 # Unit tests first (no Windows menu needed).
@@ -121,7 +124,7 @@ $env:DEXMENU_LAYOUT_FILE = "$Work\broken.json"
 WithLeft '' {
     $script:runs = @((Run @("$Work\a.txt") $true @('--expect-windows')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, broken layout' -PassThru)
 }
-$env:DEXMENU_LAYOUT_FILE = $null
+$env:DEXMENU_LAYOUT_FILE = $baseLayout
 Report 'a broken layout file: Windows'' own menu' $runs @() ''
 
 # The settings app (plan 00 step 4): its preview, drawn by the DLL from the seen items, shows the menu a right-click
@@ -149,6 +152,7 @@ function MenuCards([string[]]$hostOut) {
 }
 function Same($a, $b) { ($a | ForEach-Object { "$($_.Kind)|$($_.Text)|$($_.Enabled)|$($_.Sub)" }) -join "`n" -eq (($b | ForEach-Object { "$($_.Kind)|$($_.Text)|$($_.Enabled)|$($_.Sub)" }) -join "`n") }
 
+Remove-Item -Recurse -Force $env:DEXMENU_SEEN_FOLDER -ErrorAction SilentlyContinue   # only this right-click's items
 WithLeft '' {
     $script:runs = @((Run @("$Work\a.txt") $true) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, items recorded for the preview' -PassThru)
 }
@@ -181,7 +185,7 @@ try {
 finally {
     if (-not $app.HasExited) { [void]$app.CloseMainWindow(); if (-not $app.WaitForExit(5000)) { Stop-Process $app -Force } }
     $env:DEXMENU_DUMP = $null
-    $env:DEXMENU_LAYOUT_FILE = $null
+    $env:DEXMENU_LAYOUT_FILE = $baseLayout
 }
 Report 'the settings app: the preview is the menu, and follows the layout file' $runs $problems ": $($menu.Count) cards"
 
@@ -222,9 +226,44 @@ try {
 finally {
     if (-not $app.HasExited) { [void]$app.CloseMainWindow(); if (-not $app.WaitForExit(5000)) { Stop-Process $app -Force } }
     $env:DEXMENU_DUMP = $null
-    $env:DEXMENU_LAYOUT_FILE = $null
+    $env:DEXMENU_LAYOUT_FILE = $baseLayout
 }
 Report 'a layout of rules: the right-click and the preview show the same menu' $runs $problems ": $($menu.Count) cards"
+
+# The seen items merged (Dexmenu.Seen): one file right-clicked without and with a left side chosen in LexPen; the
+# preview shows LexPen's items of both, those of only one striped ("sometimes"), the others not.
+Remove-Item -Recurse -Force $env:DEXMENU_SEEN_FOLDER -ErrorAction SilentlyContinue
+WithLeft '' {
+    $script:runs = @((Run @("$Work\a.txt") $true) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, no left side' -PassThru)
+}
+WithLeft "$Work\left.txt" {
+    $script:runs += @((Run @("$Work\a.txt") $true) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, a left side chosen' -PassThru)
+}
+$problems = @()
+$env:DEXMENU_DUMP = Join-Path $Work 'preview-merged-dump.txt'
+$app = Start-Process (Join-Path $root 'bin\DexmenuSettings.exe') -ArgumentList '--kind', 'file' -PassThru
+try {
+    $cards = @()
+    for ($i = 0; $i -lt 150 -and $cards.Count -eq 0; $i++) {
+        Start-Sleep -Milliseconds 100
+        if (Test-Path $env:DEXMENU_DUMP) {
+            $cards = @(Get-Content $env:DEXMENU_DUMP -Encoding utf8 | Where-Object { $_ -match '^card item .* sometimes=(\d) .* text=(.*)$' } |
+                ForEach-Object { [pscustomobject]@{ Sometimes = $matches[1] -eq '1'; Text = $matches[2] } })
+        }
+    }
+    $want = @{ 'Select left side to compare' = $true; 'Select as new left side to compare' = $true; 'Compare to left.txt' = $true;
+        'Edit in LexPen' = $false; 'View in LexPen' = $false }
+    foreach ($k in $want.Keys) {
+        $c = @($cards | Where-Object Text -eq $k)
+        if ($c.Count -ne 1) { $problems += "the preview shows '$k' $($c.Count) time(s), expected once" }
+        elseif ($c[0].Sometimes -ne $want[$k]) { $problems += "'$k': sometimes=$($c[0].Sometimes), expected $($want[$k])" }
+    }
+}
+finally {
+    if (-not $app.HasExited) { [void]$app.CloseMainWindow(); if (-not $app.WaitForExit(5000)) { Stop-Process $app -Force } }
+    $env:DEXMENU_DUMP = $null
+}
+Report 'the seen items merged: items of only some right-clicks shown striped in the preview' $runs $problems ''
 
 # Registering for the current user from the settings app (Registration.cs), without restarting Explorer: unregistered,
 # then registered again (as the tests need it).

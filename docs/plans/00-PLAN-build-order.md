@@ -179,9 +179,8 @@ None.
 - The kind of right-click: the handler tells it from the items (`file`, `folder`, `several`, `background`, `drive`,
   else `default`); the menu uses that kind's lines in the layout (the default's when it has none).
 - Seen items (`src/dll/Dexmenu.Seen.pas`): after each menu Dexmenu showed, the items of that right-click, with the
-  Windows submenus that were opened, in `%APPDATA%\Dexmenu\seen\<kind>.json` (`DEXMENU_SEEN_FOLDER` for the tests).
-  The last right-click of a kind for now; merging what every right-click showed is left for later (the preview's
-  stripes, plan 03 3.10, need it).
+  Windows submenus that were opened, in `%APPDATA%\Dexmenu\seen\<kind>.json` (`DEXMENU_SEEN_FOLDER` for the tests),
+  merged across right-clicks (6.5).
 - The preview (`src/dll/Dexmenu.Preview.pas`, exported `DexmenuPreviewCreate`, `DexmenuPreviewSet`,
   `DexmenuBaseLayout`): a child window of the settings app; the seen items made into a real Windows menu again, then
   the same tree, placement and drawing as a right-click (the drawing split into rendering a level into an image and
@@ -225,6 +224,20 @@ None.
   selection cases: all pass; the rest (Send to, a broken layout, the settings app's preview, the self-test in the
   suite, a layout of rules at a right-click against the preview, a click inside a found card's submenu) was not run
   through: the run was stopped for low memory.
+- Seen items merged (`src/dll/Dexmenu.Seen.pas`): every item any right-click of a kind showed stays in its file, so
+  items an extension hides for some selections can be placed too. Items are matched per level by name (two of one
+  name one to one); an item missing from a level is kept after the item it followed (after the separator it followed,
+  too), and a submenu not opened this time keeps what was seen in it. An item not there every time is marked
+  `"sometimes"`: one of an earlier right-click missing now, one of this right-click missing earlier, and one Windows'
+  menu lost while shown (the session keeps what it read before each change, as Explorer deletes the items it hides
+  after the show). The preview draws those items, and a found card holding only such items, with diagonal stripes;
+  the menu at a right-click never does (`Render`'s `Editing`). Once marked, an item stays marked; an item no
+  right-click shows any more stays in the file (no way yet to forget one). Tested: unit tests of the merge (order,
+  separators, marking both ways, sticky, submenus opened or not, two of one name, the mark read back from the
+  preview's menu); a suite case: one file right-clicked without and with a left side chosen in LexPen, the preview
+  shows LexPen's items of both, the ones of only one striped (`sometimes=1` in the dump), Edit and View in LexPen not.
+  The suite names `tests\layout-base.json` for its base-layout cases, as an unset `DEXMENU_LAYOUT_FILE` picks the
+  user's own chosen layout.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

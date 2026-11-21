@@ -15,6 +15,7 @@ uses
   Dexmenu.Menus in '..\..\src\dll\Dexmenu.Menus.pas',
   Dexmenu.Tree in '..\..\src\dll\Dexmenu.Tree.pas',
   Dexmenu.Place in '..\..\src\dll\Dexmenu.Place.pas',
+  Dexmenu.Seen in '..\..\src\dll\Dexmenu.Seen.pas',
   System.JSON;
 
 var
@@ -363,11 +364,94 @@ begin
     'found none: the card is not shown');
 end;
 
+// The seen items merged (Dexmenu.Seen): names, '*' for "sometimes", a submenu's items in [ ], '-' a separator.
+function Items(const Text: string): TJSONArray;
+begin
+  Result := TJSONObject.ParseJSONValue(Text) as TJSONArray;
+end;
+
+function Shown(A: TJSONArray): string;
+var
+  V: TJSONValue;
+  O: TJSONObject;
+begin
+  Result := '';
+  for V in A do
+  begin
+    O := TJSONObject(V);
+    if Result <> '' then
+      Result := Result + ',';
+    if O.GetValue('separator') <> nil then
+    begin
+      Result := Result + '-';
+      Continue;
+    end;
+    Result := Result + O.GetValue('name').Value;
+    if O.GetValue('sometimes') <> nil then
+      Result := Result + '*';
+    if O.GetValue('items') is TJSONArray then
+      Result := Result + '[' + Shown(TJSONArray(O.GetValue('items'))) + ']';
+  end;
+end;
+
+function Merged(const Old, New: string; MarkNew: Boolean): string;
+var
+  O, N, M: TJSONArray;
+begin
+  O := nil;
+  if Old <> '' then
+    O := Items(Old);
+  N := Items(New);
+  M := MergeSeen(O, N, MarkNew);
+  try
+    Result := Shown(M);
+  finally
+    M.Free;
+    N.Free;
+    O.Free;
+  end;
+end;
+
+procedure TestSeen;
+const
+  ABC = '[ {"name":"A"}, {"name":"B"}, {"separator":true}, {"name":"C"} ]';
+  ACD = '[ {"name":"A"}, {"name":"C"}, {"name":"D"} ]';
+var
+  Menu: HMENU;
+  Error: string;
+  Top: TNodes;
+begin
+  Check(Merged(ABC, ACD, True) = 'A,B*,C,D*', 'merged: an old item missing now kept after the one it followed, ' +
+    'a new one marked: ' + Merged(ABC, ACD, True));
+  Check(Merged(ABC, ACD, False) = 'A,B*,C,D', 'within one right-click: only what was lost is marked: ' +
+    Merged(ABC, ACD, False));
+  Check(Merged('[ {"name":"A"}, {"separator":true}, {"name":"B"} ]', '[ {"name":"A"}, {"separator":true}, {"name":"C"} ]',
+    True) = 'A,-,B*,C*', 'an old item after a separator stays after it: ' + Merged('[ {"name":"A"}, {"separator":true}, ' +
+    '{"name":"B"} ]', '[ {"name":"A"}, {"separator":true}, {"name":"C"} ]', True));
+  Check(Merged('', ABC, True) = 'A,B,-,C', 'nothing seen before: nothing marked: ' + Merged('', ABC, True));
+  Check(Merged('[ {"name":"A","sometimes":true} ]', '[ {"name":"A"} ]', True) = 'A*', 'once not there, always marked');
+  Check(Merged('[ {"name":"S","submenu":true,"items":[ {"name":"x"}, {"name":"y"} ]} ]',
+    '[ {"name":"S","submenu":true} ]', True) = 'S[x,y]', 'a submenu not opened this time keeps what was seen in it');
+  Check(Merged('[ {"name":"S","submenu":true,"items":[ {"name":"x"}, {"name":"y"} ]} ]',
+    '[ {"name":"S","submenu":true,"items":[ {"name":"x"} ]} ]', True) = 'S[x,y*]', 'a submenu''s items merged too');
+  Check(Merged('[ {"name":"Open"}, {"name":"Open"} ]', '[ {"name":"Open"} ]', True) = 'Open,Open*',
+    'two items of one name: matched one to one');
+  Menu := MenuFromSeen('{ "items": [ {"text":"A","name":"A"}, {"text":"B","name":"B","sometimes":true} ] }', Error);
+  Top := ReadLevel(Menu, '');
+  try
+    Check((Top.Count = 2) and not Top[0].Sometimes and Top[1].Sometimes, 'the preview''s menu: "sometimes" read back');
+  finally
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 begin
   TestComments;
   TestLayouts;
   TestCurrent;
   TestRules;
+  TestSeen;
   if Failures = 0 then
     Writeln('OK')
   else
