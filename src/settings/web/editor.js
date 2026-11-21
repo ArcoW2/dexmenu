@@ -233,8 +233,11 @@ function ruleEditor(card, rule, index) {
 
 function renderCardPane() {
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
-  $("cardPane").hidden = !at;
-  if (!at) return;
+  if (!at) {
+    $("cardHeading").textContent = "Card";
+    $("card").replaceChildren(el("div", "hint", "Select a card to edit it and its rules."));
+    return;
+  }
   const card = at.card;
   $("cardHeading").textContent = M.isRemaining(card) ? "The remaining card" : card.menu ? "A card with a menu" : "A card with rules";
   const box = $("card");

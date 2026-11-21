@@ -30,7 +30,7 @@ sealed class MainForm : Form
     public MainForm(string? kindArgument, string? selftestFile)
     {
         Text = "Dexmenu";
-        Width = 1250;
+        Width = 1500;
         Height = 820;
         StartPosition = FormStartPosition.CenterScreen;
         selftest = selftestFile;
@@ -47,7 +47,7 @@ sealed class MainForm : Form
 
     async Task Start()
     {
-        split.SplitterDistance = Width * 52 / 100;
+        split.SplitterDistance = Width * 70 / 100;   // the page's three panes, then the preview
         if (selftest is null)
         {
             preview = Native.DexmenuPreviewCreate(previewPanel.Handle);
