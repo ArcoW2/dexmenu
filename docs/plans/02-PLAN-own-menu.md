@@ -42,7 +42,7 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Item tree | Windows' menu read into a tree with names and paths, kept live while shown | plan 01 Delphi DLL | 3.1; 3.2 |
-| Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, who gets an item, several found, the remaining card | Item tree | 3.3 |
+| Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the rules' priority list, several found, the remaining card | Item tree | 3.3 |
 | Layout editing | dragging cards: onto a card makes a menu (its rules kept in a first card), moving, the remaining card | Rules; plan 01 Settings app | 3.5 |
 | Settings and layouts | global settings; layouts per kind of right-click, saved under a name; JSON with comments | Rules | 3.4; 3.5 |
 | Window | Dexmenu's own window, drawn by the Delphi DLL: lines of cards, keys, mouse, closing, the id handed back | Settings and layouts | 3.6; 3.7; 3.8 |
@@ -100,9 +100,18 @@ in the layout is where its items show.
 - **States:** a set, `["enabled"]`, `["disabled"]` or both; an item whose state is in the set is taken. The default
   set is in the global settings (3.4). An item left out because it is disabled can be taken once Explorer enables it
   (plan 01 3.1).
-- **Who gets an item:** a card's results are every item its rules find. When the rules of two cards find the same
-  item, the card first in the layout (top to bottom, left to right) gets it; a rule with `also: true` shows it in its
-  card as well (a favourite in the icon row that also stays in its group); both hand back the same id.
+- **A found item takes its subitems:** an item with a submenu that a rule finds goes to that card as a whole, its
+  subitems following it as its submenu, except subitems already taken by a rule earlier in the order below.
+- **The order of the rules:** because of that, who gets an item cannot follow the cards' places in the layout. A
+  layout (per kind of right-click) has one priority list of all its rules, independent of where their cards stand;
+  the editor shows it and the user orders it by dragging. Rules take items in that order: an item goes to the first
+  rule that finds it and is not found again by a later one. So a rule for a deeper item (`7-Zip > Add to archive...`)
+  placed before the rule for its parent (`7-Zip`) takes that item first; the parent, taken later, keeps the rest of
+  its submenu. The other way round, the parent takes all its subitems and the later rule finds none of them. The
+  remaining card's rule is always last and is not in the list. A new rule goes at the end of the list, before the
+  remaining card's.
+- **Also:** a rule with `also: true` takes items even when an earlier rule has taken them, and shows them in its card
+  as well (a favourite in the icon row that also stays in its group); both hand back the same id.
 - **One expected, several found:** a card is an action when its rules find one item, and a card with a submenu
   holding all of them when they find more, without a change to the layout. A rule written for one item ("Open") that
   also finds "Open with" and "Open in new window" therefore still works. Found none: the card is not shown (the
@@ -115,8 +124,8 @@ in the layout is where its items show.
     in that submenu.
   - So a layout with only the remaining card at the root shows Windows' menu as it is, as cards: the starting point
     of every layout.
-  - An item with a submenu goes as a whole: its subitems follow it, as its submenu. A subitem another card's rule
-    took (scope `anywhere`, or a path) is in that card instead; the submenu shows what is left.
+  - An item with a submenu goes as a whole, as with any rule: its subitems follow it, except those another rule
+    took (scope `anywhere`, or a path); the submenu shows what is left.
   - By default it is at the root; the user can move it into any submenu and back, so the user decides where the rest
     goes. Items not seen before (plan 01 3.6) can be marked new.
 - **An item taken out of a Windows submenu** shows in its card; the submenu shows what is left.
@@ -176,6 +185,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   - dragging the last card out of a submenu: it keeps its rules, and the parent becomes a card with rules that has
     none. It stays in the layout, finds nothing and is not shown in the menu;
   - the remaining card is moved as any other, never deleted;
+  - the rules' priority list (3.3) in a list of its own beside the cards, ordered by dragging; selecting a rule there
+    marks its card in the editor and the preview, and the other way round;
   - cards that can never show anything are marked in the editor and the preview with a red outline (plan 03 3.10):
     a card with no rules, and a card with a rule that is invalid (a bad regex, a scope and a path both given). The
     layout is still saved and used; such a card is left out of the menu.
@@ -321,7 +332,9 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 ### 3.12 Tests
 
 - Rules on a tree made for the test, and on trees read by the test host (plan 01 6.1): every match kind, case,
-  the states set, scope or path (both given: an error), who gets an item and `also`, one expected and several found,
+  the states set, scope or path (both given: an error), a found item taking its subitems, the priority order (a
+  deeper item's rule before its parent's and after it, with the parent's submenu showing what is left), `also`, one
+  expected and several found,
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
 - Editing: a card dropped onto a card with rules makes a card with a menu whose first card has those rules; onto a
