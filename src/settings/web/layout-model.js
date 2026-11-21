@@ -127,6 +127,24 @@ const LayoutModel = (() => {
     renumber(lines);
   }
 
+  // A card's rule (index: its place in fromCard.rules) moved, or copied, onto another card with rules. A moved rule keeps
+  // its place in the priority list; a copy comes right after the original. Never the remaining card's rule, never onto
+  // a card with a menu or the remaining card. The rule now on toCard, or null.
+  function moveRuleToCard(lines, fromCard, index, toCard, copy) {
+    const rule = fromCard.rules && fromCard.rules[index];
+    if (!rule || rule === "remaining" || !toCard || toCard.menu || isRemaining(toCard)) return null;
+    if (!copy && fromCard === toCard) return null;
+    toCard.rules = toCard.rules || [];
+    let placed = rule;
+    if (copy) {
+      placed = JSON.parse(JSON.stringify(rule));
+      placed.priority = rule.priority + 0.5;   // renumbered right after the original
+    } else fromCard.rules.splice(index, 1);
+    toCard.rules.push(placed);
+    renumber(lines);
+    return placed;
+  }
+
   function addRule(lines, card) {
     const rule = { name: { contains: "" }, priority: ruleList(lines).length + 1 };
     card.rules = card.rules || [];
@@ -279,6 +297,6 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule,
+  return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard, addCard, makeMenu, remainingCount, withoutComments };
 })();

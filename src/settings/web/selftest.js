@@ -123,6 +123,28 @@
     "the card lists its rules in priority order: a2 #1, a1 #3");
   check(!M.moveCardRule(L.default, a, 0, 5), "a place beyond the card's rules: refused");
 
+  // a rule moved or copied onto another card
+  L = sample();
+  const zipCard = () => [...M.cards(L.default)].find(x => x.card.card === "Zip").card;
+  const lexCard = () => [...M.cards(L.default)].find(x => x.card.card === "LexPen").card;
+  const moved = M.moveRuleToCard(L.default, zipCard(), 0, lexCard(), false);
+  check(moved && lexCard().rules.length === 2 && zipCard().rules.length === 0, "Zip's rule moved onto LexPen");
+  check(moved.priority === 3 && M.ruleList(L.default).map(r => r.rule.priority).join() === "1,2,3,4", "it keeps its place in the list (#3)");
+  check(M.useless(zipCard()), "Zip has no rules left: outlined red");
+  L = sample();
+  const copied = M.moveRuleToCard(L.default, lexCard(), 0, zipCard(), true);
+  check(copied && lexCard().rules.length === 1 && zipCard().rules.length === 2, "LexPen's rule copied onto Zip");
+  check(M.ruleList(L.default).map(r => r.card.card).join() === "LexPen,Zip,Clip,Zip,Git", "the copy right after the original: " +
+    M.ruleList(L.default).map(r => r.card.card).join());
+  check(copied !== lexCard().rules[0] && JSON.stringify(copied.name) === JSON.stringify(lexCard().rules[0].name), "a copy, not the same rule");
+  L = sample();
+  const toolsCard = () => [...M.cards(L.default)].find(x => x.card.card === "Tools").card;
+  const restCard = () => [...M.cards(L.default)].find(x => x.card.card === "Rest").card;
+  check(!M.moveRuleToCard(L.default, lexCard(), 0, toolsCard(), false), "not onto a card with a menu");
+  check(!M.moveRuleToCard(L.default, lexCard(), 0, restCard(), false), "not onto the remaining card");
+  check(!M.moveRuleToCard(L.default, restCard(), 0, lexCard(), false), "the remaining card's rule is not moved");
+  check(!M.moveRuleToCard(L.default, lexCard(), 0, lexCard(), false), "moved onto its own card: nothing");
+
   // useless cards and rule problems
   check(M.useless({ card: "x", rules: [] }), "no rules: useless");
   check(M.useless({ card: "x", rules: [ { name: { regex: "(" } } ] }), "a regex that does not compile: useless");

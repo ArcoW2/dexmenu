@@ -74,6 +74,7 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 /* the rules view */
 #rules { margin: 0; padding-left: 26px; }
 #rules li { padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; cursor: grab; }
+#rules li.mine { background: var(--hover); }
 #rules li.selected { border-color: var(--accent); }
 #rules li.over { border-top: 2px solid var(--accent); }
 #rules li.fixed { cursor: default; color: var(--dim); list-style: none; }

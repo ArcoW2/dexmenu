@@ -107,6 +107,11 @@ function renderCard(card) {
     e.preventDefault();
     e.stopPropagation();
     box.classList.remove(...zones);
+    if (e.dataTransfer.types.includes("text/ruleref")) {   // a rule: onto the card, moved or (Shift) copied
+      e.dataTransfer.dropEffect = e.shiftKey ? "copy" : "move";
+      if (!card.menu && !M.isRemaining(card)) box.classList.add("over");
+      return;
+    }
     box.classList.add(zoneClass(dropZoneOf(box, e)));
   });
   box.addEventListener("dragleave", e => { e.stopPropagation(); box.classList.remove(...zones); });
@@ -114,11 +119,24 @@ function renderCard(card) {
     e.preventDefault();
     e.stopPropagation();
     box.classList.remove(...zones);
+    if (e.dataTransfer.types.includes("text/ruleref")) {
+      const ref = JSON.parse(e.dataTransfer.getData("text/ruleref"));
+      const from = M.find(linesOf(), ref.cardId);
+      const placed = from && M.moveRuleToCard(linesOf(), from.card, ref.index, card, e.shiftKey);
+      if (placed) { selectedId = card.id; selectedRule = card.rules.indexOf(placed); post({ type: "mark", cardId: card.id }); changed(); }
+      return;
+    }
     const dragged = e.dataTransfer.getData("text/card"), zone = dropZoneOf(box, e);
     const done = zone === "onto" ? M.dropOnCard(layout, linesOf(), dragged, card.id) : M.moveCardNext(linesOf(), dragged, card.id, zone);
     if (done) changed();
   });
   return box;
+}
+
+// A rule dragged: from the rules view or a card's panel; onto a card it is moved, with Shift copied.
+function startRuleDrag(e, card, index) {
+  e.dataTransfer.setData("text/ruleref", JSON.stringify({ cardId: card.id, index }));
+  e.dataTransfer.effectAllowed = "copyMove";
 }
 
 // Where on a card a drop lands: its top or bottom edge, a line of its own above or below the card's line; its left or
@@ -178,9 +196,13 @@ function ruleEditor(card, rule, index) {
   // Reordered by dragging its handle (the card's rules keep their places in the priority list, swapped among
   // themselves); numbered within the card, with its number in the priority list beside it.
   const handle = el("span", "handle", "::");
-  handle.title = "Drag to change the order of this card's rules";
   handle.draggable = true;
-  handle.addEventListener("dragstart", e => { e.stopPropagation(); e.dataTransfer.setData("text/cardrule", String(index)); });
+  handle.title = "Drag to change the order of this card's rules, or onto another card: move (Shift: copy)";
+  handle.addEventListener("dragstart", e => {
+    e.stopPropagation();
+    e.dataTransfer.setData("text/cardrule", String(index));
+    startRuleDrag(e, card, index);
+  });
   box.addEventListener("dragover", e => { if (e.dataTransfer.types.includes("text/cardrule")) { e.preventDefault(); box.classList.add("over"); } });
   box.addEventListener("dragleave", () => box.classList.remove("over"));
   box.addEventListener("drop", e => {
@@ -321,14 +343,18 @@ function renderRules() {
   const list = $("rules");
   list.replaceChildren();
   M.ruleList(linesOf()).forEach((r, i) => {
-    const li = el("li", r.card.id === selectedId && r.index === selectedRule ? "selected" : "");
+    const classes = [];
+    if (r.card.id === selectedId) classes.push("mine");   // the selected card's rules
+    if (r.card.id === selectedId && r.index === selectedRule) classes.push("selected");
+    const li = el("li", classes.join(" "));
+    li.title = "Drag to change its place in the list, or onto a card: move (Shift: copy)";
     li.draggable = true;
     li.append(el("span", "card-name", r.card.card), ": " + summary(r.rule));
     const problem = M.ruleProblem(r.rule);
     if (problem) li.append(el("span", "problem", problem));
     li.addEventListener("click", () => select(r.card.id, r.index));
-    li.addEventListener("dragstart", e => e.dataTransfer.setData("text/rule", String(i)));
-    li.addEventListener("dragover", e => { e.preventDefault(); li.classList.add("over"); });
+    li.addEventListener("dragstart", e => { e.dataTransfer.setData("text/rule", String(i)); startRuleDrag(e, r.card, r.index); });
+    li.addEventListener("dragover", e => { if (e.dataTransfer.types.includes("text/rule")) { e.preventDefault(); li.classList.add("over"); } });
     li.addEventListener("dragleave", () => li.classList.remove("over"));
     li.addEventListener("drop", e => {
       e.preventDefault();

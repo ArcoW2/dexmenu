@@ -262,6 +262,10 @@ None.
   edge on a line of its own above or below that line (a card that shared a line becomes menu-wide again), the middle
   onto it as before; the edge drawn while dragging. Tested: the editor's self-test (beside, both sides; above and
   below; into a card's menu; not into the card's own menu).
+- Rules and cards: the selected card's rules highlighted in the rules view; a rule dragged (from the rules view or
+  the card's panel) onto another card with rules is moved there, keeping its place in the priority list, or with
+  Shift copied, the copy right after the original. Never the remaining card's rule, never onto a card with a menu
+  or the remaining card. Tested: the editor's self-test.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.
