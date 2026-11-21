@@ -132,7 +132,10 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 - **States taken:** the default set of a rule, enabled, disabled or both (3.3).
 - **Most used:** the row on or off and how many items it shows (3.9).
 - **The active layout:** which named layout is used (3.5).
-- **Light and dark:** as Windows, or fixed.
+- **Light and dark:** follow Windows' mode, or fixed to light or to dark; a theme for light and one for dark
+  (`themeLight`, `themeDark`; plan 03 3.3).
+- **Animation:** for submenus and the `replace` change: none, slide (with a direction), fade or crossfade, and the
+  time it takes (plan 03 3.9).
 
 ### 3.5 Layouts
 
