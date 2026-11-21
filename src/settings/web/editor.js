@@ -319,6 +319,21 @@ async function askName() {
   return new Promise(resolve => dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok" ? $("nameInput").value.trim() : ""), { once: true }));
 }
 
+// Registration for this user (Registration.cs): the state, Register / Unregister, Explorer restarted when asked.
+function showRegistration(r, error) {
+  const s = $("regState");
+  if (!r) return;
+  if (r.registered && r.ours && r.enabled) { s.className = "on"; s.textContent = "Dexmenu is registered and on for you."; }
+  else if (r.registered && !r.ours) { s.className = "other"; s.textContent = "Another DexmenuShell.dll is registered: " + r.dll; }
+  else if (r.registered) { s.className = "off"; s.textContent = "Dexmenu is registered but switched off."; }
+  else { s.className = "off"; s.textContent = "Dexmenu is not registered: right-clicks show Windows' own menu."; }
+  if (error) { s.className = "other"; s.textContent = "Not done: " + error; }
+  $("register").disabled = r.registered && r.ours && r.enabled;
+  $("unregister").disabled = !r.registered;
+}
+$("register").addEventListener("click", () => post({ type: "register", restart: $("restart").checked }));
+$("unregister").addEventListener("click", () => post({ type: "unregister", restart: $("restart").checked }));
+
 $("kind").addEventListener("change", () => post({ type: "kind", kind: $("kind").value }));
 $("layouts").addEventListener("change", () => post({ type: "open", name: $("layouts").value }));
 $("save").addEventListener("click", async () => {
@@ -342,7 +357,8 @@ document.addEventListener("keydown", e => {
 
 chrome.webview.addEventListener("message", e => {
   const m = e.data;
-  if (m.type === "state") load(m);
+  if (m.type === "state") { showRegistration(m.registration); load(m); }
+  else if (m.type === "registration") showRegistration(m.registration, m.error);
   else if (m.type === "preview") { $("error").hidden = !m.error; $("error").textContent = m.error || ""; }
   else if (m.type === "placed" && m.cardId) {
     if (m.event === 2) select(m.cardId, m.rule);

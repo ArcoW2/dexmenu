@@ -135,7 +135,8 @@ sealed class MainForm : Form
             Post(new { type = "preview", error });
             return;
         }
-        Post(new { type = "state", kind, kinds, layout = text, source, name = LayoutName, layouts = LayoutNames(), active = ActiveName(), error });
+        Post(new { type = "state", kind, kinds, layout = text, source, name = LayoutName, layouts = LayoutNames(), active = ActiveName(), error,
+            registration = RegistrationState() });
     }
 
     void Post(object message) => web.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message));
@@ -181,7 +182,28 @@ sealed class MainForm : Form
             case "mark":
                 if (preview != IntPtr.Zero) Native.DexmenuPreviewMark(preview, Str("cardId"));
                 break;
+            case "register":
+            case "unregister":
+                try
+                {
+                    if (Str("type") == "register") Registration.Register(); else Registration.Unregister();
+                    if (m.TryGetProperty("restart", out var restart) && restart.GetBoolean()) Registration.RestartExplorer();
+                    Post(new { type = "registration", registration = RegistrationState() });
+                }
+                catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+                {
+                    Post(new { type = "registration", registration = RegistrationState(), error = e.Message });
+                }
+                break;
         }
+    }
+
+    // What the page shows about the registration: on for this user (this app's DLL), another DLL registered, or off.
+    static object RegistrationState()
+    {
+        var dll = Registration.RegisteredDll;
+        var ours = dll is not null && string.Equals(Path.GetFullPath(dll), Path.GetFullPath(Registration.DllPath), StringComparison.OrdinalIgnoreCase);
+        return new { registered = dll is not null, ours, dll, enabled = Registration.Enabled };
     }
 
     // The layout written under a name (layouts\<name>.json); with DEXMENU_LAYOUT_FILE (the tests) to that file.

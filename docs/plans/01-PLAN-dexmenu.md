@@ -37,6 +37,7 @@ On any doubt, Windows' own menu is shown untouched.
 | Spike, test host | the shell extension loaded, the show call caught, the top level arranged into a submenu of the user's own with Windows' items moved (same ids), put back after; checked in a test host | 3.1 - 3.4; 6.1 |
 | Spike, Explorer | the same in Explorer's full menu, with the states Explorer sets after the show; LexPen's items in "from LexPen" shown, hidden and run as without Dexmenu | 3.1; 3.4; 6.2 |
 | Delphi DLL | the DLL in Delphi 10.4 with DDetours: handler, hook, following changes, trace; `build.cmd`; the C++ spike retired | 3.2; 6.3 |
+| Register in the settings app | Register / Unregister for the current user, Explorer restarted when asked; also `--register` / `--unregister` (`src/settings/Registration.cs`) | 3.9 |
 | Full menu at once | Windows 11 switched to the full menu (`register.ps1 -FullMenu` / `-ShortMenu` until the settings app) | 3.10 |
 
 ### Not yet built
@@ -178,6 +179,11 @@ not as a fallback (the fallback is Windows' own menu).
 - Settings per user: on or off (`HKCU\Software\Dexmenu` `Enabled`), the layout and seen items in the user's
   `%APPDATA%\Dexmenu`, Windows' full menu (3.10, per user already). Off by default: every user has Windows' menu
   until they switch Dexmenu on in the settings app. Off, the DLL is loaded but sets no hook (6.1).
+- The settings app registers Dexmenu for the current user (no administrator): the DLL next to it as the handler, and
+  switched on; and unregisters it (the handler entries gone, switched off). With "Restart Explorer afterwards" (on by
+  default) it ends Explorer and starts it again, as Explorer loads the DLL, or lets go of it, only when it starts; its
+  open windows close. The same from the command line: `DexmenuSettings.exe --register | --unregister
+  [--restart-explorer]`. Per user, so elevated programs keep Windows' menu; every user of the computer: the installer.
 - `register.ps1` (per user, no administrator) stays a developer's tool for building and testing.
 - Removal: the registration taken away; Explorer restarted or signed out and in, as for any shell extension.
 

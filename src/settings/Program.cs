@@ -2,10 +2,18 @@ namespace Dexmenu.Settings;
 
 static class Program
 {
-    /// <summary>DexmenuSettings.exe [--kind &lt;kind of right-click&gt;] [--selftest &lt;file&gt;]</summary>
+    /// <summary>DexmenuSettings.exe [--kind &lt;kind of right-click&gt;] [--selftest &lt;file&gt;]
+    /// DexmenuSettings.exe --register | --unregister [--restart-explorer]   (no window; for scripts and the tests)</summary>
     [STAThread]
-    static void Main(string[] args)
+    static int Main(string[] args)
     {
+        if (args.Contains("--register") || args.Contains("--unregister"))
+        {
+            if (args.Contains("--register")) Registration.Register();
+            else Registration.Unregister();
+            if (args.Contains("--restart-explorer")) Registration.RestartExplorer();
+            return 0;
+        }
         string? kind = null, selftest = null;
         for (var i = 0; i < args.Length - 1; i++)
         {
@@ -14,5 +22,6 @@ static class Program
         }
         ApplicationConfiguration.Initialize();
         Application.Run(new MainForm(kind, selftest));
+        return 0;
     }
 }
