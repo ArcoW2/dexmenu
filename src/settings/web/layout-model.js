@@ -96,8 +96,25 @@ const LayoutModel = (() => {
     return list;
   }
 
+  // Priorities 1..n in the list's order; each card's rules kept in that order too (the remaining card's rule first).
   function renumber(lines) {
     ruleList(lines).forEach((r, i) => { r.rule.priority = i + 1; });
+    for (const at of cards(lines))
+      if (Array.isArray(at.card.rules))
+        at.card.rules.sort((a, b) => (a === "remaining" ? 0 : a.priority) - (b === "remaining" ? 0 : b.priority));
+  }
+
+  // A card's rule moved within the card (from, to: places among the card's own rules, in priority order). The card's
+  // rules keep the places they hold in the priority list; only their order among themselves changes.
+  function moveCardRule(lines, card, from, to) {
+    const own = card.rules.filter(r => r !== "remaining").sort((a, b) => a.priority - b.priority);
+    if (from < 0 || from >= own.length || to < 0 || to >= own.length || from === to) return false;
+    const slots = own.map(r => r.priority);
+    const [moved] = own.splice(from, 1);
+    own.splice(to, 0, moved);
+    own.forEach((r, i) => { r.priority = slots[i]; });
+    renumber(lines);
+    return true;
   }
 
   // The rule at place `from` in the priority list moved to place `to`.
@@ -106,6 +123,7 @@ const LayoutModel = (() => {
     const [moved] = list.splice(from, 1);
     list.splice(to, 0, moved);
     list.forEach((r, i) => { r.rule.priority = i + 1; });
+    renumber(lines);
   }
 
   function addRule(lines, card) {
@@ -239,6 +257,6 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule,
+  return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, deleteCard, addCard, makeMenu, remainingCount, withoutComments };
 })();

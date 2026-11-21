@@ -80,6 +80,21 @@
   M.deleteRule(L.default, [...M.cards(L.default)].find(a => a.card.card === "Zip").card, 1);
   check(M.ruleList(L.default).length === 4, "a rule deleted");
 
+  // a card's own rules reordered: they keep their places in the priority list, swapped among themselves
+  L = M.ensureIds({ default: [
+    { line: [ { card: "A", rules: [ { name: { equals: "a1" } }, { name: { equals: "a2" } } ] } ] },
+    { line: [ { card: "B", rules: [ { name: { equals: "b1" } } ] } ] },
+    { line: [ { card: "Rest", rules: [ "remaining" ] } ] }
+  ] });
+  const a = [...M.cards(L.default)].find(x => x.card.card === "A").card;
+  M.moveRule(L.default, 2, 1);   // the list: a1, b1, a2
+  check(M.ruleList(L.default).map(r => r.rule.name.equals).join() === "a1,b1,a2", "the list: a1, b1, a2");
+  check(M.moveCardRule(L.default, a, 1, 0), "card A's second rule (a2) moved to its first place");
+  check(M.ruleList(L.default).map(r => r.rule.name.equals).join() === "a2,b1,a1", "a2 took a1's place (#1), a1 a2's (#3); b1 stays #2");
+  check(a.rules.map(r => r.name.equals).join() === "a2,a1" && a.rules.map(r => r.priority).join() === "1,3",
+    "the card lists its rules in priority order: a2 #1, a1 #3");
+  check(!M.moveCardRule(L.default, a, 0, 5), "a place beyond the card's rules: refused");
+
   // useless cards and rule problems
   check(M.useless({ card: "x", rules: [] }), "no rules: useless");
   check(M.useless({ card: "x", rules: [ { name: { regex: "(" } } ] }), "a regex that does not compile: useless");

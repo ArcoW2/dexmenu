@@ -145,8 +145,26 @@ function matchEditor(match, onChange) {
 
 function ruleEditor(card, rule, index) {
   const box = el("div", "rule" + (index === selectedRule ? " selected" : ""));
+  // Reordered by dragging its handle (the card's rules keep their places in the priority list, swapped among
+  // themselves); numbered within the card, with its number in the priority list beside it.
+  const handle = el("span", "handle", "::");
+  handle.title = "Drag to change the order of this card's rules";
+  handle.draggable = true;
+  handle.addEventListener("dragstart", e => { e.stopPropagation(); e.dataTransfer.setData("text/cardrule", String(index)); });
+  box.addEventListener("dragover", e => { if (e.dataTransfer.types.includes("text/cardrule")) { e.preventDefault(); box.classList.add("over"); } });
+  box.addEventListener("dragleave", () => box.classList.remove("over"));
+  box.addEventListener("drop", e => {
+    box.classList.remove("over");
+    const from = e.dataTransfer.getData("text/cardrule");
+    if (from === "") return;
+    e.preventDefault();
+    if (M.moveCardRule(linesOf(), card, +from, index)) { selectedRule = index; changed(); }
+  });
   const head = el("div", "row");
-  head.append(el("span", "badge", "#" + rule.priority), el("span", "", "Name"),
+  const number = el("span", "number", (index + 1) + ".");
+  const priority = el("span", "badge", "#" + rule.priority);
+  priority.title = "Its place in the priority list";
+  head.append(handle, number, priority, el("span", "", "Name"),
     ...matchEditor(rule.name, m => { rule.name = m; changed(); }));
   const where = el("div", "row");
   const placeSel = el("select");

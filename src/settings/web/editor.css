@@ -49,6 +49,9 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .rule { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
 .rule.selected { border-color: var(--accent); }
+.rule.over { box-shadow: 0 -2px 0 var(--accent); }
+.rule .handle { cursor: grab; color: var(--dim); font-weight: 700; letter-spacing: -1px; padding: 0 2px; }
+.rule .number { font-weight: 600; min-width: 1.6em; }
 .rule .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 3px 0; }
 .rule .row input[type=text] { flex: 1; min-width: 120px; }
 .problem { color: var(--bad); font-size: 12px; }
