@@ -59,8 +59,7 @@ sealed class MainForm : Form
         var data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Dexmenu", "WebView2");
         var env = await CoreWebView2Environment.CreateAsync(null, data);
         await web.EnsureCoreWebView2Async(env);
-        web.CoreWebView2.SetVirtualHostNameToFolderMapping("dexmenu.app", Path.Combine(AppContext.BaseDirectory, "web"),
-            CoreWebView2HostResourceAccessKind.Allow);
+        WebFiles.Serve(web.CoreWebView2);
         web.CoreWebView2.WebMessageReceived += (_, e) => Received(e.WebMessageAsJson);
         web.CoreWebView2.NavigationCompleted += (_, _) => { pageReady = true; Reload(); };
         web.CoreWebView2.Navigate("https://dexmenu.app/" + (selftest is null ? "index.html" : "selftest.html"));
