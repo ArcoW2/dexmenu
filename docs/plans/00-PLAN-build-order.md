@@ -248,6 +248,13 @@ None.
   subitems); the editor's self-test (the drops next to a card's own line, `consume` valid or not); the suite's rules
   case (LexPen's items at the top, then Tools; the preview the same; View in LexPen chosen). Not tested automatically:
   the click closing a submenu.
+- The preview's right-click (plan 02 3.8): "Right-click on" moved from the page to a bar above the preview, with a
+  base folder and the item(s) in it; with a folder, Windows' real menu of that right-click there
+  (`src/settings/ShellMenu.cs`, made into seen items' text by the DLL's `DexmenuSeenOfMenu`, merged with the seen
+  file so hidden items show striped). `DexmenuSettings.exe --live <out> <kind> <folder> [item ...]` writes that text,
+  for the tests. Tested: a suite case (a file in the work folder: LexPen's items, 7-Zip's submenu filled; a folder's
+  empty part: a menu); by a run here, this repository's empty part shows TortoiseGit's Pull, Push and Commit, a
+  folder outside it Clone and Create repository. The bar itself only started, not driven by a test.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

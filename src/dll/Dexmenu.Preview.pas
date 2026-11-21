@@ -32,12 +32,16 @@ type
 procedure DexmenuPreviewSetCallback(Wnd: HWND; Callback: TPreviewCallback); stdcall;
 // Marks the items a card placed (the card selected in the editor); '' marks none.
 procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;
+// A real Windows menu (the settings app built it for a right-click in a folder, its submenus filled) as seen items'
+// text: every level read, merged into Seen (a seen file's text, or '') as within one right-click, so items Seen has
+// and this menu lacks are kept, marked "sometimes". Into Buffer; the number of characters it needs (with the #0).
+function DexmenuSeenOfMenu(Menu: HMENU; Seen, Kind: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 
 implementation
 
 uses
-  Winapi.Messages, Winapi.D2D1, System.SysUtils, System.Math, System.Classes, System.Generics.Collections,
-  Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen;
+  Winapi.Messages, Winapi.D2D1, System.SysUtils, System.Math, System.Classes, System.Generics.Collections, System.JSON,
+  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen;
 
 const
   PreviewClassName = 'DexmenuPreview';
@@ -497,6 +501,60 @@ begin
   P := PreviewOf(Wnd);
   if P <> nil then
     P.Callback := Callback;
+end;
+
+procedure ReadDeep(Nodes: TNodes);
+var
+  N: TNode;
+begin
+  for N in Nodes do
+    if (N.SubMenu <> 0) and not N.IsSeparator then
+    begin
+      ReadChildren(N);
+      ReadDeep(N.Children);
+    end;
+end;
+
+function DexmenuSeenOfMenu(Menu: HMENU; Seen, Kind: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+var
+  Top: TNodes;
+  Live, Merged: TJSONArray;
+  Before: TJSONValue;
+  Old: TJSONArray;
+  Root: TJSONObject;
+  Text, Error: string;
+begin
+  Text := '';
+  try
+    Top := ReadLevel(Menu, '');
+    Before := nil;
+    Live := nil;
+    Root := TJSONObject.Create;
+    try
+      ReadDeep(Top);
+      Live := SeenJson(Top);
+      Old := nil;
+      if (Seen <> nil) and (Seen^ <> #0) then
+        Before := ParseWithComments(Seen, Error);
+      if (Before is TJSONObject) and (TJSONObject(Before).GetValue('items') is TJSONArray) then
+        Old := TJSONArray(TJSONObject(Before).GetValue('items'));
+      Merged := MergeSeen(Old, Live, False);
+      Root.AddPair('kind', string(Kind));
+      Root.AddPair('items', Merged);
+      Text := Root.Format(2);
+    finally
+      Root.Free;
+      Live.Free;
+      Before.Free;
+      Top.Free;
+    end;
+  except
+    on E: Exception do
+      Log('seen of a menu: ' + E.Message);
+  end;
+  Result := Length(Text) + 1;
+  if (Buffer <> nil) and (Chars > 0) then
+    StrPLCopy(Buffer, Text, Chars - 1);
 end;
 
 procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;

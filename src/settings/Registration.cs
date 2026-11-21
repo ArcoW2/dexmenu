@@ -82,6 +82,10 @@ static class Registration
             if (Process.GetProcessesByName("explorer").Any(p => p.SessionId == session)) return;
             Thread.Sleep(100);
         }
-        Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true });
+        // without this process's DEXMENU_EDITOR (Program), else Dexmenu would stay out of that Explorer
+        var start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
+            { UseShellExecute = false };
+        start.Environment.Remove("DEXMENU_EDITOR");
+        Process.Start(start);
     }
 }

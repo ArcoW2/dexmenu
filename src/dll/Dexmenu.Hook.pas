@@ -238,11 +238,21 @@ begin
   end;
 end;
 
+// The settings app builds Windows' real menu for its preview, so Dexmenu's handler runs in it too, maybe from another
+// copy of this DLL (the registered one) than the one the app loads itself: the app says it is the editor in its
+// environment (DEXMENU_EDITOR=1), which every copy reads. There the handler notes nothing and sets no hook.
+function InEditor: Boolean;
+var
+  Env: array[0..7] of Char;
+begin
+  Result := (GetEnvironmentVariable('DEXMENU_EDITOR', Env, Length(Env)) > 0) and (Env[0] = '1');
+end;
+
 procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind: string);
 var
   I: Integer;
 begin
-  if (Flags and $00000001 <> 0) or not Enabled or not SetHooks then   // CMF_DEFAULTONLY: a double-click, no menu
+  if InEditor or (Flags and $00000001 <> 0) or not Enabled or not SetHooks then   // CMF_DEFAULTONLY: a double-click, no menu
     Exit;
   NotedLock.Enter;
   try

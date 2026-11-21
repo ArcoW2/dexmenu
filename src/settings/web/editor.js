@@ -2,10 +2,10 @@
 // (a tree of lines and submenus, dragged around; a card selected shows its name, title, extra text and rules) and the
 // rules in priority order (dragged to change it). Every change goes to the app at once ({ type: "edit", layout }),
 // which has the DLL draw the preview from it; saving writes the file. The app sends:
-//   { type: "state", kind, kinds, layout, source, name, layouts, active, error }   a layout (re)loaded
+//   { type: "state", kind, kindName, layout, source, name, layouts, active, error }   a layout (re)loaded
 //   { type: "preview", error }                                                      the preview of an edit
 //   { type: "placed", event, cardId, rule }      the preview: an item hovered (1) or clicked (2): who placed it
-// and gets { type: "kind" | "edit" | "save" | "open" | "activate" | "mark", ... } back.
+// and gets { type: "edit" | "save" | "open" | "activate" | "mark", ... } back.
 "use strict";
 
 const M = LayoutModel;
@@ -319,11 +319,8 @@ function render() {
 }
 
 function load(state) {
-  if (state.kinds) {
-    $("kind").replaceChildren(...state.kinds.map(k => { const o = el("option", "", kindNames[k] || k); o.value = k; return o; }));
-    $("kind").value = state.kind;
-  }
-  kind = state.kind;
+  kind = state.kind;   // chosen above the preview (the app)
+  $("kindName").textContent = "for a right-click on " + (state.kindName || kindNames[kind] || kind);
   const names = [...new Set([...(state.layouts || []), state.name].filter(Boolean))];
   $("layouts").replaceChildren(...names.map(n => {
     const o = el("option", "", n + (n === state.active ? " (active)" : ""));
@@ -372,7 +369,6 @@ function showRegistration(r, error) {
 $("register").addEventListener("click", () => post({ type: "register", restart: $("restart").checked }));
 $("unregister").addEventListener("click", () => post({ type: "unregister", restart: $("restart").checked }));
 
-$("kind").addEventListener("change", () => post({ type: "kind", kind: $("kind").value }));
 $("layouts").addEventListener("change", () => post({ type: "open", name: $("layouts").value }));
 $("save").addEventListener("click", async () => {
   let name = $("layouts").value;

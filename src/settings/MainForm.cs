@@ -10,12 +10,27 @@ namespace Dexmenu.Settings;
 /// items that kind of right-click showed. Every edit goes to the preview at once; saving writes the layout file. The
 /// file, settings.json and the seen items are watched: a change reloads them (an unsaved edit is kept). An item hovered
 /// or clicked in the preview selects the card and rule that placed it; a card selected marks its items there.
+/// Above the preview: the kind of right-click, and a base folder with the item(s) right-clicked in it; with a folder
+/// the preview shows Windows' real menu of that right-click there (ShellMenu: a Git folder differs from an SVN one),
+/// the seen items' others striped; without one, the seen items of that kind.
 /// With --selftest &lt;file&gt; it runs the editor's self-test (web\selftest.html) instead, writes its lines to the file
 /// and exits with the number of failures.</summary>
 sealed class MainForm : Form
 {
     readonly WebView2 web = new() { Dock = DockStyle.Fill };
     readonly Panel previewPanel = new() { Dock = DockStyle.Fill };
+    readonly FlowLayoutPanel previewBar = new() { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4) };
+    readonly ComboBox kindBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
+    readonly TextBox folderBox = new() { ReadOnly = true, Width = 230, PlaceholderText = "no folder: the seen items" };
+    readonly Button folderButton = new() { Text = "Folder...", AutoSize = true };
+    readonly Button noFolderButton = new() { Text = "x", Width = 24 };
+    readonly ComboBox itemBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+    readonly Button itemsButton = new() { AutoSize = true };
+    readonly CheckedListBox itemsList = new() { CheckOnClick = true, Width = 260, Height = 300, BorderStyle = BorderStyle.None };
+    readonly ToolStripDropDown itemsDrop = new() { Padding = Padding.Empty };
+    readonly Label liveError = new() { AutoSize = true, ForeColor = Color.Firebrick, Padding = new Padding(0, 6, 0, 0) };
+    string? folder;          // the base folder; null: the seen items
+    string? liveSeen;        // Windows' real menu there, as seen items' text (merged with the seen file)
     readonly SplitContainer split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
     readonly System.Windows.Forms.Timer settle = new() { Interval = 150 };
     readonly List<FileSystemWatcher> watchers = [];
@@ -39,6 +54,9 @@ sealed class MainForm : Form
         callback = Placed;
         split.Panel1.Controls.Add(web);
         split.Panel2.Controls.Add(previewPanel);
+        split.Panel2.Controls.Add(previewBar);
+        previewPanel.BringToFront();   // docked last: the room the bar leaves
+        BuildPreviewBar();
         Controls.Add(split);
         settle.Tick += (_, _) => { settle.Stop(); Reload(); };
         previewPanel.Resize += (_, _) => FitPreview();
@@ -64,6 +82,99 @@ sealed class MainForm : Form
         web.CoreWebView2.NavigationCompleted += (_, _) => { pageReady = true; Reload(); };
         web.CoreWebView2.Navigate("https://dexmenu.app/" + (selftest is null ? "index.html" : "selftest.html"));
     }
+
+    static readonly (string Kind, string Name)[] Kinds =
+        [("file", "a file"), ("folder", "a folder"), ("several", "several items"), ("background", "a folder's empty part"), ("drive", "a drive")];
+
+    void BuildPreviewBar()
+    {
+        Label Text(string t) => new() { Text = t, AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
+        foreach (var (k, name) in Kinds) kindBox.Items.Add(name);
+        if (!Kinds.Any(x => x.Kind == kind)) kind = "file";
+        kindBox.SelectedIndex = Array.FindIndex(Kinds, x => x.Kind == kind);
+        itemsDrop.Items.Add(new ToolStripControlHost(itemsList) { Padding = Padding.Empty, AutoSize = false, Size = itemsList.Size });
+        previewBar.Controls.AddRange([Text("Right-click on"), kindBox, Text("in"), folderBox, folderButton, noFolderButton, itemBox, itemsButton, liveError]);
+        kindBox.SelectedIndexChanged += (_, _) => { kind = Kinds[kindBox.SelectedIndex].Kind; FillItems(); Live(); Reload(); };
+        folderButton.Click += (_, _) =>
+        {
+            using var dialog = new FolderBrowserDialog { SelectedPath = folder ?? "", Description = "The folder in which the preview's right-click is" };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            folder = dialog.SelectedPath;
+            FillItems();
+            Live();
+            Reload();
+        };
+        noFolderButton.Click += (_, _) => { folder = null; FillItems(); Live(); Reload(); };
+        itemBox.SelectedIndexChanged += (_, _) => { if (itemBox.Visible) { Live(); Reload(); } };
+        itemsButton.Click += (_, _) => itemsDrop.Show(itemsButton, 0, itemsButton.Height);
+        itemsList.ItemCheck += (_, _) => BeginInvoke(() => { ItemsButtonText(); Live(); Reload(); });
+        FillItems();
+    }
+
+    // The items the kind right-clicks in the folder: files (a file), subfolders (a folder), both (several); the first
+    // ones chosen. The folder's empty part and the drive need none.
+    void FillItems()
+    {
+        folderBox.Text = folder ?? "";
+        noFolderButton.Visible = folder is not null;
+        var entries = new List<string>();
+        if (folder is not null && Directory.Exists(folder))
+        {
+            var info = new DirectoryInfo(folder);
+            bool Shown(FileSystemInfo f) => (f.Attributes & (FileAttributes.Hidden | FileAttributes.System)) == 0;
+            try
+            {
+                if (kind is "folder" or "several")
+                    entries.AddRange(info.EnumerateDirectories().Where(Shown).Select(d => d.Name).Order(StringComparer.OrdinalIgnoreCase));
+                if (kind is "file" or "several")
+                    entries.AddRange(info.EnumerateFiles().Where(Shown).Select(f => f.Name).Order(StringComparer.OrdinalIgnoreCase));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
+        var one = folder is not null && kind is "file" or "folder";
+        itemBox.Visible = false;
+        itemBox.Items.Clear();
+        if (one)
+        {
+            itemBox.Items.AddRange([.. entries]);
+            if (entries.Count > 0) itemBox.SelectedIndex = 0;
+        }
+        itemBox.Visible = one;
+        itemsList.Items.Clear();
+        for (var i = 0; i < entries.Count; i++) itemsList.Items.Add(entries[i], kind == "several" && i < 2);
+        itemsButton.Visible = folder is not null && kind == "several";
+        ItemsButtonText();
+    }
+
+    void ItemsButtonText()
+    {
+        var n = itemsList.CheckedItems.Count;
+        itemsButton.Text = n == 0 ? "Choose items..." : n + (n == 1 ? " item: " : " items: ") + string.Join(", ", itemsList.CheckedItems.Cast<string>().Take(2)) + (n > 2 ? ", ..." : "");
+    }
+
+    // Windows' real menu of the right-click in the folder, or none (the seen items).
+    void Live()
+    {
+        liveSeen = null;
+        liveError.Text = "";
+        if (folder is null) return;
+        IReadOnlyList<string> chosen = kind switch
+        {
+            "file" or "folder" => itemBox.SelectedItem is string s ? [Path.Combine(folder, s)] : [],
+            "several" => itemsList.CheckedItems.Cast<string>().Select(s => Path.Combine(folder, s)).ToList(),
+            _ => [],
+        };
+        if (kind is "file" or "folder" or "several" && chosen.Count == 0) { liveError.Text = "nothing to right-click here"; return; }
+        Cursor = Cursors.WaitCursor;
+        try
+        {
+            liveSeen = ShellMenu.SeenOf(Handle, kind, folder, chosen, DataFolder.ReadSeen(kind), out var error);
+            liveError.Text = error;
+        }
+        finally { Cursor = Cursors.Default; }
+    }
+
+    string SeenText() => liveSeen ?? DataFolder.ReadSeen(kind);
 
     void FitPreview()
     {
@@ -125,16 +236,14 @@ sealed class MainForm : Form
         var text = FileText(out var source);
         var error = preview == IntPtr.Zero
             ? "DexmenuShell.dll did not make the preview"
-            : Native.SetPreview(preview, editedText ?? text, DataFolder.ReadSeen(kind), kind);
+            : Native.SetPreview(preview, editedText ?? text, SeenText(), kind);
         if (!pageReady) return;
-        var kinds = DataFolder.SeenKinds();
-        if (!kinds.Contains(kind)) kinds = [kind, .. kinds];
         if (editedText is not null)
         {
             Post(new { type = "preview", error });
             return;
         }
-        Post(new { type = "state", kind, kinds, layout = text, source, name = LayoutName, layouts = LayoutNames(), active = ActiveName(), error,
+        Post(new { type = "state", kind, kindName = Kinds.FirstOrDefault(x => x.Kind == kind).Name ?? kind, layout = text, source, name = LayoutName, layouts = LayoutNames(), active = ActiveName(), error,
             registration = RegistrationState() });
     }
 
@@ -154,14 +263,11 @@ sealed class MainForm : Form
                 File.WriteAllLines(selftest!, m.GetProperty("lines").EnumerateArray().Select(l => l.GetString() ?? ""));
                 Environment.Exit(m.GetProperty("failures").GetInt32());
                 break;
-            case "kind":
-                if (Str("kind") is { Length: > 0 } k) { kind = k; Reload(); }
-                break;
             case "edit":
                 // quiet: the editor only added ids to what it loaded; the preview gets them, but it is no unsaved change,
                 // so the file on disk is still followed
                 if (!m.TryGetProperty("quiet", out _)) editedText = Str("layout");
-                Post(new { type = "preview", error = Native.SetPreview(preview, Str("layout"), DataFolder.ReadSeen(kind), kind) });
+                Post(new { type = "preview", error = Native.SetPreview(preview, Str("layout"), SeenText(), kind) });
                 break;
             case "save":
                 Save(Str("name"), Str("layout"));

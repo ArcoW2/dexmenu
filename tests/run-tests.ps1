@@ -271,6 +271,34 @@ finally {
 }
 Report 'the seen items merged: items of only some right-clicks shown striped in the preview' $runs $problems ''
 
+# The preview's live menu (ShellMenu, DexmenuSettings.exe --live): Windows' real menu of a right-click in a base folder,
+# its submenus filled; a file in the work folder has LexPen's items and 7-Zip's filled submenu; the empty part of a
+# folder has a menu too.
+$problems = @()
+$liveOut = Join-Path $Work 'live.json'
+function LiveMenu([string[]]$liveArgs) {
+    Remove-Item $liveOut -ErrorAction SilentlyContinue
+    $p = Start-Process (Join-Path $root 'bin\DexmenuSettings.exe') -ArgumentList (@('--live', "`"$liveOut`"") + ($liveArgs | ForEach-Object { "`"$_`"" })) -PassThru
+    if (-not $p.WaitForExit(60000)) { Stop-Process $p -Force; return $null }
+    if ($p.ExitCode -ne 0) { return $null }
+    Get-Content $liveOut -Raw -Encoding utf8 | ConvertFrom-Json
+}
+function Names($items) { foreach ($i in $items) { if ($i.name) { $i.name }; if ($i.items) { Names $i.items } } }
+WithLeft '' {
+    $live = LiveMenu @('file', $Work, "$Work\a.txt")
+    if ($null -eq $live) { $script:problems += 'a file: no menu' }
+    else {
+        $names = @(Names $live.items)
+        foreach ($n in 'Select left side to compare', 'Edit in LexPen', 'View in LexPen') { if ($names -notcontains $n) { $script:problems += "a file: '$n' missing" } }
+        $zip = $live.items | Where-Object name -eq '7-Zip'
+        if ($zip -and -not $zip.items) { $script:problems += 'a file: 7-Zip''s submenu not filled' }
+    }
+}
+$live = LiveMenu @('background', $Work)
+if ($null -eq $live -or @(Names $live.items).Count -eq 0) { $problems += 'a folder''s empty part: no menu' }
+$runs = @()
+Report 'the preview''s live menu: Windows'' real menu of a right-click in a folder' $runs $problems ''
+
 # Registering for the current user from the settings app (Registration.cs), without restarting Explorer: unregistered,
 # then registered again (as the tests need it).
 function RegState {

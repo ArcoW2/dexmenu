@@ -8,7 +8,6 @@
 </head>
 <body>
   <header>
-    <label>Right-click on <select id="kind"></select></label>
     <span class="grow"></span>
     <label>Layout <select id="layouts"></select></label>
     <span id="dirty" hidden>changed</span>
@@ -32,7 +31,7 @@
       <ol id="rules"></ol>
     </section>
     <section class="pane" id="cardsPane">
-      <h2>Cards <button id="addTop" title="A new card at the end of the menu">+ Card</button></h2>
+      <h2>Cards <span class="hint" id="kindName"></span> <button id="addTop" title="A new card at the end of the menu">+ Card</button></h2>
       <div id="cards"></div>
     </section>
     <section class="pane" id="cardPane">

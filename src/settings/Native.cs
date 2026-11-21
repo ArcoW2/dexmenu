@@ -29,6 +29,10 @@ static class Native
     [DllImport(Dll, CharSet = CharSet.Unicode)]
     static extern int DexmenuBaseLayout(StringBuilder? buffer, int chars);
 
+    /// <summary>A real menu (ShellMenu) as seen items' text, merged into a seen file's text; the characters it needs.</summary>
+    [DllImport(Dll, CharSet = CharSet.Unicode)]
+    public static extern int DexmenuSeenOfMenu(IntPtr menu, string seen, string kind, StringBuilder? buffer, int chars);
+
     [DllImport("user32.dll")]
     public static extern bool MoveWindow(IntPtr wnd, int x, int y, int width, int height, bool repaint);
 

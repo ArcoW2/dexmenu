@@ -297,7 +297,16 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 - In the preview, an item that is not always there (seen, but hidden for some selections, or removed late by
   Explorer) and a card that would be empty are shown as unavailable: diagonal stripes, so the layout can be made for
   them too. The use count of every item can be shown on it (3.9).
-- In the settings app the DLL sets no hook: it only draws. The DLL is 64-bit, so the settings app runs 64-bit.
+- What the preview is a right-click of: chosen above it, the kind of right-click and a base folder with the item(s)
+  in it (a file or a folder picked from the folder's, several checked, nothing more for the folder's empty part or
+  its drive). With a folder the settings app asks Windows for the real menu of that right-click there, as Explorer
+  does, every submenu opened once, so a Git folder shows TortoiseGit's items, an SVN folder TortoiseSVN's, a folder
+  without source control neither; the seen items' other items show too, striped. Without a folder: the seen items.
+  The folder's empty part shows the shell's own items and the extensions', not Explorer's view items (View, Sort
+  by, Refresh, Paste), which the folder view adds itself: [not yet checked] whether they can be had.
+- In the settings app the DLL sets no hook: it only draws. Dexmenu's handler runs there too while the real menu is
+  built (maybe the registered copy of the DLL, not the app's own); the app marks its process (`DEXMENU_EDITOR`), so
+  it notes nothing; Explorer started again from the app does not get the mark. The DLL is 64-bit, so the settings app runs 64-bit.
 - A preview drawn by the settings app itself (in HTML) is not made: it would drift from the real menu.
 - Screen readers: the window as UI Automation elements: [not yet checked] what that takes.
 
