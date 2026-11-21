@@ -360,6 +360,112 @@ using TrackPopupMenuFn = BOOL(WINAPI*)(HMENU, UINT, int, int, int, HWND, const R
 TrackPopupMenuExFn realTrackPopupMenuEx = nullptr;
 TrackPopupMenuFn realTrackPopupMenu = nullptr;
 
+// ---- trace of menu changes while an arranged menu is shown (plan 01, Open question 6) -----------------------------
+// Which calls a program makes on its menu after the show (Explorer sets Explorer commands' states then). Traced only:
+// nothing is changed or redirected yet.
+
+SRWLOCK activeLock = SRWLOCK_INIT;
+const Arranged* active = nullptr;     // the arranged menu being shown, if any
+bool activeTrace = false;
+thread_local bool own = false;        // Dexmenu's own menu calls (arranging, putting back): not traced
+
+std::wstring RoleOf(HMENU m)
+{
+    if (!active) return L"?";
+    if (m == active->original) return L"ORIGINAL";
+    if (m == active->shown) return L"arranged";
+    for (auto x : active->made) if (x == m) return L"group";
+    for (const auto& item : active->items) if (item.info.hSubMenu == m) return L"windows-submenu";
+    return L"other";
+}
+
+void TraceCall(const wchar_t* call, HMENU m, UINT item, bool byPosition, const std::wstring& what, BOOL result)
+{
+    if (own) return;
+    AcquireSRWLockShared(&activeLock);
+    const bool on = active && activeTrace;
+    std::wstring role = on ? RoleOf(m) : L"";
+    ReleaseSRWLockShared(&activeLock);
+    if (!on) return;
+    wchar_t line[200];
+    swprintf_s(line, L"  call %s thread=%lu menu=%p (%s) %s=%u %s -> %d", call, GetCurrentThreadId(), static_cast<void*>(m),
+        role.c_str(), byPosition ? L"pos" : L"id", item, what.c_str(), result);
+    own = true;
+    Log(line);
+    own = false;
+}
+
+std::wstring InfoText(LPCMENUITEMINFOW info)
+{
+    if (!info) return L"null";
+    wchar_t s[120];
+    swprintf_s(s, L"mask=0x%X type=0x%X state=0x%X id=%u", info->fMask, info->fType, info->fState, info->wID);
+    return s;
+}
+
+using EnableMenuItemFn = BOOL(WINAPI*)(HMENU, UINT, UINT);
+using SetMenuItemInfoWFn = BOOL(WINAPI*)(HMENU, UINT, BOOL, LPCMENUITEMINFOW);
+using InsertMenuItemWFn = BOOL(WINAPI*)(HMENU, UINT, BOOL, LPCMENUITEMINFOW);
+using DeleteMenuFn = BOOL(WINAPI*)(HMENU, UINT, UINT);
+using ModifyMenuWFn = BOOL(WINAPI*)(HMENU, UINT, UINT, UINT_PTR, LPCWSTR);
+using CheckMenuItemFn = DWORD(WINAPI*)(HMENU, UINT, UINT);
+EnableMenuItemFn realEnableMenuItem = nullptr;
+SetMenuItemInfoWFn realSetMenuItemInfoW = nullptr;
+InsertMenuItemWFn realInsertMenuItemW = nullptr;
+DeleteMenuFn realDeleteMenu = nullptr;
+DeleteMenuFn realRemoveMenu = nullptr;
+ModifyMenuWFn realModifyMenuW = nullptr;
+CheckMenuItemFn realCheckMenuItem = nullptr;
+
+BOOL WINAPI HookEnableMenuItem(HMENU m, UINT item, UINT flags)
+{
+    const BOOL r = realEnableMenuItem(m, item, flags);
+    TraceCall(L"EnableMenuItem", m, item, (flags & MF_BYPOSITION) != 0, L"flags=0x" + std::to_wstring(flags), r);
+    return r;
+}
+
+BOOL WINAPI HookSetMenuItemInfoW(HMENU m, UINT item, BOOL byPosition, LPCMENUITEMINFOW info)
+{
+    const BOOL r = realSetMenuItemInfoW(m, item, byPosition, info);
+    TraceCall(L"SetMenuItemInfoW", m, item, byPosition != 0, InfoText(info), r);
+    return r;
+}
+
+BOOL WINAPI HookInsertMenuItemW(HMENU m, UINT item, BOOL byPosition, LPCMENUITEMINFOW info)
+{
+    const BOOL r = realInsertMenuItemW(m, item, byPosition, info);
+    TraceCall(L"InsertMenuItemW", m, item, byPosition != 0, InfoText(info), r);
+    return r;
+}
+
+BOOL WINAPI HookDeleteMenu(HMENU m, UINT item, UINT flags)
+{
+    const BOOL r = realDeleteMenu(m, item, flags);
+    TraceCall(L"DeleteMenu", m, item, (flags & MF_BYPOSITION) != 0, L"", r);
+    return r;
+}
+
+BOOL WINAPI HookRemoveMenu(HMENU m, UINT item, UINT flags)
+{
+    const BOOL r = realRemoveMenu(m, item, flags);
+    TraceCall(L"RemoveMenu", m, item, (flags & MF_BYPOSITION) != 0, L"", r);
+    return r;
+}
+
+BOOL WINAPI HookModifyMenuW(HMENU m, UINT item, UINT flags, UINT_PTR id, LPCWSTR text)
+{
+    const BOOL r = realModifyMenuW(m, item, flags, id, text);
+    TraceCall(L"ModifyMenuW", m, item, (flags & MF_BYPOSITION) != 0, L"flags=0x" + std::to_wstring(flags) + L" newid=" + std::to_wstring(id), r);
+    return r;
+}
+
+DWORD WINAPI HookCheckMenuItem(HMENU m, UINT item, UINT flags)
+{
+    const DWORD r = realCheckMenuItem(m, item, flags);
+    TraceCall(L"CheckMenuItem", m, item, (flags & MF_BYPOSITION) != 0, L"flags=0x" + std::to_wstring(flags), static_cast<BOOL>(r));
+    return r;
+}
+
 template <typename Show>
 BOOL ShowArranged(HMENU menu, Show show)
 {
@@ -371,18 +477,32 @@ BOOL ShowArranged(HMENU menu, Show show)
     }
     Arranged a;
     bool arranged = false;
+    own = true;
     try { arranged = Arrange(menu, a); }
     catch (...) { arranged = false; }
+    own = false;
     if (trace) Log(L"show " + Hex(menu) + L" (" + std::to_wstring(a.items.size()) + L" items): noted, "
         + (arranged ? L"arranged into " + std::to_wstring(GetMenuItemCount(a.shown)) + L" items" : std::wstring(L"nothing to arrange")));
     if (!arranged)
     {
         if (!a.made.empty()) Log(L"arranging failed; Windows' menu shown");
+        own = true;
         Restore(a);
+        own = false;
         return show(menu);
     }
+    AcquireSRWLockExclusive(&activeLock);
+    active = &a;
+    activeTrace = trace;
+    ReleaseSRWLockExclusive(&activeLock);
     const BOOL result = show(a.shown);
+    AcquireSRWLockExclusive(&activeLock);
+    active = nullptr;
+    ReleaseSRWLockExclusive(&activeLock);
+    if (trace) Log(L"show " + Hex(menu) + L" closed, returned " + std::to_wstring(result));
+    own = true;
     Restore(a);
+    own = false;
     return result;
 }
 
@@ -407,6 +527,13 @@ BOOL CALLBACK SetHooks(PINIT_ONCE, PVOID, PVOID*)
     if (MH_Initialize() != MH_OK
         || MH_CreateHookApi(L"user32", "TrackPopupMenuEx", reinterpret_cast<LPVOID>(&HookTrackPopupMenuEx), reinterpret_cast<LPVOID*>(&realTrackPopupMenuEx)) != MH_OK
         || MH_CreateHookApi(L"user32", "TrackPopupMenu", reinterpret_cast<LPVOID>(&HookTrackPopupMenu), reinterpret_cast<LPVOID*>(&realTrackPopupMenu)) != MH_OK
+        || MH_CreateHookApi(L"user32", "EnableMenuItem", reinterpret_cast<LPVOID>(&HookEnableMenuItem), reinterpret_cast<LPVOID*>(&realEnableMenuItem)) != MH_OK
+        || MH_CreateHookApi(L"user32", "SetMenuItemInfoW", reinterpret_cast<LPVOID>(&HookSetMenuItemInfoW), reinterpret_cast<LPVOID*>(&realSetMenuItemInfoW)) != MH_OK
+        || MH_CreateHookApi(L"user32", "InsertMenuItemW", reinterpret_cast<LPVOID>(&HookInsertMenuItemW), reinterpret_cast<LPVOID*>(&realInsertMenuItemW)) != MH_OK
+        || MH_CreateHookApi(L"user32", "DeleteMenu", reinterpret_cast<LPVOID>(&HookDeleteMenu), reinterpret_cast<LPVOID*>(&realDeleteMenu)) != MH_OK
+        || MH_CreateHookApi(L"user32", "RemoveMenu", reinterpret_cast<LPVOID>(&HookRemoveMenu), reinterpret_cast<LPVOID*>(&realRemoveMenu)) != MH_OK
+        || MH_CreateHookApi(L"user32", "ModifyMenuW", reinterpret_cast<LPVOID>(&HookModifyMenuW), reinterpret_cast<LPVOID*>(&realModifyMenuW)) != MH_OK
+        || MH_CreateHookApi(L"user32", "CheckMenuItem", reinterpret_cast<LPVOID>(&HookCheckMenuItem), reinterpret_cast<LPVOID*>(&realCheckMenuItem)) != MH_OK
         || MH_EnableHook(MH_ALL_HOOKS) != MH_OK)
     {
         Log(L"hooks not set");
