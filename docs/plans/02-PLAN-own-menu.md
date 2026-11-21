@@ -318,7 +318,8 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
   titles.
 - Editing: a card dropped onto a card with rules makes a card with a menu whose first card has those rules; onto a
   card with a menu, it joins it; the last card of a submenu deleted, its parent a card with rules with its rules;
-  the last card dragged out, its parent a card without rules, outlined red; an invalid rule outlined red; the remaining card moved but never deleted; a layout without exactly one remaining
+  the last card dragged out, its parent a card without rules, outlined red; an invalid rule outlined red; the
+  remaining card moved but never deleted; a layout without exactly one remaining
   card reported as invalid.
 - Settings and layouts: valid and invalid files, comments (also `//` inside a string kept), save under a name, switch
   the active layout, the fallback.

@@ -192,7 +192,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   corner.
 - **Overflow:** a title that does not fit ends in an ellipsis; the full text as a tooltip.
 - **Its own look:** a card in the layout (plan 02 3.5) can overrule the theme for itself: `background` (colour,
-  gradient, image; `none` or alpha only on a menu with a background, 3.4), `foreground`, `border`, `radius`, `height`, `minWidth`, `weight`. Per state where wanted
+  gradient, image; `none` or alpha only on a menu with a background, 3.4), `foreground`, `border`, `radius`,
+  `height`, `minWidth`, `weight`, `cardFit` (3.5). Per state where wanted
   (`hover` of its own).
 - **An action or a submenu:** the same card; the mark and the click differ (plan 02 3.3: one item found is an action,
   several a submenu).
