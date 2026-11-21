@@ -20,7 +20,7 @@ need a structure of their own.
 ## 2. The solution, in brief
 
 A drawing engine in the Delphi DLL with Direct2D and DirectWrite draws a fixed set of elements: the menu window,
-lines, cards, the icon row, headings, separators, the search box, submenu panels and a scrollbar, each in a fixed set
+lines, cards, dividers, the icon row, the search box, submenu panels and a scrollbar, each in a fixed set
 of states (normal, hover, pressed, focused, disabled, unavailable). A theme is a JSON file as in LexPen (a name, a base
 theme, only what differs), but what it holds is per element and per state: colours, a background (colour, gradient
 or image), border, corner radius, padding, gap and font. The layout positions cards on lines by the level's width,
@@ -43,8 +43,9 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Shipped themes | light and dark, and a few on them | Theme files; Open question 5 | 3.3 |
 | Menu window | popup, corners, shadow, border, background colour / gradient / image, placement, scrolling | Engine | 3.4 |
 | Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
-| Card | icon, titles, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
-| Other elements | icon row, headings, separators, search box, most used row, `<<` | Card | 3.8 |
+| Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
+| Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
+| Other elements | icon row, search box, most used row, `<<` | Card | 3.8 |
 | Submenu panels | next, under, replace: where they appear and how they look | Card; plan 02 Submenus | 3.9 |
 | Preview marks | striped unavailable items, use counts, new | Card; plan 02 Preview | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
@@ -79,13 +80,14 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   theme), and only what differs from the base. `light` and `dark` are the roots and set everything. Shipped themes in
   the DLL's folder, the user's own in `%APPDATA%\Dexmenu\themes`; a file of the user's with the same name wins.
 - **What it holds:** per element, per state, a set of properties:
-  - Elements: `menu` (the window), `line`, `card`, `item` (a card alone on a line), `row` (an icon row and its
-    icons), `heading`, `separator`, `search`, `panel` (a submenu panel), `back` (the `<<` line), `scrollbar`,
-    `badge` (counts, new).
+  - Elements: `menu` (the window), `line`, `card`, `item` (a card alone on a line), `divider`, `row` (an icon row
+    and its icons), `search`, `panel` (a submenu panel), `back` (the `<<` line), `scrollbar`, `badge` (counts,
+    new).
   - States: `normal`, `hover`, `pressed`, `focused` (the keyboard's), `disabled`, `checked`, `default` (Windows'
     default item, bold there), `unavailable` (the preview's stripes). A state lists only what differs from `normal`.
-  - Properties: `background` (3.4), `foreground` (text), `foregroundDim` (second title), `mark` (the action and
-    submenu marks' colour), `border` (colour and width), `radius`, `padding`, `gap` (between cards on a line and
+  - Properties: `background` (3.4), `foreground` (the title, a divider's label), `extra` (the extra text's colour
+    and font), `mark` (the action and submenu marks' colour), `border` (colour and width), `radius`, `padding`,
+    `gap` (between cards on a line and
     between lines), `font` (family, size, weight), `iconSize`, `opacity`.
 - **A palette:** named colours at the top of the theme (`accent`, `text`, `surface`, ...), used by name in the
   elements, so a theme on a base can change a few palette colours and recolour every element using them. This
@@ -143,10 +145,12 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 ### 3.6 A card
 
-- **Content:** an optional icon, a title, an optional second title (dimmer, a line under it), and a mark: the action
-  mark or the submenu mark of the global settings (plan 02 3.4), in the theme's `mark` colour.
-- **Arrangement:** a wide card (menu item, or wider than tall): icon left, titles beside it, mark at the right end. A
-  tall or square card: icon at the top, titles under it, centred, mark in the corner.
+- **Content:** an optional icon, the title, an optional extra text (smaller, from the theme's `extra`) above or below
+  the title as the card says (`extraAt`: `above`, `below`), and a mark: the action mark or the submenu mark of the
+  global settings (plan 02 3.4), in the theme's `mark` colour.
+- **Arrangement:** a wide card (menu item, or wider than tall): icon left, the title and extra text beside it, mark
+  at the right end. A tall or square card: icon at the top, the title and extra text under it, centred, mark in the
+  corner.
 - **Overflow:** a title that does not fit ends in an ellipsis; the full text as a tooltip.
 - **Its own look:** a card in the layout (plan 02 3.5) can overrule the theme for itself: `background` (colour,
   gradient, image), `foreground`, `border`, `radius`, `height`, `minWidth`, `weight`. Per state where wanted
@@ -167,8 +171,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - **Icon row:** square cells of an icon each, the title as a tooltip; the same states as a card.
 - **Most used row:** as an icon row, or as small cards with titles; the use count as a badge in the preview only.
-- **Heading:** a line of text, dimmer, smaller, from the theme.
-- **Separator:** a thin line between lines, with the theme's colour and margins.
+- **Divider:** between two lines of cards. Without a label: a thin line. With a label: the text aligned `left`,
+  `middle` or `right`, the line on the free side(s). Its own `height` (the space it takes) and `background` (colour,
+  gradient or image, 3.4) where the layout gives them; the label's colour and font from the theme's `divider`, or
+  the divider's own, as a card's text can have its own.
 - **Search box:** a text field at the top (or where the layout puts it), shown when typing starts if the layout has
   none (plan 02 3.6); matches marked in the titles.
 - **`<<`:** the first line of a `replace` submenu, with the path of the levels above it.
@@ -199,7 +205,9 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   one (per light, dark, a few DPI scales); a change in drawing shows as a difference to look at.
 - Lines and cards: widths from weights and minimum widths, the case that does not fit (Open question 1), heights and
   how cards sit in a line, a single card drawn as a menu item.
-- Every state of a card and their combinations; a card's own background (colour, gradient, image) and colours.
+- Every state of a card and their combinations; a card's own background (colour, gradient, image) and colours; the
+  extra text above and below the title.
+- Dividers: without a label, with a label left, middle and right; own height, background and label colour.
 - Themes: a theme on a base with only palette changes recolours every element using them; an unknown property or a
   bad colour reported, the base's value used.
 - By hand: Explorer and the settings app's preview side by side, the same layout and theme, the same picture.

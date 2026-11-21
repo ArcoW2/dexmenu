@@ -19,11 +19,12 @@ disabled items taken or left per rule, and every item no rule found still placed
 ## 2. The solution, in brief
 
 The DLL keeps catching the show call with Windows' items, as in plan 01, but instead of a Windows menu it opens a
-window of its own, drawn by Dexmenu from a layout. A layout is lines of cards; each card takes Windows' items by rules
-on their text and path, and is an action when it finds one item, a card with a submenu when it finds more. Global
-settings decide how submenus open, the menu's width per level and the marks for actions and submenus; a card can
-overrule them. A place for the rest catches every item no rule took, and a row of the most used items comes from
-counting every choice. The window follows the program's changes while it is open and returns the chosen item's id
+window of its own, drawn by Dexmenu from a layout. A layout is lines of cards and dividers; each card has rules that
+take Windows' items by their text and where they sit, and is an action when it finds one item, a card with a submenu
+when it finds more. Global settings decide how submenus open, the menu's width per level and the marks for actions
+and submenus; a card can overrule them. Items no card took go to a card with the rule `remaining`, or else each
+becomes a card of its own after the layout's. A row of the most used items comes from counting every choice. The
+window follows the program's changes while it is open and returns the chosen item's id
 exactly as Windows' menu would, so every item still does what it does now. On any error Windows' own menu is shown.
 Layouts are saved under a name; the settings app shows the menu while a layout is edited, drawn by the same code, so
 the preview is the result.
@@ -40,7 +41,7 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Item tree | Windows' menu read into a tree with names and paths, kept live while shown | plan 01 Delphi DLL | 3.1; 3.2 |
-| Rules | finding items: match kinds, fields, states, scope, first match, several found, the rest | Item tree | 3.3 |
+| Rules | cards filled by rules: name, scope or path, match kinds, states, who gets an item, several found, remaining | Item tree | 3.3 |
 | Settings and layouts | global settings; layouts per kind of right-click, saved under a name; JSON with comments | Rules | 3.4; 3.5 |
 | Window | Dexmenu's own window, drawn by the Delphi DLL: lines of cards, keys, mouse, closing, the id handed back | Settings and layouts | 3.6; 3.7; 3.8 |
 | Submenus | next to, half under, or in place of the menu; on hover or on click; filled when opened (Send to) | Window | 3.7 |
@@ -77,28 +78,35 @@ the preview is the result.
 
 ### 3.3 Rules: finding items
 
-A rule picks items of the tree. Each card or place in the layout has one or more rules.
+Cards first: the layout defines cards, and each card has rules that fill it from Windows' menu. Where a card stands
+in the layout is where its items show (Open question 1).
 
-- **Fields:** `name` (default), `path` (the full `A > B > C`), `verb` (if 3.2 allows it), `parent` (the submenu it
-  sits in), `position` (first / last in Windows' menu, before or after another item).
+- **A rule:** a `name` to match (the item's text without `&`), and where to look: either a `scope` or a `path`,
+  never both.
+  - `scope`: `top` (Windows' top level) or `anywhere` (every level).
+  - `path`: (part of) the submenu path the item sits in, matched as the name is (`7-Zip`, or `startsWith: "Tortoise"`).
+  - Neither: `top`.
+  - `verb` instead of `name`, if 3.2 allows it.
 - **Match kinds:** `equals`, `contains`, `startsWith`, `endsWith`, `wildcard` (`*`, `?`), `regex`. Case insensitive by
-  default; `caseSensitive: true` per rule.
-- **Combining:** `any` (one of), `all`, `not`; a rule can be a list of patterns.
-- **States:** `disabled: include | exclude | only` per rule, with a default in the global settings (3.4). `exclude`
-  leaves a disabled item to the next rule or to the rest; with late states (plan 01 3.1) the item can move once
-  Explorer enables it.
-- **Scope:** `top` (Windows' top level only), `in: "7-Zip"` (inside one submenu), `anywhere` (every level). An item
-  taken out of a Windows submenu is shown in its new place; the submenu shows what is left.
-- **Who wins:** an item goes to the first card whose rule takes it, in the order of the layout. A rule can say
-  `also: true` to show an item in a second place as well (a favourite in the icon row that also stays in its group);
-  both hand back the same id.
-- **One expected, several found:** a card is an action card when its rules find one item, and becomes a card with a
-  submenu holding all of them when they find more, without a change to the layout. A rule written for one item
-  ("Open") that also finds "Open with" and "Open in new window" therefore still works. Found none: the card is not
-  shown (the preview shows it striped, 3.8).
-- **The rest:** one place marked `rest` takes every item no rule took, in Windows' order. Without one: a "More" card
-  at the end. Items not seen before (plan 01 3.6) can be marked new there.
-- **Hidden:** a place `hidden`; its items are not shown. Windows' menu (3.11) still has them.
+  default; `caseSensitive: true` per rule. `any` takes a list of patterns (one of them).
+- **States:** a set, `["enabled"]`, `["disabled"]` or both; an item whose state is in the set is taken. The default
+  set is in the global settings (3.4). An item left out because it is disabled can be taken once Explorer enables it
+  (plan 01 3.1).
+- **Who gets an item:** a card's results are every item its rules find. When the rules of two cards find the same
+  item, the card first in the layout (top to bottom, left to right) gets it; a rule with `also: true` shows it in its
+  card as well (a favourite in the icon row that also stays in its group); both hand back the same id.
+- **One expected, several found:** a card is an action when its rules find one item, and a card with a submenu
+  holding all of them when they find more, without a change to the layout. A rule written for one item ("Open") that
+  also finds "Open with" and "Open in new window" therefore still works. Found none: the card is not shown (the
+  preview shows it striped, 3.8).
+- **Items no card took:**
+  - A card with the rule `remaining` takes them all, in Windows' order, as its submenu (a "More" card). It is
+    evaluated after every other card, wherever it stands.
+  - Without such a card, every top-level item no card took becomes a card of its own (a root card), alone on its
+    line, after the layout's cards, in Windows' order: the menu as Windows has it, below what the layout placed. A
+    Windows submenu among them keeps its items.
+  - Items not seen before (plan 01 3.6) can be marked new.
+- **An item taken out of a Windows submenu** shows in its card; the submenu shows what is left.
 - **Titles:** a card shows the item's own text unless the layout gives a title, or rewrites it with a regex replace
   (`Kopieren naar... "SynologyDrive"` shown as `SynologyDrive`).
 
@@ -107,14 +115,14 @@ A rule picks items of the tree. Each card or place in the layout has one or more
 The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmenu\settings.json`.
 
 - **Opening submenus:** `next` (next to the item, as a classic menu), `under` (below the item, starting at its
-  middle, over the lines below it) or `replace` (the submenu takes the place of the menu; only on a click; a `<<` item at its top goes back, as Esc
-  does). A card or item can overrule it.
+  middle, over the lines below it) or `replace` (the submenu takes the place of the menu; only on a click; a `<<`
+  item at its top goes back, as Esc does). A card or item can overrule it.
 - **Only on click:** submenus open only on a click, never on hover. `replace` is always on click.
 - **Marks:** the character shown on an action and the one shown on an item or card with a submenu (for example none
   and `>`), chosen by the user.
 - **Menu width per level:** the width of the top level, of a first submenu, of a submenu in that, and so on. The cards
   on one line share that width.
-- **Disabled items:** taken or left by default (3.3).
+- **States taken:** the default set of a rule, enabled, disabled or both (3.3).
 - **Most used:** the row on or off and how many items it shows (3.9).
 - **The active layout:** which named layout is used (3.5).
 - **Light and dark:** as Windows, or fixed.
@@ -128,18 +136,19 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   `//` is kept. Read again when the file changes. An invalid file: the error in the log, Windows' own menu shown.
 - Per kind of right-click: one file, several items, a folder, a folder's empty part, a drive; by extension where
   wanted (`.zip`). A kind without a layout of its own uses the layout's default.
-- A layout is a list of lines, top to bottom. A line holds one card alone, or several cards next to each other that
-  share the menu's width (equally, or by a weight per card). The other kinds of place take a line of their own:
-  - `card`: a title, an optional second title (a line under it), an optional icon, its rules, and optionally its own
-    way of opening a submenu. One item found: an action; more: a card with a submenu (3.3).
-  - `list`: items as lines, as a classic menu.
+- A layout is a list of lines, top to bottom. A line holds one card alone (it looks and feels like a menu item), or
+  several cards next to each other that share the level's width (equally, or by a weight per card). The other kinds
+  take a line of their own:
+  - `card`: a title; an optional extra text; an optional icon; its rules; optionally its own way of opening a
+    submenu; its own look where wanted (plan 03 3.6: where the extra text goes, height, minimum width, background,
+    colours). One item found: an action; more: a card with a submenu (3.3).
+  - `divider`: between lines, with an optional label; its look (label alignment, height, background, colours) is
+    plan 03 3.8.
   - `row`: items as icons in one line, the text as tooltip (Windows 11's Cut / Copy / Paste row).
   - `mostUsed`: the row of the items chosen most (3.9).
-  - `heading` and `line`: text and lines between places.
   - `search`: a box that filters all items as you type (3.6).
-  - `rest` and `hidden` (3.3).
-- A submenu of the user's own is a card whose items are cards and places again, so the same lines go one level down,
-  with that level's width.
+- A submenu of the user's own is a card whose content is lines of cards and dividers again, one level down, with
+  that level's width.
 - A card or line without items is not shown (also when late states empty it).
 - An example, in the shape it may take:
 
@@ -149,11 +158,12 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
       { "row": "actions", "rules": [ { "name": { "any": ["Cut", "Copy", "Paste", "Rename", "Delete"] } } ] },
       { "mostUsed": true },
       { "line": [ { "card": "Open", "rules": [ { "name": { "startsWith": "Open" } } ] } ] },
+      { "divider": "Programs", "align": "left" },
       { "line": [
           { "card": "LexPen", "icon": "lexpen.ico", "rules": [ { "verb": { "startsWith": "LexPen." } } ] },
-          { "card": "Archive", "title2": "7-Zip", "submenu": "replace",
-            "rules": [ { "path": { "regex": "^7-Zip > " }, "disabled": "exclude" } ] } ] },
-      { "rest": "More" }
+          { "card": "Archive", "extra": "7-Zip", "extraAt": "below", "submenu": "replace",
+            "rules": [ { "name": { "wildcard": "*" }, "path": { "equals": "7-Zip" }, "states": ["enabled"] } ] } ] },
+      { "line": [ { "card": "More", "rules": [ "remaining" ] } ] }
   ] }
   ```
 
@@ -232,8 +242,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 Shipped as named layouts; A is active for a new user, who can pick another, change it and save it as their own (3.5).
 
 - **A. Classic plus (default).** An icon row on top (Cut, Copy, Paste, Rename, Delete, Properties); the most used row;
-  Open and Open with; one card per program with a submenu of its items (LexPen, 7-Zip, TortoiseGit); "More" with the
-  rest.
+  Open and Open with; a divider "Programs"; one card per program with a submenu of its items (LexPen, 7-Zip,
+  TortoiseGit); a "More" card with `remaining`.
 
   ```
   [Cut] [Copy] [Paste] [Rename] [Delete] [Properties]
@@ -275,8 +285,8 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 ### 3.12 Tests
 
 - Rules on a tree made for the test, and on trees read by the test host (plan 01 6.1): every match kind, case,
-  disabled include / exclude / only, scope, first match and `also`, one expected and several found, none found, the
-  rest, hidden, titles.
+  the states set, scope or path (both given: an error), who gets an item and `also`, one expected and several found,
+  none found, `remaining` wherever it stands, root cards for what no card took, titles.
 - Settings and layouts: valid and invalid files, comments (also `//` inside a string kept), save under a name, switch
   the active layout, the fallback.
 - The window in the test host: the cards shown per line for a given tree and layout, widths per level; keys and
@@ -294,4 +304,6 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 ## 4. Open questions
 
-None.
+1. **Cards first or rules first.** As written (3.3): the layout defines cards and each card has rules, so where a
+   card stands is where its items show, and two cards finding the same item are settled by the layout's order. The
+   other way: a list of rules, each naming the card its results go to, settled by the rules' order. Cards first?
