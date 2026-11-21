@@ -13,6 +13,11 @@ $root = Split-Path $PSScriptRoot
 $host_ = Join-Path $root 'bin\DexmenuTest.exe'
 $env:DEXMENU_LAYOUT = Join-Path $PSScriptRoot 'layout-lexpen.txt'
 
+# Unit tests first (no Windows menu needed).
+& (Join-Path $root 'bin\DexmenuUnitTests.exe') | Where-Object { $_ -like 'FAIL*' -or $_ -like '*FAILED' } | ForEach-Object { Write-Output "unit: $_" }
+$unitFailures = $LASTEXITCODE
+Write-Output $(if ($unitFailures) { "unit tests: $unitFailures failed" } else { 'unit tests: all passed' })
+
 Remove-Item -Recurse -Force $Work -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force "$Work\folder" | Out-Null
 Set-Content "$Work\a.txt" 'a'
@@ -79,4 +84,4 @@ foreach ($c in $cases) {
     else { Write-Output "PASS $($c.Name): from LexPen = [$($got -join '; ')]" }
 }
 Write-Output ($(if ($failed) { "$failed case(s) failed" } else { 'all cases passed' }))
-exit $failed
+exit ($failed + $unitFailures)

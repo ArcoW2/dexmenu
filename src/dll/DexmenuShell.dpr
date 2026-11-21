@@ -7,6 +7,8 @@ uses
   System.Win.ComServ,
   Dexmenu.Log in 'Dexmenu.Log.pas',
   Dexmenu.Menus in 'Dexmenu.Menus.pas',
+  Dexmenu.Json in 'Dexmenu.Json.pas',
+  Dexmenu.Layout in 'Dexmenu.Layout.pas',
   Dexmenu.Arrange in 'Dexmenu.Arrange.pas',
   Dexmenu.Hook in 'Dexmenu.Hook.pas',
   Dexmenu.Handler in 'Dexmenu.Handler.pas';

@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: step 1.
+- 2026-11-21: partly executed: step 2.
 
 Orders the parts of plan 01 (`01-PLAN-dexmenu.md`: the DLL, the hook, install), plan 02 (`02-PLAN-own-menu.md`:
 cards, rules, layouts, the editor) and plan 03 (`03-PLAN-menu-look.md`: themes and the look) into steps. Each step
@@ -31,12 +32,12 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 | Part | What | Reference |
 |---|---|---|
 | Step 1: Delphi DLL | the spike in Delphi: handler, hook, late changes, the test host's checks passing (Explorer by hand with step 3) | 3.1; plan 01 6.3 |
+| Step 2: the base layout | the layout file (JSON with comments) with the remaining card; read, checked, read again on change; unit tests | 3.2; 6.2 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Step 2: the base layout | the layout file with one card, the remaining card | -- | 3.2 |
 | Step 3: plain cards | the DLL draws its own menu: every item a plain card, submenus as cards that open, the id handed back | Steps 1, 2 | 3.3 |
 | Step 4: the editor's frame | the settings app: two panes, the preview on the right drawn by the DLL | Step 3 | 3.4 |
 | Step 5: editing | cards, rules, titles, dragging, the remaining card moved; the preview following every change | Step 4 | 3.5 |
@@ -128,3 +129,23 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 Step 1
+
+- See plan 01 6.3.
+
+### 6.2 Step 2
+
+- `src/dll/Dexmenu.Json.pas`: `//` comments taken out outside strings, then `System.JSON`.
+- `src/dll/Dexmenu.Layout.pas`: the layout as objects (kinds, lines, cards with a title and either rules or a menu;
+  a rule is `remaining` or an object kept as written for step 5), checked (exactly one remaining card per kind,
+  wherever it is; `default` required; rules and menu not both), shared as a reference-counted `ILayout`.
+- Which file: `DEXMENU_LAYOUT_FILE` (tests), else `%APPDATA%\Dexmenu\settings.json` `"layout": "<name>"` as
+  `%APPDATA%\Dexmenu\layouts\<name>.json`; none of them: the built-in base layout (only the remaining card). Read again
+  when its time stamp changes; a file that cannot be used: no layout, the reason in the log.
+- Tested: `tests/unit/DexmenuUnitTests.dpr` (built to `bin\DexmenuUnitTests.exe` by `build.cmd`, run first by
+  `tests/run-tests.ps1`): comments, valid and invalid layouts, the built-in base, reading, reading again on a change,
+  a broken file. All passed; the menu cases still pass.
+- Not yet: the DLL uses the layout from step 3 on (the arranged spike menu still uses its text layout).

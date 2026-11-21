@@ -18,6 +18,9 @@ if not exist "%DELPHI_ROOT%bin\dcc64.exe" (
 )
 "%DELPHI_ROOT%bin\dcc64.exe" -Q -B -W- "-NSSystem;Winapi;System.Win" "-U%ROOT%src\vendor\DDetours;%DELPHI_ROOT%lib\win64\release" ^
   "-I%ROOT%src\vendor\DDetours" "-E%OBJ%\dll" "-NU%OBJ%\dll" "%ROOT%src\dll\DexmenuShell.dpr" || exit /b 1
+if not exist "%OBJ%\unit" mkdir "%OBJ%\unit"
+"%DELPHI_ROOT%bin\dcc64.exe" -Q -B -W- "-NSSystem;Winapi;System.Win" "-U%ROOT%src\dll;%DELPHI_ROOT%lib\win64\release" ^
+  "-E%OUT%" "-NU%OBJ%\unit" "%ROOT%tests\unit\DexmenuUnitTests.dpr" || exit /b 1
 
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VS="
