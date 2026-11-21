@@ -41,12 +41,13 @@ On any doubt, Windows' own menu is shown untouched.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Spike, Open dialog | the same in an Open or Save dialog | Open questions 1, 2 | 3.1; 3.2 |
+| Spike, Open dialog | the same in an Open or Save dialog | -- | 3.1; 3.2 |
+| Delphi DLL | the spike's DLL in Delphi 10.4 with DDetours (handler, hook, following changes, trace), a build script; the C++ spike retired once its tests pass on it | -- | 3.2; 6.1; 6.2 |
 | Showing it | the arranged menu shown, lazy submenus and self-drawn items working, the choice handed back | Spike | 3.4; 3.5 |
 | Seen items | each item seen recorded per kind of right-click, for the settings app | plan 02 Item tree | 3.6 |
-| Settings app | the layout edited from the seen items; Dexmenu on and off | Seen items; Open question 3 | 3.7 |
+| Settings app | .NET 10 and WebView2: the layout edited from the seen items, a preview of the menu, on and off | Seen items | 3.7 |
 | Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | Showing it | 3.8 |
-| Install | registration, per user or per machine, removal | Open question 4 | 3.9 |
+| Install | per machine registration by an installer, settings per user, off by default, removal | Delphi DLL | 3.9 |
 | Windows 11 menu | the full-menu switch in the settings app | Settings app | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
 
@@ -62,7 +63,9 @@ Moved out: the layout engine (the layout file, finding items, places) to plan 02
   (`InvokeCommand`). Explorer, the file dialogs and other file managers all do this.
 - Dexmenu is one more shell extension (`IShellExtInit`, `IContextMenu`), registered for files, folders, a folder's
   empty part and drives (`*`, `Directory`, `Directory\Background`, `Drive`, `AllFilesystemObjects`; the exact set:
-  [not yet checked]). So it is loaded into every process that builds such a menu, the same way 7-Zip's is.
+  [not yet checked]). So it is loaded into every process that builds such a menu, the same way 7-Zip's is, and
+  Dexmenu applies in all of them: Explorer, the Open and Save dialogs of every program, other file managers. No list
+  of programs.
 - Its `QueryContextMenu` adds nothing; it only notes the `HMENU` it was given: that handle is a shell right-click menu
   being built. `IShellExtInit.Initialize` gives it the items (their types, one or several, a folder's empty part), for
   a layout per kind of right-click (3.3).
@@ -84,8 +87,12 @@ Moved out: the layout engine (the layout file, finding items, places) to plan 02
 
 ### 3.2 The hook
 
-- A small hooking library in the DLL (MinHook or Detours for C++; DDetours for Delphi: Open question 1), set when the
-  DLL is first loaded into a process and removed when it unloads.
+- The DLL is Delphi, built with the Delphi 10.4 Sydney on this machine (`dcc64`, 64-bit, as Explorer is), with no
+  runtime to load into other processes. The hook is DDetours (`InterceptCreate`; MPL 2.0: its files used unchanged,
+  changes to them would have to be published). Checked: a probe DLL built with `dcc64` and DDetours, loaded in a
+  64-bit process, caught a `TrackPopupMenuEx` call; it exports `DllGetClassObject` and `DllCanUnloadNow`.
+- The hook is set when the DLL first notes a menu in a process; the DLL then stays loaded (pinned), so the hook never
+  points into an unloaded DLL.
 - Explorer keeps it loaded; a dialog's process loads it when its first right-click menu is built. Before that first
   menu nothing is hooked, which is fine: nothing to arrange yet.
 - The DLL holds no state across processes; each process reads the layout file itself (3.3), and reads it again when
@@ -146,8 +153,10 @@ Moved out: the layout engine (the layout file, finding items, places) to plan 02
 
 - Shows, per kind of right-click, the places of the layout and the items in them; items are dragged between places,
   into a submenu of their own, or into Hidden; groups and submenus added, renamed, ordered.
-- Dexmenu on and off for everything (3.8).
-- A separate program, not loaded into Explorer: its language and look are free (Open question 3).
+- Dexmenu on and off for the user (3.9), and Windows' full menu at once (3.10).
+- A preview of the resulting menu: the layout applied to the seen items of a kind of right-click, shown as the menu
+  will look, updated while editing.
+- A separate program, not loaded into Explorer: .NET 10, a WinForms window hosting WebView2, as LexPen and Foldex.
 
 ### 3.8 Safety
 
@@ -161,9 +170,13 @@ Moved out: the layout engine (the layout file, finding items, places) to plan 02
 
 ### 3.9 Install
 
-- The DLL registered as a COM class and as a context menu handler for the types of 3.1, signed.
-- Per user (`HKCU\Software\Classes`) needs no administrator, but elevated programs do not read per-user COM classes,
-  so their menus stay Windows' own; per machine (`HKLM`) covers those too: Open question 4.
+- The DLL registered per machine (`HKLM\Software\Classes`) as a COM class and as a context menu handler for the types
+  of 3.1, signed, by an installer with administrator rights. Per machine also covers elevated programs, which do not
+  read per-user COM classes.
+- Settings per user: on or off (`HKCU\Software\Dexmenu` `Enabled`), the layout and seen items in the user's
+  `%APPDATA%\Dexmenu`, Windows' full menu (3.10, per user already). Off by default: every user has Windows' menu
+  until they switch Dexmenu on in the settings app. Off, the DLL is loaded but sets no hook (6.1).
+- `register.ps1` (per user, no administrator) stays a developer's tool for building and testing.
 - Removal: the registration taken away; Explorer restarted or signed out and in, as for any shell extension.
 
 ### 3.10 Windows 11's short menu
@@ -188,20 +201,15 @@ Moved out: the layout engine (the layout file, finding items, places) to plan 02
 
 ## 4. Open questions
 
-1. **The DLL's language.** C++ (MinHook or Detours) or Delphi (DDetours)? Both make a native DLL without a runtime to
-   load into Explorer. The settings app can be another language.
-2. **Which programs.** Every program that builds a shell right-click menu (Explorer, file dialogs, other file managers), or
-   only some (a list in the settings app)?
-3. **The settings app.** Its language and look: .NET WinForms, a WebView2 page, Delphi?
-4. **Per user or per machine.** Per user needs no administrator but leaves elevated programs' menus as Windows' own;
-   per machine covers them and needs an installer with administrator rights.
+None.
 
 ## 6. As built
 
 ### 6.1 The spike, in a test host
 
 - `src/shell/DexmenuShell.cpp`: C++ with WRL and MinHook (v1.3.4, `src/vendor/minhook`), built by `build.cmd`
-  into `bin`. C++ for the spike only, the same toolchain as LexPen's `LexPenShell.dll`; Open question 1 stays open.
+  into `bin`. C++ for the spike, the same toolchain as LexPen's `LexPenShell.dll`; the DLL to keep is Delphi (3.2,
+  Status).
 - A context menu handler (`IShellExtInit`, `IContextMenu`) that adds nothing; its `QueryContextMenu` notes the
   `HMENU`. On first use it hooks `TrackPopupMenu` and `TrackPopupMenuEx` (user32) and pins the DLL, so the hooks
   never point into an unloaded DLL. The hook only acts on a noted menu.

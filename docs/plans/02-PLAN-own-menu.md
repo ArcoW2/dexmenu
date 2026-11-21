@@ -152,8 +152,8 @@ A rule picks items of the tree. Each place in the layout has one or more rules.
 ### 3.7 Drawing and icons
 
 - In the program's process (Explorer first), so no .NET, WebView2 or other runtime (plan 01 3.8): a native popup
-  window drawn with Direct2D and DirectWrite, per-monitor DPI, light and dark as Windows has it, the accent colour.
-  Open question 1 weighs a separate process instead.
+  window in the Delphi DLL (plan 01 3.2), drawn with Direct2D and DirectWrite, per-monitor DPI, light and dark as
+  Windows has it, the accent colour. Open question 1 weighs a separate process instead.
 - A window of Dexmenu's own replaces the show call: the hook runs its own message loop until a choice or close, so
   the program waits as it does for Windows' menu.
 - Icons:
@@ -221,10 +221,13 @@ Shipped as examples; the user starts from one (Open question 6).
 
 ## 4. Open questions
 
-1. **Where the window runs.** In the program's process, native (Direct2D), fast, no runtime, all drawing written by
-   hand; or a separate Dexmenu process the DLL talks to on every right-click, which can use WinUI or WebView2 and
-   makes cards and animation easy, at the cost of starting or waking it on the right-click ([not yet checked] how
-   long that takes)?
+1. **Where the window runs.** In the program's process, native (the Delphi DLL of plan 01, Direct2D), fast, no
+   runtime, all drawing written by hand; or a separate Dexmenu process the DLL talks to on every right-click, which
+   can use WebView2 and makes cards and animation easy, at the cost of starting or waking it on the right-click
+   ([not yet checked] how long that takes)? The settings app (plan 01 3.7) is .NET 10 with WebView2 and previews the
+   menu: with the window in WebView2 too, preview and menu are the same page; with a native window, the preview is
+   either a second rendering in HTML that can drift from the real one, or the DLL draws the preview into an image
+   for the settings app.
 2. **The file format.** JSON (as plan 01 said), or a format with comments and less punctuation (JSON5, YAML, TOML),
    since the user edits it by hand?
 3. **Submenus.** Flyout, open in place, or drill in; one for all, or per card in the layout?
