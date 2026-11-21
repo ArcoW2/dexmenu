@@ -42,14 +42,15 @@ On any doubt, Windows' own menu is shown untouched.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Spike, Open dialog | the same in an Open or Save dialog | Open questions 1, 2 | 3.1; 3.2 |
-| Layout engine | the layout file as planned (`layout.json`, kinds of right-click, items in submenus by path, Hidden, Other, groups) | -- | 3.3; 3.4 |
 | Showing it | the arranged menu shown, lazy submenus and self-drawn items working, the choice handed back | Spike | 3.4; 3.5 |
-| Seen items | each item seen recorded per kind of right-click, for the settings app | Layout engine | 3.6 |
+| Seen items | each item seen recorded per kind of right-click, for the settings app | plan 02 Item tree | 3.6 |
 | Settings app | the layout edited from the seen items; Dexmenu on and off | Seen items; Open question 3 | 3.7 |
 | Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | Showing it | 3.8 |
 | Install | registration, per user or per machine, removal | Open question 4 | 3.9 |
 | Windows 11 menu | the full-menu switch in the settings app | Settings app | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
+
+Moved out: the layout engine (the layout file, finding items, places) to plan 02, which draws the menu itself.
 
 ## 3. Details
 
@@ -92,6 +93,8 @@ On any doubt, Windows' own menu is shown untouched.
 
 ### 3.3 The layout
 
+- The layout file and its rules are plan 02's (3.3, 3.4); below is what the arranged Windows menu of this plan needs
+  of it.
 - A file of the user's (`layout.json` in `%APPDATA%\Dexmenu`; [not yet decided]), written by the settings app, read
   by the DLL.
 - Per kind of right-click (a file, several items, a folder, a folder's empty part, a drive; by type where wanted, as
