@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: the spike in a test host (DLL, hook, a minimal layout, LexPen's items into a submenu).
+- 2026-11-21: partly executed: the spike in Explorer (states set after the show followed); the full menu at once.
 
 Dexmenu arranges the menu for every program that shows Windows' right-click menu for files and folders: Explorer, the
 Open and Save dialogs, other file managers.
@@ -33,19 +34,21 @@ On any doubt, Windows' own menu is shown untouched.
 | Part | What | Reference |
 |---|---|---|
 | Spike, test host | the shell extension loaded, the show call caught, the top level arranged into a submenu of the user's own with Windows' items moved (same ids), put back after; checked in a test host | 3.1 - 3.4; 6.1 |
+| Spike, Explorer | the same in Explorer's full menu, with the states Explorer sets after the show; LexPen's items in "from LexPen" shown, hidden and run as without Dexmenu | 3.1; 3.4; 6.2 |
+| Full menu at once | Windows 11 switched to the full menu (`register.ps1 -FullMenu` / `-ShortMenu` until the settings app) | 3.10 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Spike, Explorer and Open dialog | the same, by hand, in Explorer's full menu (with the states Explorer sets after the show) and an Open dialog | Open questions 1, 2 | 3.1; 3.2; 3.4; 6.2 |
+| Spike, Open dialog | the same in an Open or Save dialog | Open questions 1, 2 | 3.1; 3.2 |
 | Layout engine | the layout file as planned (`layout.json`, kinds of right-click, items in submenus by path, Hidden, Other, groups) | -- | 3.3; 3.4 |
 | Showing it | the arranged menu shown, lazy submenus and self-drawn items working, the choice handed back | Spike | 3.4; 3.5 |
 | Seen items | each item seen recorded per kind of right-click, for the settings app | Layout engine | 3.6 |
 | Settings app | the layout edited from the seen items; Dexmenu on and off | Seen items; Open question 3 | 3.7 |
 | Safety | fallback to Windows' menu on any error, a key to get Windows' menu, off switch | Showing it | 3.8 |
 | Install | registration, per user or per machine, removal | Open question 4 | 3.9 |
-| Windows 11 menu | the short menu of Windows 11 | Open question 5 | 3.10 |
+| Windows 11 menu | the full-menu switch in the settings app | Settings app | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -163,9 +166,10 @@ On any doubt, Windows' own menu is shown untouched.
 ### 3.10 Windows 11's short menu
 
 - Windows 11 shows a short menu of its own first (not a `TrackPopupMenu` menu) and the full one under "Show more
-  options". Dexmenu arranges the full one. Either the user switches Windows to the full menu straight away (the
-  registry switch under `HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}`, which the settings app
-  can set and undo), or Dexmenu applies only under "Show more options": Open question 5.
+  options". Dexmenu arranges the full one, and switches Windows to the full menu straight away: Windows' own switch,
+  an empty `InprocServer32` under `HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}`, per user,
+  Explorer restarted. Undone by removing that key. The settings app sets and undoes it; until it exists,
+  `register.ps1 -FullMenu` / `-ShortMenu`.
 
 ### 3.11 Tests
 
@@ -188,8 +192,6 @@ On any doubt, Windows' own menu is shown untouched.
 3. **The settings app.** Its language and look: .NET WinForms, a WebView2 page, Delphi?
 4. **Per user or per machine.** Per user needs no administrator but leaves elevated programs' menus as Windows' own;
    per machine covers them and needs an installer with administrator rights.
-5. **Windows 11's short menu.** Switch Windows to the full menu (the settings app sets the switch), or arrange only
-   under "Show more options"?
 
 ## 6. As built
 
@@ -242,6 +244,10 @@ On any doubt, Windows' own menu is shown untouched.
   after the call against Windows' menu with those changes. `run-tests.ps1` runs every case also with `--late`, off and
   on. Against the DLL without following changes it failed (the submenu and the put-back menu without the changes);
   with it, all cases passed. Not covered by a test: a user's submenu left empty; a change by position.
+- By hand in Explorer with following changes: the trace has every call redirected and succeeding; "from LexPen"
+  shows only the items LexPen gives, enabled, and choosing one runs LexPen (once LexPen's own registration was
+  applied again, 6.2 Foldex).
+- The full menu at once (3.10): `register.ps1 -FullMenu` sets Windows' switch and restarts Explorer.
 - The trace (`HKCU\Software\Dexmenu` `Trace` 1): each menu noted, each show call and each item in
   `%LOCALAPPDATA%\Dexmenu\dexmenu.log`. `DEXMENU=0` forces the DLL off in a process, so the tests hold while the
   registry has Dexmenu on.
