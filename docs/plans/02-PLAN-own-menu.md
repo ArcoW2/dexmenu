@@ -108,10 +108,17 @@ in the layout is where its items show.
   also finds "Open with" and "Open in new window" therefore still works. Found none: the card is not shown (the
   preview shows it striped, 3.8).
 - **Items no card took: the remaining card.** Every layout has exactly one card with the rule `remaining`; it cannot
-  be removed. It takes every item no other card's rules took, in Windows' order, and is evaluated after all other
-  cards, wherever it stands. By default it is at the root; the user can move it into any submenu and back, so the
-  user decides where the rest goes. One item left: an action; more: a submenu of them (a "More" card). Items not seen
-  before (plan 01 3.6) can be marked new in it.
+  be removed. It takes every top-level item of Windows' menu no other card's rules took, and is evaluated after all
+  other cards, wherever it stands.
+  - Its place is where those items go: each becomes a card of its own at that place, in Windows' order, in the
+    remaining card's style. At the root: they are at the root of the new menu. Inside a card with a menu: they are
+    in that submenu.
+  - So a layout with only the remaining card at the root shows Windows' menu as it is, as cards: the starting point
+    of every layout.
+  - An item with a submenu goes as a whole: its subitems follow it, as its submenu. A subitem another card's rule
+    took (scope `anywhere`, or a path) is in that card instead; the submenu shows what is left.
+  - By default it is at the root; the user can move it into any submenu and back, so the user decides where the rest
+    goes. Items not seen before (plan 01 3.6) can be marked new.
 - **An item taken out of a Windows submenu** shows in its card; the submenu shows what is left.
 - **Titles:** a card shows the item's own text unless the layout gives a title, or rewrites it with a regex replace
   (`Kopieren naar... "SynologyDrive"` shown as `SynologyDrive`).
@@ -191,7 +198,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
               { "line": [ { "card": "Git", "rules": [
                   { "name": { "wildcard": "*" }, "path": { "startsWith": "Tortoise" } } ] } ] }
           ] } ] },
-      { "line": [ { "card": "More", "rules": [ "remaining" ] } ] }   // the remaining card: always one
+      { "line": [ { "card": "More", "menu": [                        // the rest in a submenu "More":
+          { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] } ] }   // the remaining card, always one
   ] }
   ```
 
@@ -271,7 +279,7 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 - **A. Classic plus (default).** An icon row on top (Cut, Copy, Paste, Rename, Delete, Properties); the most used row;
   Open and Open with; a divider "Programs"; one card per program with a submenu of its items (LexPen, 7-Zip,
-  TortoiseGit); a "More" card with `remaining`.
+  TortoiseGit); a "More" card with a menu holding the remaining card, so the rest is in that submenu.
 
   ```
   [Cut] [Copy] [Paste] [Rename] [Delete] [Properties]
@@ -338,4 +346,7 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 ## 4. Open questions
 
-None.
+1. **Ordinary cards with several items.** The remaining card places its items at its own place, each as a card in
+   its style (3.3). Is that so for every card with rules too (a card "Open" finding "Open" and "Open with" puts both
+   there as cards, its title not shown), or does an ordinary card keep the rule written now: one item an action, more
+   a submenu under the card's title?

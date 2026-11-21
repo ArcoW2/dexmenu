@@ -36,7 +36,7 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 |---|---|---|---|
 | Step 1: Delphi DLL | the spike in Delphi: handler, hook, late changes, the test host's checks passing | -- | 3.1 |
 | Step 2: the base layout | the layout file with one card, the remaining card | -- | 3.2 |
-| Step 3: plain cards | the DLL draws its own menu: every item a plain card, submenus as cards that open, the id handed back | Steps 1, 2; Open question 1 | 3.3 |
+| Step 3: plain cards | the DLL draws its own menu: every item a plain card, submenus as cards that open, the id handed back | Steps 1, 2 | 3.3 |
 | Step 4: the editor's frame | the settings app: two panes, the preview on the right drawn by the DLL | Step 3 | 3.4 |
 | Step 5: editing | cards, rules, titles, dragging, the remaining card moved; the preview following every change | Step 4 | 3.5 |
 | Step 6: the look | themes, colours, the card's structure, lines of cards, dividers | Step 5 | 3.6 |
@@ -69,12 +69,12 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
   Windows' menu a plain card alone on its line (so it looks like a menu item: its text, its state, the submenu
   mark); a Windows submenu a card that opens it next to it, filled when opened (Send to); keys, mouse, closing; the
   chosen id handed back; Explorer's late changes followed (an item enabled, a card removed, its line closed up).
-  Windows' own menu on any error (plan 02 3.11).
+  Windows' own menu on any error (plan 02 3.11). The remaining card at the root places every top-level item there as
+  a card of its own, each with its subitems following it (plan 02 3.3), so the menu is Windows' menu as cards.
 - Done when: in the test host and in Explorer, an Open dialog and Foldex the menu shows every item as a card, a
   choice runs the item as Windows' menu would (LexPen's items included, shown and hidden per selection), lazy
   submenus fill, a forced error shows Windows' menu.
 - Left out: themes (one built-in look), icons, lines with several cards, dividers, rows, search.
-- How the remaining card at the root shows its items: Open question 1.
 
 ### 3.4 Step 4: the editor's frame
 
@@ -123,8 +123,4 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 
 ## 4. Open questions
 
-1. **The remaining card at the root in step 3.** Plan 02 3.3 makes a card with several items a card with a submenu,
-   so the base layout would show one card ("Others") holding the whole of Windows' menu. Read here: in step 3 every
-   item is a card of its own. That needs the remaining card (or any card) to be able to show its items in its place,
-   each as a card, instead of as a submenu: a card setting `spread`, for example. Is that what is meant, and is
-   `spread` the way (for the remaining card only, or for any card)?
+None.
