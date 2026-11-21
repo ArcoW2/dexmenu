@@ -43,7 +43,8 @@ the preview is the result.
 | Rules | finding items: match kinds, fields, states, scope, first match, several found, the rest | Item tree | 3.3 |
 | Settings and layouts | global settings; layouts per kind of right-click, saved under a name; JSON with comments | Rules | 3.4; 3.5 |
 | Window | Dexmenu's own window, drawn by the Delphi DLL: lines of cards, keys, mouse, closing, the id handed back | Settings and layouts | 3.6; 3.7; 3.8 |
-| Submenus | next to, half under, or in place of the menu; on hover or on click; filled when opened (Send to) | Window; Open question 1 | 3.7 |
+| Submenus | next to, half under, or in place of the menu; on hover or on click; filled when opened (Send to) | Window | 3.7 |
+| Edit menu | "Edit menu..." in the menu: the settings app's layout editor opened on this menu as it is | Window; plan 01 Settings app | 3.6 |
 | Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | Window | 3.8 |
 | Preview | the same window drawn by the DLL inside the settings app, from the seen items and the layout being edited | Window; plan 01 Settings app | 3.8 |
 | Use counts | every choice counted per item; the most used row; counts shown while editing | Window | 3.9 |
@@ -105,8 +106,8 @@ A rule picks items of the tree. Each card or place in the layout has one or more
 
 The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmenu\settings.json`.
 
-- **Opening submenus:** `next` (next to the item, as a classic menu), `under` (half under the item: Open question 1)
-  or `replace` (the submenu takes the place of the menu; only on a click; a `<<` item at its top goes back, as Esc
+- **Opening submenus:** `next` (next to the item, as a classic menu), `under` (below the item, starting at its
+  middle, over the lines below it) or `replace` (the submenu takes the place of the menu; only on a click; a `<<` item at its top goes back, as Esc
   does). A card or item can overrule it.
 - **Only on click:** submenus open only on a click, never on hover. `replace` is always on click.
 - **Marks:** the character shown on an action and the one shown on an item or card with a submenu (for example none
@@ -166,8 +167,13 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   the layout has none); it filters every item of every place, Windows' submenus included once filled, with the same
   match kinds as the rules (contains by default, a leading `/` for a regex). Enter runs the first hit.
 - **Disabled items:** shown greyed, or left out, per rule (3.3).
-- **Late changes:** an item that Explorer enables or removes while the window is open changes in place (Open
-  question 2 for what a removed card leaves).
+- **Late changes:** an item that Explorer enables changes in place; a card Explorer removes goes at once and its
+  line closes up. (In the preview such a card is striped instead, 3.8.)
+- **No editing from the menu:** the menu does not pin, move, hide or rename items; removing an item while a menu is
+  being used is too easily done by mistake. Changing the layout is the settings app's.
+- **Edit menu...:** an item at the end of the menu (on or off in the global settings) that closes the menu and opens
+  the settings app's layout editor on this menu as it was: this kind of right-click, the items it had (the DLL writes
+  them to a file and starts the settings app with it), the layout in use. The user places what they just saw.
 - **Closing:** a click outside, the window losing focus, Esc on the top level, Alt: closed without a choice, as
   Windows' menu.
 
@@ -175,7 +181,7 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 
 - Three ways, from the global settings or a card's own (3.4):
   - `next`: a panel next to the item, as a classic menu.
-  - `under`: half under the item (Open question 1).
+  - `under`: below the item, starting at the item's middle, lying over the lines below it.
   - `replace`: the submenu takes the place of the menu, on a click only, with `<<` at the top; `<<` and Esc go back a
     level. The path can show at the top.
 - On hover or on click: on hover unless "only on click" is set; `replace` always on click.
@@ -186,6 +192,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 
 ### 3.8 Drawing, icons and the preview
 
+- How the menu looks (themes, the window, lines and cards, their states, submenu panels) is plan 03's
+  (`03-PLAN-menu-look.md`). Below: where it is drawn, icons, and the preview.
 - In the program's process (Explorer first), so no .NET, WebView2 or other runtime (plan 01 3.8): a native popup
   window in the Delphi DLL (plan 01 3.2), drawn with Direct2D and DirectWrite, per-monitor DPI, light and dark, the
   accent colour. A right-click needs no other process.
@@ -274,8 +282,9 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 - The window in the test host: the cards shown per line for a given tree and layout, widths per level; keys and
   typing; each way of opening a submenu, on hover and on click, `<<` and Esc back; a choice hands back the right id
   (the host clicks or presses Enter through the window, not through Windows' menu).
-- Late changes (`--late` of plan 01): an item enabled and one removed while the window is open, the window updated,
-  the right id handed back after.
+- Late changes (`--late` of plan 01): an item enabled and one removed while the window is open, the window updated
+  (the removed card gone, its line closed up), the right id handed back after.
+- Edit menu...: the settings app started with this menu's items and kind of right-click.
 - Use counts: a choice counted once, the most used row in order of counts.
 - The preview: the same tree and layout drawn in the test host's menu window and in the preview window give the same
   picture (both captured and compared); a layout edit redraws the preview; striped items; a choice in the preview
@@ -285,10 +294,4 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 ## 4. Open questions
 
-1. **"Half under".** Read here as: the submenu opens below the item, starting at the item's middle and lying over
-   the lines below it. Is that what is meant, or something else (for example below the item at full width, pushing
-   nothing aside)?
-2. **Late removals at a right-click.** In the preview a card that may go is striped (3.8). In the real menu, when
-   Explorer removes a card while the window is open: leave its space until the mouse moves, or close up at once?
-3. **Changing the layout from the menu.** Pin / Move / Hide / Rename on a right-click in Dexmenu's window, writing the
-   active layout: wanted, or only in the settings app?
+None.
