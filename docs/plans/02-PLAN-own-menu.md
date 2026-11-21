@@ -159,6 +159,9 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
     they go to a new card, the first in the new submenu, so nothing is lost; the dragged card follows it. The user
     then orders the cards in the submenu as wanted;
   - a card dragged onto a line or between lines moves there, at that level;
+  - deleting the last card of a submenu makes its parent a card with rules again: the deleted card's rules go to
+    the parent, so they are not lost (the reverse of dropping a card onto a card). Dividers in that submenu go with
+    it;
   - the remaining card is moved as any other, never deleted;
   - a card made as a card with a menu starts with one empty card in its submenu, ready for rules.
 - A card or line without items is not shown (also when late states empty it).
@@ -305,7 +308,7 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
 - Editing: a card dropped onto a card with rules makes a card with a menu whose first card has those rules; onto a
-  card with a menu, it joins it; the remaining card moved but never deleted; a layout without exactly one remaining
+  card with a menu, it joins it; the last card of a submenu deleted, its parent a card with rules with its rules; the remaining card moved but never deleted; a layout without exactly one remaining
   card reported as invalid.
 - Settings and layouts: valid and invalid files, comments (also `//` inside a string kept), save under a name, switch
   the active layout, the fallback.
@@ -324,4 +327,6 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 ## 4. Open questions
 
-None.
+1. **The last card dragged out of a submenu.** Deleting it gives its rules to the parent (3.5). Dragging it elsewhere
+   keeps its rules with it, leaving the parent with an empty submenu: does the parent then become a card with rules
+   without any (it finds nothing and is not shown), or is it removed?
