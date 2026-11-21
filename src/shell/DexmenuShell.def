@@ -1,0 +1,4 @@
+LIBRARY DexmenuShell
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE
