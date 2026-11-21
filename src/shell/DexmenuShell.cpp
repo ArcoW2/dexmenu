@@ -72,6 +72,21 @@ void Log(const std::wstring& text)
     CloseHandle(h);
 }
 
+// HKCU\Software\Dexmenu Trace 1: every menu noted and every show call in the log (to see what a program does).
+bool Tracing()
+{
+    DWORD value = 0, size = sizeof(value);
+    RegGetValueW(HKEY_CURRENT_USER, L"Software\\Dexmenu", L"Trace", RRF_RT_REG_DWORD, nullptr, &value, &size);
+    return value == 1;
+}
+
+std::wstring Hex(const void* p)
+{
+    wchar_t s[32];
+    swprintf_s(s, L"%p", p);
+    return s;
+}
+
 // ---- the layout ---------------------------------------------------------------------------------------------------
 
 struct Group
@@ -337,11 +352,18 @@ TrackPopupMenuFn realTrackPopupMenu = nullptr;
 template <typename Show>
 BOOL ShowArranged(HMENU menu, Show show)
 {
-    if (!TakeNoted(menu) || !Enabled()) return show(menu);
+    const bool trace = Tracing();
+    if (!TakeNoted(menu) || !Enabled())
+    {
+        if (trace) Log(L"show " + Hex(menu) + L" (" + std::to_wstring(GetMenuItemCount(menu)) + L" items): not noted, passed through");
+        return show(menu);
+    }
     Arranged a;
     bool arranged = false;
     try { arranged = Arrange(menu, a); }
     catch (...) { arranged = false; }
+    if (trace) Log(L"show " + Hex(menu) + L" (" + std::to_wstring(a.items.size()) + L" items): noted, "
+        + (arranged ? L"arranged into " + std::to_wstring(GetMenuItemCount(a.shown)) + L" items" : std::wstring(L"nothing to arrange")));
     if (!arranged)
     {
         if (!a.made.empty()) Log(L"arranging failed; Windows' menu shown");
@@ -393,7 +415,10 @@ public:
     IFACEMETHODIMP QueryContextMenu(HMENU menu, UINT, UINT, UINT, UINT flags) override
     {
         if (!(flags & CMF_DEFAULTONLY) && Enabled() && InitOnceExecuteOnce(&hooksOnce, SetHooks, nullptr, nullptr))
+        {
             Note(menu);
+            if (Tracing()) Log(L"noted " + Hex(menu) + L" (" + std::to_wstring(GetMenuItemCount(menu)) + L" items so far, flags " + std::to_wstring(flags) + L")");
+        }
         return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 0);   // no items of its own
     }
 
