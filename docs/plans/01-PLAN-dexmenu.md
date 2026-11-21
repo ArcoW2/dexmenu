@@ -37,7 +37,7 @@ On any doubt, Windows' own menu is shown untouched.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Spike, Explorer and Open dialog | the same, by hand, in Explorer's full menu and an Open dialog; whether Explorer shows the HMENU its handlers filled or a copy | Open questions 1, 2 | 3.1; 3.2; 6.1 |
+| Spike, Explorer and Open dialog | the same, by hand, in Explorer's full menu and an Open dialog: in Explorer the states set after the show onto the moved items | Open questions 1, 2, 6 | 3.1; 3.2; 6.1; 6.2 |
 | Layout engine | the layout file as planned (`layout.json`, kinds of right-click, items in submenus by path, Hidden, Other, groups) | -- | 3.3; 3.4 |
 | Showing it | the arranged menu shown, lazy submenus and self-drawn items working, the choice handed back | Spike | 3.4; 3.5 |
 | Seen items | each item seen recorded per kind of right-click, for the settings app | Layout engine | 3.6 |
@@ -64,9 +64,16 @@ On any doubt, Windows' own menu is shown untouched.
 - In each process it is loaded into, it hooks the show call once (`TrackPopupMenu` and `TrackPopupMenuEx`; which one
   each program uses: [not yet checked]). A call with a noted `HMENU`: Dexmenu's turn (3.4). Any other menu (a program's
   own menus): passed through untouched.
-- By the time the menu is shown, every extension has added its items, including those that switch on only for these
-  items. Nothing is added after that moment, so nothing escapes the layout. Submenus an extension fills only when they
-  open are filled when they open, in the arranged menu too (3.5).
+- By the time the menu is shown, every extension has added its items. Submenus an extension fills only when they open
+  are filled when they open, in the arranged menu too (3.5).
+- Not every item's state is final then. Explorer builds its full menu with `CMF_ASYNCVERBSTATE`: an Explorer command
+  (`IExplorerCommand`, as LexPen's items) is put in disabled, and its state (shown, hidden, enabled) is asked for in
+  the background and set on the menu while it is open. Seen in Explorer: every LexPen item disabled when the menu is
+  shown, the hidden ones included. A program that builds the menu without that flag (Foldex, the test host) has
+  every state before the show call. How Explorer sets the states later (which calls, by id or by position): [not yet
+  checked]; Open question 6.
+- Explorer's full menu has every item owner-drawn by the time it is shown (Explorer draws them itself); each item
+  keeps its text, so it is named as any other.
 
 ### 3.2 The hook
 
@@ -175,6 +182,10 @@ On any doubt, Windows' own menu is shown untouched.
    per machine covers them and needs an installer with administrator rights.
 5. **Windows 11's short menu.** Switch Windows to the full menu (the settings app sets the switch), or arrange only
    under "Show more options"?
+6. **States set after the show (Explorer).** Explorer sets an Explorer command's state on its own menu while it is
+   open (3.1), so a moved item keeps the disabled state it had at the show. Follow Explorer's changes onto the moved
+   items (hook the menu calls Explorer makes, once the trace has shown which), or wait for the states before
+   arranging, or leave Explorer commands where Explorer put them?
 
 ## 6. As built
 
@@ -208,5 +219,17 @@ On any doubt, Windows' own menu is shown untouched.
 - Not covered: LexPen only shows or hides (`ECS_ENABLED`, `ECS_HIDDEN`), it never disables, so a disabled LexPen
   item is not tested; the state is copied as a whole, and a disabled item of Windows' ("Retrieving libraries...",
   in a submenu) is shown disabled. LexPen's submenu mode (`explorerPlace` "submenu") not tested. Choosing an item
-  (the id handed back) is checked only by the ids being Windows' ids, not by a choice made. Explorer and an Open
-  dialog not tried.
+  (the id handed back) is checked only by the ids being Windows' ids, not by a choice made. An Open dialog not tried.
+
+### 6.2 The spike in Explorer and Foldex
+
+- Foldex: "from LexPen" shown with LexPen's items as Windows gives them; a choice reached LexPen's command. That
+  command failed with "Windows cannot find ..." also without Dexmenu (`DexmenuTest --invoke LexPen.CompareLeft`:
+  `0x80070002`): LexPen's `HKCU\Software\Classes\LexPen.Shell` key, which holds its exe, is missing on this computer.
+- Explorer (full menu): the show call is made with the noted `HMENU`, so the hook works there. Every item is
+  owner-drawn by then; the DLL reads their text too. "from LexPen" is shown, but LexPen's items in it stay disabled
+  and the hidden ones show: Explorer's later state changes (3.1) reach its own menu, not the moved items. Open
+  question 6.
+- The trace (`HKCU\Software\Dexmenu` `Trace` 1): each menu noted, each show call and each item in
+  `%LOCALAPPDATA%\Dexmenu\dexmenu.log`. `DEXMENU=0` forces the DLL off in a process, so the tests hold while the
+  registry has Dexmenu on.
