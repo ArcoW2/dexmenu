@@ -2,6 +2,7 @@
 rem Builds DexmenuShell.dll (src\dll, Delphi's dcc64) and the test host DexmenuTest.exe (tests\host, Visual Studio's
 rem C++ tools) into bin, 64-bit; intermediate files in obj. Explorer keeps a DLL it loaded open: then the old one is
 rem renamed (that is allowed) and the new one takes its name, as LexPen's build does.
+rem The DLL stays in obj\dll as the artifact a publish of the settings app takes (dotnet publish src\settings).
 rem Delphi: DELPHI_ROOT, else the newest RootDir under HKLM\SOFTWARE\WOW6432Node\Embarcadero\BDS.
 setlocal
 set "ROOT=%~dp0"

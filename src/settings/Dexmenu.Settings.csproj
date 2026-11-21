@@ -16,7 +16,8 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <AssemblyName>DexmenuSettings</AssemblyName>
     <RootNamespace>Dexmenu.Settings</RootNamespace>
-    <OutDir>$(MSBuildThisFileDirectory)..\..\bin\</OutDir>
+    <!-- a publish builds in its own folder, so a running app in bin does not stop it -->
+    <OutDir Condition="'$(_IsPublishing)' != 'true'">$(MSBuildThisFileDirectory)..\..\bin\</OutDir>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <WebView2NeverCopyLoaderDllToOutputDirectory>true</WebView2NeverCopyLoaderDllToOutputDirectory>
   </PropertyGroup>
@@ -25,6 +26,18 @@
     <!-- The page, served from bin\web through a virtual host. -->
     <Content Include="web\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- DexmenuShell.dll, the Delphi build's artifact (build.cmd compiles it into obj\dll), goes into a publish next to
+       the app. Not copied on a build: build.cmd puts it in bin itself, renaming the old one when Explorer holds it. -->
+  <PropertyGroup>
+    <DexmenuShellDll>$(MSBuildThisFileDirectory)..\..\obj\dll\DexmenuShell.dll</DexmenuShellDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(DexmenuShellDll)" Link="DexmenuShell.dll" CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="RequireDexmenuShellDll" BeforeTargets="PrepareForPublish">
+    <Error Condition="!Exists('$(DexmenuShellDll)')" Text="DexmenuShell.dll is not built: run build.cmd first (it compiles the Delphi DLL into obj\dll)." />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
