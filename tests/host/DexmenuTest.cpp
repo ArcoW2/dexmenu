@@ -8,7 +8,8 @@
 // so the check does not lean on the layout's patterns. With DEXMENU=1 (Dexmenu on) the shown menu must hold those
 // items, exactly as Windows' menu has them (text, id, state, type, bitmap, submenu), in a submenu named --group, and
 // every other item as in Windows' menu, in its order. Without it, the shown menu must be Windows' menu. Either way,
-// after the call Windows' menu must be as it was. Exit code 0: pass.
+// after the call Windows' menu must be as it was. Exit code 0: pass. Run it with DEXMENU set to 1 or 0: without it
+// the DLL follows the registry (HKCU\Software\Dexmenu Enabled), and the host's checks for "off" would not hold.
 
 #define NOMINMAX
 #include <windows.h>

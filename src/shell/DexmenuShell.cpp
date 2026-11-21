@@ -3,7 +3,8 @@
 // layout instead. The arranged menu holds Windows' own items (same ids, states, bitmaps, item data, submenu handles),
 // so the program runs the chosen id on the menu it built, as before. After the call every item is put back.
 //
-// On only when HKCU\Software\Dexmenu Enabled is 1 or the environment variable DEXMENU is 1 (the tests); otherwise no
+// On when the environment variable DEXMENU is 1, off when it is 0 (the tests); without it, on only when
+// HKCU\Software\Dexmenu Enabled is 1. Off: no
 // hook is set and every call passes through. Any error: Windows' menu shown untouched, the error in
 // %LOCALAPPDATA%\Dexmenu\dexmenu.log.
 //
@@ -35,7 +36,7 @@ namespace {
 bool Enabled()
 {
     wchar_t env[8] = {};
-    if (GetEnvironmentVariableW(L"DEXMENU", env, 8) && wcscmp(env, L"1") == 0) return true;
+    if (GetEnvironmentVariableW(L"DEXMENU", env, 8)) return wcscmp(env, L"1") == 0;   // the tests: 1 on, 0 off
     DWORD value = 0, size = sizeof(value);
     RegGetValueW(HKEY_CURRENT_USER, L"Software\\Dexmenu", L"Enabled", RRF_RT_REG_DWORD, nullptr, &value, &size);
     return value == 1;
@@ -199,7 +200,9 @@ bool Read(HMENU menu, std::vector<Item>& items)
         item.info.fMask = Mask | MIIM_STRING;
         item.info.dwTypeData = nullptr;
         if (!GetMenuItemInfoW(menu, i, TRUE, &item.info)) return false;
-        if (!(item.info.fType & (MFT_SEPARATOR | MFT_OWNERDRAW | MFT_BITMAP)) && item.info.cch > 0)
+        // Owner-drawn items too: Explorer's full menu makes every item owner-drawn before showing it, and the text
+        // stays with the item apart from its type.
+        if (!(item.info.fType & (MFT_SEPARATOR | MFT_BITMAP)) && item.info.cch > 0)
         {
             item.text.resize(item.info.cch + 1);
             item.info.cch++;
@@ -269,6 +272,14 @@ bool Arrange(HMENU original, Arranged& a)
     a.original = original;
     if (!Read(original, a.items)) return false;
     const auto groups = Layout();
+    if (Tracing())
+        for (const auto& item : a.items)
+        {
+            wchar_t line[96];
+            swprintf_s(line, L"  item id=%u type=0x%X state=0x%X data=%p bitmap=%p text=", item.info.wID, item.info.fType,
+                item.info.fState, reinterpret_cast<void*>(item.info.dwItemData), static_cast<void*>(item.info.hbmpItem));
+            Log(line + (item.hasText ? L"\"" + NameOf(item.text) + L"\"" : std::wstring(L"(none)")));
+        }
 
     // Which group each item goes to (-1: stays where it is).
     std::vector<int> groupOf(a.items.size(), -1);

@@ -19,7 +19,7 @@ Set-Content "$Work\b.txt.bak" 'b'
 Set-Content "$Work\left.txt" 'left'
 
 function Run($paths, [bool]$on) {
-    $env:DEXMENU = if ($on) { '1' } else { $null }
+    $env:DEXMENU = if ($on) { '1' } else { '0' }   # 0: off, also when the registry has it on
     $out = & $host_ @paths
     [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out; LexPen = ($out | Where-Object { $_ -like '== Items with verb*' }) }
 }
