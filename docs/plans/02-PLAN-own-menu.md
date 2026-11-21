@@ -126,8 +126,9 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 - **Only on click:** submenus open only on a click, never on hover. `replace` is always on click.
 - **Marks:** the character shown on an action and the one shown on an item or card with a submenu (for example none
   and `>`), chosen by the user.
-- **Menu width per level:** the width of the top level, of a first submenu, of a submenu in that, and so on. The cards
-  on one line share that width.
+- **Menu width per level:** the width of the top level, of a first submenu, of a submenu in that, and so on, and a
+  maximum width per level. The cards on one line share that width; a line whose cards do not fit makes the level
+  wider, up to the maximum, before its cards wrap (plan 03 3.5).
 - **States taken:** the default set of a rule, enabled, disabled or both (3.3).
 - **Most used:** the row on or off and how many items it shows (3.9).
 - **The active layout:** which named layout is used (3.5).

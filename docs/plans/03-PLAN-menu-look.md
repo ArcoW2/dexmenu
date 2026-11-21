@@ -40,7 +40,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 |---|---|---|---|
 | Engine | Direct2D and DirectWrite in the DLL: brushes, rounded rectangles, text, images, stripes; drawing into a window or an image | plan 01 Delphi DLL | 3.1 |
 | Theme files | per element and state; base and differences; JSON with comments; light and dark roots | -- | 3.2; 3.3 |
-| Shipped themes | light and dark, and a few on them | Theme files; Open question 4 | 3.3 |
+| Shipped themes | light and dark, and a few on them | Theme files; Open question 3 | 3.3 |
 | Menu window | popup, corners, shadow, border, background colour / gradient / image, placement, scrolling | Engine | 3.4 |
 | Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
 | Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
@@ -122,7 +122,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - `light` and `dark`, complete, close to Windows 11's own menus so Dexmenu does not look foreign at first.
 - A few on them that change the palette only. Whether every LexPen theme is carried over (as Foldex did), its app
-  colours mapped onto the palette: Open question 4.
+  colours mapped onto the palette: Open question 3.
 
 ### 3.4 The menu window and backgrounds
 
@@ -159,9 +159,12 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - **The width:** each level of the menu has a width (plan 02 3.4). The cards on a line share it, after the theme's
   `gap` between them, by their `weight` (equal by default).
 - **Minimum width:** a card can have a `minWidth`. When the cards of a line do not fit side by side at their minimum
-  widths: Open question 1 (wrap onto the next line, or let the level grow).
+  widths, the level first grows: as wide as that line needs, up to the level's maximum width (plan 02 3.4) and never
+  wider than the screen's work area. The whole level takes that width, every line in it. When the line still does not
+  fit at the maximum, its last cards wrap onto a new line below it, in their order, and that new line shares the
+  width as any other.
 - **Heights:** a card's `height` is `auto` (from its content: the titles, the icon) or a fixed height in lines of
-  text (`2`, `3`) or in units. The line is as tall as its tallest card; how the lower cards sit in it: Open question 2.
+  text (`2`, `3`) or in units. The line is as tall as its tallest card; how the lower cards sit in it: Open question 1.
 - **A single card on a line** is drawn as a menu item: full width, no card border, the hover as a menu's, the icon
   left and the mark right. Several cards on a line are drawn as cards: their own background and border, the icon
   above or left of the titles depending on the card's shape (3.6).
@@ -214,7 +217,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   its top-left corner.
 - **Opening on hover:** after Windows' own menu delay (the system setting), as Windows' menus; closing when the mouse
   goes to another card. On click only: as the global setting says.
-- **Animation:** Open question 3.
+- **Animation:** Open question 2.
 
 ### 3.10 Marks of the preview
 
@@ -230,7 +233,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - The engine draws into an image in memory: for a fixed tree, layout and theme, the picture compared with an approved
   one (per light, dark, a few DPI scales); a change in drawing shows as a difference to look at.
-- Lines and cards: widths from weights and minimum widths, the case that does not fit (Open question 1), heights and
+- Lines and cards: widths from weights and minimum widths; a line that does not fit (the level grown up to its
+  maximum, the screen's edge as a limit, then the last cards wrapped), heights and
   how cards sit in a line, a single card drawn as a menu item.
 - Every state of a card and their combinations; a card's own background (colour, gradient, image) and colours; the
   extra text above and below the title.
@@ -243,10 +247,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 ## 4. Open questions
 
-1. **Cards that do not fit.** When the cards of a line do not fit side by side at their minimum widths: wrap the
-   last ones onto a new line, or make that level wider for this menu?
-2. **Cards of different heights on a line.** Stretch every card to the line's height, or keep each card's own height
+1. **Cards of different heights on a line.** Stretch every card to the line's height, or keep each card's own height
    (aligned to the top)?
-3. **Animation.** Submenus and the `replace` change: none (as Windows' classic menus), or a short slide or fade?
-4. **LexPen's themes.** Carry every LexPen theme over (its app colours mapped onto the palette), as Foldex did, or ship
+2. **Animation.** Submenus and the `replace` change: none (as Windows' classic menus), or a short slide or fade?
+3. **LexPen's themes.** Carry every LexPen theme over (its app colours mapped onto the palette), as Foldex did, or ship
    only `light`, `dark` and a few of Dexmenu's own?
