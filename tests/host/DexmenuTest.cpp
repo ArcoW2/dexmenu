@@ -141,13 +141,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 int wmain(int argc, wchar_t** argv)
 {
-    std::wstring group = L"from LexPen", prefix = L"LexPen.";
+    std::wstring group = L"from LexPen", prefix = L"LexPen.", invoke;
     std::vector<std::wstring> paths;
     for (int i = 1; i < argc; i++)
     {
         const std::wstring a = argv[i];
         if (a == L"--group" && i + 1 < argc) group = argv[++i];
         else if (a == L"--prefix" && i + 1 < argc) prefix = argv[++i];
+        else if (a == L"--invoke" && i + 1 < argc) invoke = argv[++i];
         else paths.push_back(a);
     }
     if (paths.empty()) { fwprintf(stderr, L"usage: DexmenuTest [--group name] [--prefix verb-prefix] path...\n"); return 2; }
@@ -182,6 +183,23 @@ int wmain(int argc, wchar_t** argv)
     menu->QueryInterface(IID_PPV_ARGS(&menu3));
     const HMENU hmenu = CreatePopupMenu();
     if (FAILED(menu->QueryContextMenu(hmenu, 0, First, Last, CMF_NORMAL | CMF_CANRENAME))) return 2;
+
+    // --invoke verb: the item run as a program runs a choice (by its id), no UI; its result printed, nothing shown.
+    if (!invoke.empty())
+    {
+        UINT id = 0;
+        for (const auto& n : Tree(hmenu, 0)) if (n.verb == invoke) id = n.id;
+        if (!id) { wprintf(L"no item with verb %s\n", invoke.c_str()); return 1; }
+        CMINVOKECOMMANDINFOEX info = { sizeof(info) };
+        info.fMask = CMIC_MASK_UNICODE | CMIC_MASK_FLAG_NO_UI;
+        info.hwnd = hwnd;
+        info.lpVerb = MAKEINTRESOURCEA(id - First);
+        info.lpVerbW = MAKEINTRESOURCEW(id - First);
+        info.nShow = SW_SHOWNORMAL;
+        const HRESULT hr = menu->InvokeCommand(reinterpret_cast<CMINVOKECOMMANDINFO*>(&info));
+        wprintf(L"invoked %s (id %u): hr=0x%08X\n", invoke.c_str(), id, static_cast<unsigned>(hr));
+        return SUCCEEDED(hr) ? 0 : 1;
+    }
 
     const auto windows = Tree(hmenu, 1);
     wprintf(L"== Windows' menu\n");
