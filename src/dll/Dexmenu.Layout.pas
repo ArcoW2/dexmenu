@@ -16,23 +16,31 @@ unit Dexmenu.Layout;
 interface
 
 uses
-  System.Generics.Collections, System.JSON;
+  System.Generics.Collections, System.JSON, Dexmenu.Rules;
 
 type
   TLine = class;
+  TCard = class;
 
   TRuleKind = (rkRemaining, rkMatch);
 
   TRule = class
   public
     Kind: TRuleKind;
-    Spec: TJSONObject;   // rkMatch: the rule as written (its fields are used from step 5 on)
+    Raw: TJSONObject;    // rkMatch: the rule as written
+    Spec: TRuleSpec;     // rkMatch: the rule parsed (Dexmenu.Rules); Spec.Valid False: it finds nothing
+    Card: TCard;         // the card it is on
+    Index: Integer;      // its place on that card, from 0
     destructor Destroy; override;
   end;
 
   TCard = class
   public
-    Title: string;
+    Id: string;            // "id", or made up (c1, c2, ...) when the layout has none
+    Title: string;         // "card": its name in the editor, and its title when it holds several items
+    ShownTitle: string;    // "title": its title also when it holds one item ('' : the item's own text)
+    RenameFrom, RenameTo: string;   // "rename": { "regex": ..., "replace": ... } on the item's text
+    Parent: TCard;         // the card with a menu it sits in; nil at the top
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -86,7 +94,7 @@ type
 
 destructor TRule.Destroy;
 begin
-  Spec.Free;
+  Raw.Free;
   inherited;
 end;
 
@@ -151,9 +159,13 @@ end;
 
 // ---- parsing ------------------------------------------------------------------------------------------------------
 
-function ParseLines(Value: TJSONValue; const Where: string; Lines: TLines; var Error: string): Boolean; forward;
+function ParseLines(Value: TJSONValue; const Where: string; Parent: TCard; Lines: TLines; var Error: string): Boolean;
+  forward;
 
-function ParseCard(Value: TJSONValue; const Where: string; out Card: TCard; var Error: string): Boolean;
+threadvar
+  NextCardId: Integer;   // ids made up per parse; a layout may be parsed on several threads
+
+function ParseCard(Value: TJSONValue; const Where: string; Parent: TCard; out Card: TCard; var Error: string): Boolean;
 var
   Obj: TJSONObject;
   Rules, Menu: TJSONValue;
@@ -176,6 +188,20 @@ begin
   Card := TCard.Create;
   try
     Card.Title := Obj.GetValue('card').Value;
+    Card.Parent := Parent;
+    Inc(NextCardId);
+    if Obj.GetValue('id') is TJSONString then
+      Card.Id := Obj.GetValue('id').Value
+    else
+      Card.Id := 'c' + IntToStr(NextCardId);
+    if Obj.GetValue('title') is TJSONString then
+      Card.ShownTitle := Obj.GetValue('title').Value;
+    if (Obj.GetValue('rename') is TJSONObject) and (TJSONObject(Obj.GetValue('rename')).GetValue('regex') <> nil) then
+    begin
+      Card.RenameFrom := TJSONObject(Obj.GetValue('rename')).GetValue('regex').Value;
+      if TJSONObject(Obj.GetValue('rename')).GetValue('replace') <> nil then
+        Card.RenameTo := TJSONObject(Obj.GetValue('rename')).GetValue('replace').Value;
+    end;
     Rules := Obj.GetValue('rules');
     Menu := Obj.GetValue('menu');
     if (Rules <> nil) and (Menu <> nil) then
@@ -193,13 +219,16 @@ begin
       for Item in TJSONArray(Rules) do
       begin
         Rule := TRule.Create;
+        Rule.Card := Card;
+        Rule.Index := Card.Rules.Count;
         Card.Rules.Add(Rule);
         if (Item is TJSONString) and (Item.Value = 'remaining') then
           Rule.Kind := rkRemaining
         else if Item is TJSONObject then
         begin
           Rule.Kind := rkMatch;
-          Rule.Spec := TJSONObject(Item.Clone);
+          Rule.Raw := TJSONObject(Item.Clone);
+          Rule.Spec := ParseRule(Rule.Raw);
         end
         else
         begin
@@ -211,7 +240,7 @@ begin
     if Menu <> nil then
     begin
       Card.Menu := TLines.Create;
-      if not ParseLines(Menu, Where + ' > ' + Card.Title, Card.Menu, Error) then
+      if not ParseLines(Menu, Where + ' > ' + Card.Title, Card, Card.Menu, Error) then
         Exit;
     end;
     Result := True;
@@ -221,7 +250,7 @@ begin
   end;
 end;
 
-function ParseLines(Value: TJSONValue; const Where: string; Lines: TLines; var Error: string): Boolean;
+function ParseLines(Value: TJSONValue; const Where: string; Parent: TCard; Lines: TLines; var Error: string): Boolean;
 var
   Entry, CardValue: TJSONValue;
   LineCards: TJSONValue;
@@ -253,7 +282,7 @@ begin
     Lines.Add(Line);
     for CardValue in TJSONArray(LineCards) do
     begin
-      if not ParseCard(CardValue, Where, Card, Error) then
+      if not ParseCard(CardValue, Where, Parent, Card, Error) then
         Exit;
       Line.Cards.Add(Card);
     end;
@@ -299,11 +328,14 @@ begin
       Error := Source + ': the layout must be an object, a kind of right-click per key';
       Exit;
     end;
+    NextCardId := 0;
     for Pair in TJSONObject(Root) do
     begin
+      if Pair.JsonString.Value = 'template' then
+        Continue;   // the template card's look: plan 03, step 6
       Lines := TLines.Create;
       Layout.FKinds.Add(Pair.JsonString.Value, Lines);
-      if not ParseLines(Pair.JsonValue, Source + ' ' + Pair.JsonString.Value, Lines, Error) then
+      if not ParseLines(Pair.JsonValue, Source + ' ' + Pair.JsonString.Value, nil, Lines, Error) then
         Exit;
       N := CountRemaining(Lines);
       if N <> 1 then

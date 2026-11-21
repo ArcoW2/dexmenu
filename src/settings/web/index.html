@@ -9,10 +9,34 @@
 <body>
   <header>
     <label>Right-click on <select id="kind"></select></label>
-    <span id="source"></span>
+    <span class="grow"></span>
+    <label>Layout <select id="layouts"></select></label>
+    <span id="dirty" hidden>changed</span>
+    <button id="save">Save</button>
+    <button id="saveAs">Save as...</button>
+    <button id="activate">Make active</button>
   </header>
   <div id="error" hidden></div>
-  <main id="cards"></main>
+  <div id="ownKind" hidden>This kind of right-click uses the default layout. <button id="makeOwn">Give it its own</button></div>
+  <section class="pane" id="cardsPane">
+    <h2>Cards <button id="addTop" title="A new card at the end of the menu">+ Card</button></h2>
+    <div id="cards"></div>
+  </section>
+  <section class="pane" id="cardPane" hidden>
+    <h2 id="cardHeading">Card</h2>
+    <div id="card"></div>
+  </section>
+  <section class="pane" id="rulesPane">
+    <h2>Rules, in priority order <span class="hint">(drag to change; the first rule that finds an item gets it)</span></h2>
+    <ol id="rules"></ol>
+  </section>
+  <dialog id="nameDialog">
+    <form method="dialog">
+      <label>Save the layout as <input id="nameInput" required pattern="[^\\/:*?&quot;&lt;&gt;|]+"></label>
+      <menu><button value="cancel" formnovalidate>Cancel</button> <button value="ok">Save</button></menu>
+    </form>
+  </dialog>
+  <script src="layout-model.js"></script>
   <script src="editor.js"></script>
 </body>
 </html>

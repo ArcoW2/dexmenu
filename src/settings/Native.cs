@@ -9,11 +9,22 @@ static class Native
 {
     const string Dll = "DexmenuShell.dll";
 
+    /// <summary>The preview's report: an item hovered (1) or clicked (2), the card that placed it and the rule that found
+    /// it (-1: none).</summary>
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
+    public delegate void PreviewCallback(int previewEvent, string cardId, int rule);
+
     [DllImport(Dll, CharSet = CharSet.Unicode)]
     public static extern IntPtr DexmenuPreviewCreate(IntPtr parent);
 
     [DllImport(Dll, CharSet = CharSet.Unicode)]
     static extern bool DexmenuPreviewSet(IntPtr wnd, string layout, string seen, string kind, StringBuilder error, int errorChars);
+
+    [DllImport(Dll, CharSet = CharSet.Unicode)]
+    public static extern void DexmenuPreviewSetCallback(IntPtr wnd, PreviewCallback callback);
+
+    [DllImport(Dll, CharSet = CharSet.Unicode)]
+    public static extern void DexmenuPreviewMark(IntPtr wnd, string cardId);
 
     [DllImport(Dll, CharSet = CharSet.Unicode)]
     static extern int DexmenuBaseLayout(StringBuilder? buffer, int chars);

@@ -8,6 +8,7 @@ uses
   Dexmenu.Log in 'Dexmenu.Log.pas',
   Dexmenu.Menus in 'Dexmenu.Menus.pas',
   Dexmenu.Json in 'Dexmenu.Json.pas',
+  Dexmenu.Rules in 'Dexmenu.Rules.pas',
   Dexmenu.Layout in 'Dexmenu.Layout.pas',
   Dexmenu.Tree in 'Dexmenu.Tree.pas',
   Dexmenu.Place in 'Dexmenu.Place.pas',
@@ -25,7 +26,9 @@ exports
   DllUnregisterServer,
   DexmenuPreviewCreate,
   DexmenuPreviewSet,
-  DexmenuBaseLayout;
+  DexmenuBaseLayout,
+  DexmenuPreviewSetCallback,
+  DexmenuPreviewMark;
 
 begin
 end.

@@ -1,10 +1,19 @@
 unit Dexmenu.Place;
 
-// The layout applied to Windows' items (docs/plans/02-PLAN-own-menu.md 3.3; plan 00 step 3): a level of the menu is
-// lines of cards. The remaining card takes every top-level item no other rule took and places each, with its
-// subitems, at its own place as a card of its own on its own line (Windows' separators kept as thin lines). A card
-// with a menu is a card that opens its own lines. A Windows submenu opened from a card is its items as cards, one per
-// line. Cards with match rules come with step 5: until then they find nothing and are not shown.
+// The layout applied to Windows' items (docs/plans/02-PLAN-own-menu.md 3.3; plan 00 steps 3 and 5).
+//
+// Cards first: each card's rules take items; where the card stands is where its items show. The rules run in the
+// priority list's order (a rule's "priority", lower first; rules without one after, in the layout's order). An item
+// goes to the first rule that finds it; an item with a submenu takes its subitems along, except those an earlier rule
+// took, which stay there and are left out of its submenu. A rule with "also" shows an item even when an earlier rule
+// took it. The remaining card takes every top-level item no rule took (Windows' separators among them) and places
+// each, with its subitems, as a card of its own on its own line where it stands.
+//
+// A card with rules is shown as the item it found (one), or as a card with a submenu of them under its title (more),
+// or not at all (none). A card with a menu opens its lines. A Windows submenu opened from a card shows its items,
+// less those a rule took directly.
+//
+// Items are keyed by the menu they sit in and their id, not by object: a submenu's items are read again when it opens.
 
 interface
 
@@ -12,18 +21,28 @@ uses
   System.Generics.Collections, Dexmenu.Tree, Dexmenu.Layout;
 
 type
-  TViewKind = (vkItem, vkMenu, vkSeparator);
+  TViewKind = (vkItem, vkMenu, vkGroup, vkSeparator);
+
+  TFound = record
+    Node: TNode;
+    Rule: TRule;
+  end;
 
   TViewCard = class
   public
     Kind: TViewKind;
-    Node: TNode;      // vkItem: Windows' item (not owned)
-    Card: TCard;      // vkMenu: the layout's card; vkItem: the card that placed it (not owned)
+    Node: TNode;        // vkItem, vkSeparator: Windows' item (not owned)
+    Card: TCard;        // the layout's card: that placed the item (vkItem), with the menu (vkMenu), that found them (vkGroup)
+    Rule: TRule;        // vkItem: the rule that found it; nil for the remaining card's items
+    Items: TList<TFound>;   // vkGroup: what the card found
+    destructor Destroy; override;
     function Title: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
     function Checked: Boolean;
     function IsDefault: Boolean;
+    function CardId: string;
+    function RuleIndex: Integer;   // -1: none
   end;
 
   TViewLine = class
@@ -41,8 +60,12 @@ type
     function CardCount: Integer;
   end;
 
-  // What a menu shows: the layout and Windows' top-level items, and which of them are left for the remaining card.
   TPlacement = class
+  private
+    FDirect: TDictionary<string, Boolean>;   // keys of items a rule took directly
+    FTaken: TDictionary<string, Boolean>;    // keys of items taken (directly, or with an item above them)
+    FFound: TObjectDictionary<TCard, TList<TFound>>;
+    procedure Evaluate;
   public
     Layout: ILayout;
     Kind: string;
@@ -52,32 +75,77 @@ type
     destructor Destroy; override;
     function TopLevel: TViewLevel;
     function MenuLevel(Card: TCard): TViewLevel;
+    function GroupLevel(V: TViewCard): TViewLevel;
     function SubmenuLevel(Node: TNode): TViewLevel;
   end;
+
+function KeyOf(Node: TNode): string;
 
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils, System.RegularExpressions, System.Generics.Defaults, Dexmenu.Rules;
+
+function KeyOf(Node: TNode): string;
+begin
+  Result := IntToHex(NativeUInt(Node.Menu), 1) + ':' + IntToStr(Node.Id);
+end;
+
+// ---- the view ------------------------------------------------------------------------------------------------------
+
+destructor TViewCard.Destroy;
+begin
+  Items.Free;
+  inherited;
+end;
 
 function TViewCard.Title: string;
 begin
   case Kind of
-    vkItem: Result := Node.Name;
-    vkMenu: Result := Card.Title;
+    vkItem:
+      begin
+        if (Card <> nil) and (Card.ShownTitle <> '') and not Card.IsRemaining then
+          Exit(Card.ShownTitle);
+        Result := Node.Name;
+        if (Card <> nil) and (Card.RenameFrom <> '') then
+          try
+            Result := TRegEx.Replace(Result, Card.RenameFrom, Card.RenameTo);
+          except
+            // a rename that does not compile: the item's own text
+          end;
+      end;
+    vkMenu, vkGroup:
+      if Card.ShownTitle <> '' then
+        Result := Card.ShownTitle
+      else
+        Result := Card.Title;
   else
     Result := '';
   end;
 end;
 
 function TViewCard.Enabled: Boolean;
+var
+  F: TFound;
 begin
-  Result := (Kind = vkMenu) or ((Kind = vkItem) and Node.Enabled);
+  case Kind of
+    vkItem: Result := Node.Enabled;
+    vkMenu: Result := True;
+    vkGroup:
+      begin
+        for F in Items do
+          if F.Node.Enabled then
+            Exit(True);
+        Result := False;
+      end;
+  else
+    Result := False;
+  end;
 end;
 
 function TViewCard.HasSubmenu: Boolean;
 begin
-  Result := (Kind = vkMenu) or ((Kind = vkItem) and (Node.SubMenu <> 0));
+  Result := (Kind in [vkMenu, vkGroup]) or ((Kind = vkItem) and (Node.SubMenu <> 0));
 end;
 
 function TViewCard.Checked: Boolean;
@@ -88,6 +156,22 @@ end;
 function TViewCard.IsDefault: Boolean;
 begin
   Result := (Kind = vkItem) and Node.IsDefault;
+end;
+
+function TViewCard.CardId: string;
+begin
+  if Card = nil then
+    Result := ''
+  else
+    Result := Card.Id;
+end;
+
+function TViewCard.RuleIndex: Integer;
+begin
+  if Rule = nil then
+    Result := -1
+  else
+    Result := Rule.Index;
 end;
 
 constructor TViewLine.Create;
@@ -142,43 +226,190 @@ begin
     Level.Lines.Delete(Level.Lines.Count - 1);
 end;
 
-procedure AddNodeLine(Level: TViewLevel; Node: TNode; Card: TCard);
+function NewLine(Level: TViewLevel): TViewLine;
+begin
+  Result := TViewLine.Create;
+  Level.Lines.Add(Result);
+end;
+
+// An item of Windows' menu as a card of its own on its own line.
+procedure AddNodeLine(Level: TViewLevel; Node: TNode; Card: TCard; Rule: TRule);
 var
-  Line: TViewLine;
   V: TViewCard;
 begin
   if not Node.IsSeparator and (Node.Name = '') and (Node.SubMenu = 0) then
     Exit;   // an item without text (a bitmap of its own): not shown until icons (step 7)
-  Line := TViewLine.Create;
-  Level.Lines.Add(Line);
   V := TViewCard.Create;
   V.Node := Node;
   V.Card := Card;
+  V.Rule := Rule;
   if Node.IsSeparator then
     V.Kind := vkSeparator
   else
     V.Kind := vkItem;
-  Line.Cards.Add(V);
+  NewLine(Level).Cards.Add(V);
 end;
 
+// ---- the rules -----------------------------------------------------------------------------------------------------
+
 constructor TPlacement.Create(const ALayout: ILayout; const AKind: string; ATop: TNodes);
-var
-  N: TNode;
 begin
   inherited Create;
   Layout := ALayout;
   Kind := AKind;
   Top := ATop;
   Remaining := TList<TNode>.Create;
-  for N in Top do   // step 3: no match rules yet, so every top-level item is left for the remaining card
-    Remaining.Add(N);
+  FDirect := TDictionary<string, Boolean>.Create;
+  FTaken := TDictionary<string, Boolean>.Create;
+  FFound := TObjectDictionary<TCard, TList<TFound>>.Create([doOwnsValues]);
+  Evaluate;
 end;
 
 destructor TPlacement.Destroy;
 begin
+  FFound.Free;
+  FTaken.Free;
+  FDirect.Free;
   Remaining.Free;
   inherited;
 end;
+
+procedure CollectRules(Lines: TLines; Rules: TList<TRule>);
+var
+  Line: TLine;
+  Card: TCard;
+  R: TRule;
+begin
+  for Line in Lines do
+    for Card in Line.Cards do
+    begin
+      for R in Card.Rules do
+        if (R.Kind = rkMatch) and R.Spec.Valid then
+          Rules.Add(R);
+      if Card.Menu <> nil then
+        CollectRules(Card.Menu, Rules);
+    end;
+end;
+
+// Every submenu's items read (as far as Windows' menu has them before it opens), for rules that look deeper.
+procedure ReadAllChildren(Nodes: TNodes);
+var
+  N: TNode;
+begin
+  for N in Nodes do
+    if (N.SubMenu <> 0) and not N.IsSeparator then
+    begin
+      if N.Children = nil then
+        ReadChildren(N);
+      ReadAllChildren(N.Children);
+    end;
+end;
+
+function Accepts(R: TRule; Node: TNode): Boolean;
+begin
+  Result := False;
+  if Node.IsSeparator or (Node.Name = '') then
+    Exit;
+  if Node.Enabled and not (stEnabled in R.Spec.States) then
+    Exit;
+  if not Node.Enabled and not (stDisabled in R.Spec.States) then
+    Exit;
+  case R.Spec.Scope of
+    scTop: if Node.Path <> '' then Exit;
+    scPath: if (Node.Path = '') or not R.Spec.Path.Test(Node.Path, R.Spec.CaseSensitive) then Exit;
+  end;
+  Result := R.Spec.Name.Test(Node.Name, R.Spec.CaseSensitive);
+end;
+
+procedure TPlacement.Evaluate;
+var
+  Rules: TList<TRule>;
+  Order: TDictionary<TRule, Integer>;
+  R: TRule;
+  I: Integer;
+  Found: TFound;
+
+  procedure TakeBelow(Node: TNode);
+  var
+    C: TNode;
+  begin
+    if Node.Children <> nil then
+      for C in Node.Children do
+      begin
+        if not FTaken.ContainsKey(KeyOf(C)) then
+          FTaken.AddOrSetValue(KeyOf(C), True);
+        TakeBelow(C);
+      end;
+  end;
+
+  procedure Visit(Nodes: TNodes; R: TRule);
+  var
+    N: TNode;
+    List: TList<TFound>;
+  begin
+    for N in Nodes do
+    begin
+      if Accepts(R, N) and (not FTaken.ContainsKey(KeyOf(N)) or R.Spec.Also) then
+      begin
+        if not FFound.TryGetValue(R.Card, List) then
+        begin
+          List := TList<TFound>.Create;
+          FFound.Add(R.Card, List);
+        end;
+        Found.Node := N;
+        Found.Rule := R;
+        List.Add(Found);
+        if not FTaken.ContainsKey(KeyOf(N)) then
+        begin
+          FTaken.AddOrSetValue(KeyOf(N), True);
+          FDirect.AddOrSetValue(KeyOf(N), True);
+          TakeBelow(N);   // its subitems follow it, except those taken already
+        end;
+      end;
+      if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
+        Visit(N.Children, R);
+    end;
+  end;
+
+begin
+  Rules := TList<TRule>.Create;
+  Order := TDictionary<TRule, Integer>.Create;
+  try
+    CollectRules(Layout.Lines(Kind), Rules);
+    for I := 0 to Rules.Count - 1 do
+      Order.Add(Rules[I], I);
+    // the priority list: a rule's priority first (lower first), then the layout's order
+    Rules.Sort(TComparer<TRule>.Construct(
+      function(const A, B: TRule): Integer
+      var
+        PA, PB: Integer;
+      begin
+        PA := A.Spec.Priority;
+        PB := B.Spec.Priority;
+        if PA < 0 then PA := MaxInt;
+        if PB < 0 then PB := MaxInt;
+        if PA <> PB then
+          Exit(PA - PB);   // both within Integer: no overflow for real priorities
+        Result := Order[A] - Order[B];
+      end));
+    for R in Rules do
+      if R.Spec.Scope <> scTop then
+      begin
+        ReadAllChildren(Top);
+        Break;
+      end;
+    for R in Rules do
+      Visit(Top, R);
+    for I := 0 to Top.Count - 1 do
+      if not FTaken.ContainsKey(KeyOf(Top[I])) or Top[I].IsSeparator then
+        Remaining.Add(Top[I]);
+  finally
+    Order.Free;
+    Rules.Free;
+  end;
+end;
+
+// ---- the levels ------------------------------------------------------------------------------------------------
 
 function PlaceLines(P: TPlacement; Lines: TLines): TViewLevel;
 var
@@ -187,6 +418,7 @@ var
   Out: TViewLine;
   V: TViewCard;
   N: TNode;
+  List: TList<TFound>;
 begin
   Result := TViewLevel.Create;
   for Line in Lines do
@@ -197,21 +429,38 @@ begin
       begin
         Out := nil;   // the remaining items each take a line of their own
         for N in P.Remaining do
-          AddNodeLine(Result, N, Card);
+          AddNodeLine(Result, N, Card, nil);
       end
-      else if Card.Menu <> nil then
+      else
       begin
-        if Out = nil then
+        V := nil;
+        if Card.Menu <> nil then
         begin
-          Out := TViewLine.Create;
-          Result.Lines.Add(Out);
+          V := TViewCard.Create;
+          V.Kind := vkMenu;
+          V.Card := Card;
+        end
+        else if P.FFound.TryGetValue(Card, List) and (List.Count = 1) then
+        begin
+          V := TViewCard.Create;
+          V.Kind := vkItem;
+          V.Node := List[0].Node;
+          V.Card := Card;
+          V.Rule := List[0].Rule;
+        end
+        else if P.FFound.TryGetValue(Card, List) and (List.Count > 1) then
+        begin
+          V := TViewCard.Create;
+          V.Kind := vkGroup;
+          V.Card := Card;
+          V.Items := TList<TFound>.Create(List);
         end;
-        V := TViewCard.Create;
-        V.Kind := vkMenu;
-        V.Card := Card;
+        if V = nil then
+          Continue;   // found nothing: not shown
+        if Out = nil then
+          Out := NewLine(Result);
         Out.Cards.Add(V);
       end;
-      // a card with match rules: step 5
   end;
   CleanSeparators(Result);
 end;
@@ -226,6 +475,15 @@ begin
   Result := PlaceLines(Self, Card.Menu);
 end;
 
+function TPlacement.GroupLevel(V: TViewCard): TViewLevel;
+var
+  F: TFound;
+begin
+  Result := TViewLevel.Create;
+  for F in V.Items do
+    AddNodeLine(Result, F.Node, V.Card, F.Rule);
+end;
+
 function TPlacement.SubmenuLevel(Node: TNode): TViewLevel;
 var
   N: TNode;
@@ -233,7 +491,8 @@ begin
   Result := TViewLevel.Create;
   if Node.Children <> nil then
     for N in Node.Children do
-      AddNodeLine(Result, N, nil);
+      if not FDirect.ContainsKey(KeyOf(N)) then
+        AddNodeLine(Result, N, nil, nil);
   CleanSeparators(Result);
 end;
 

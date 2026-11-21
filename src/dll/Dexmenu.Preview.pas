@@ -23,6 +23,16 @@ function DexmenuPreviewSet(Wnd: HWND; Layout, Seen, Kind: PWideChar; Error: PWid
 // The built-in base layout's text into Buffer; the number of characters it needs (with the closing #0).
 function DexmenuBaseLayout(Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 
+type
+  // Event 1: the mouse over an item, 2: an item clicked; CardId and Rule: the layout's card that placed it and the
+  // rule that found it (-1: none, the remaining card's or a card with a menu).
+  TPreviewCallback = procedure(Event: Integer; CardId: PWideChar; Rule: Integer); stdcall;
+
+// Tells the settings app which card and rule placed the item under the mouse or clicked (plan 02 3.5).
+procedure DexmenuPreviewSetCallback(Wnd: HWND; Callback: TPreviewCallback); stdcall;
+// Marks the items a card placed (the card selected in the editor); '' marks none.
+procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;
+
 implementation
 
 uses
@@ -57,6 +67,8 @@ type
     Top: TNodes;
     Placement: TPlacement;
     Levels: TObjectList<TPreviewLevel>;
+    Callback: TPreviewCallback;
+    Marked: string;
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
@@ -154,6 +166,8 @@ begin
   L.Selected := -1;
   if V.Kind = vkMenu then
     L.View := Placement.MenuLevel(V.Card)
+  else if V.Kind = vkGroup then
+    L.View := Placement.GroupLevel(V)
   else
   begin
     ReadChildren(V.Node);
@@ -207,7 +221,7 @@ begin
     S := Scale;
     for L in Levels do
     begin
-      P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height);
+      P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked);
       try
         P.PaintOnto(MemDC, Round(L.X * S), Round(L.Y * S));
       finally
@@ -254,11 +268,12 @@ begin
         case V.Kind of
           vkItem: begin Kind := 'item'; Id := V.Node.Id; end;
           vkMenu: Kind := 'menu';
+          vkGroup: Kind := 'group';
         else
           Kind := 'separator';
         end;
-        Lines.Add(Format('card %s id=%u enabled=%d checked=%d default=%d sub=%d selected=%d x=%d y=%d text=%s',
-          [Kind, Id, Ord(V.Enabled), Ord(V.Checked), Ord(V.IsDefault), Ord(V.HasSubmenu), Ord(B = L.Selected),
+        Lines.Add(Format('card %s id=%u enabled=%d checked=%d default=%d sub=%d selected=%d placed=%s/%d x=%d y=%d text=%s',
+          [Kind, Id, Ord(V.Enabled), Ord(V.Checked), Ord(V.IsDefault), Ord(V.HasSubmenu), Ord(B = L.Selected), V.CardId, V.RuleIndex,
           Round((L.X + (R.left + R.right) / 2) * S), Round((L.Y + (R.top + R.bottom) / 2) * S), V.Title]));
       end;
     end;
@@ -317,6 +332,8 @@ begin
           if Box <> L.Selected then
           begin
             L.Selected := Box;
+            if (Box >= 0) and Assigned(P.Callback) then
+              P.Callback(1, PWideChar(L.Geometry.Boxes[Box].Card.CardId), L.Geometry.Boxes[Box].Card.RuleIndex);
             KillTimer(Wnd, HoverTimer);
             if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu then
             begin
@@ -353,6 +370,9 @@ begin
           SetFocus(Wnd);
           S := P.Scale;
           Index := P.LevelAt(SmallInt(LP and $FFFF) / S, SmallInt((LP shr 16) and $FFFF) / S, Box);
+          if (Index >= 0) and (Box >= 0) and Assigned(P.Callback) then
+            P.Callback(2, PWideChar(P.Levels[Index].Geometry.Boxes[Box].Card.CardId),
+              P.Levels[Index].Geometry.Boxes[Box].Card.RuleIndex);
           if (Index >= 0) and (Box >= 0) and P.Levels[Index].Geometry.Boxes[Box].Card.HasSubmenu then
           begin
             P.Open(Index, Box);
@@ -463,6 +483,26 @@ begin
   Result := Length(BaseLayout) + 1;
   if (Buffer <> nil) and (Chars > 0) then
     StrPLCopy(Buffer, BaseLayout, Chars - 1);
+end;
+
+procedure DexmenuPreviewSetCallback(Wnd: HWND; Callback: TPreviewCallback); stdcall;
+var
+  P: TPreview;
+begin
+  P := PreviewOf(Wnd);
+  if P <> nil then
+    P.Callback := Callback;
+end;
+
+procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;
+var
+  P: TPreview;
+begin
+  P := PreviewOf(Wnd);
+  if P = nil then
+    Exit;
+  P.Marked := CardId;
+  InvalidateRect(Wnd, nil, False);
 end;
 
 end.

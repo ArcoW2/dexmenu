@@ -42,7 +42,7 @@ titles, dragging. Then the look: themes, colours, the card's structure, the layo
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Step 5: editing | cards, rules, titles, dragging, the remaining card moved; the preview following every change | Step 4 | 3.5 |
+| Step 5: editing | built (6.5); the full suite's last part (Send to, a broken layout, the settings app, the editor's self-test in the suite, a layout of rules at a right-click and in the preview) not yet run through: the run was stopped for low memory | a full run of tests/run-tests.ps1 | 3.5; 6.5 |
 | Step 6: the look | themes, colours, the card's structure, lines of cards, dividers | Step 5 | 3.6 |
 | Step 7: extras and install | icons, use counts and the most used row, search, "Edit menu...", the installer | Step 6 | 3.7 |
 | Later | blur; animation | Step 6 | 3.8 |
@@ -196,3 +196,35 @@ None.
   host's output is UTF-8 now, so titles beyond ASCII compare. Each host run is guarded (killed and failed after a
   minute), and on its own time-out the host closes Dexmenu's menu itself.
 - Seen by hand: a screenshot of the app with the preview of a file's menu.
+
+### 6.5 Step 5
+
+- Rules in the DLL (`src/dll/Dexmenu.Rules.pas`): name (and path) matched by equals, contains, startsWith, endsWith,
+  wildcard, regex or any, case insensitive unless `caseSensitive`; `scope` top or anywhere, or a `path`, not both;
+  `states`; `also`; `priority`. A regex is compiled when the rule is read (TRegEx otherwise compiles on first use).
+  An invalid rule finds nothing.
+- Placement (`src/dll/Dexmenu.Place.pas`): the rules in the priority list's order; an item to the first rule that finds
+  it, its subitems with it except those taken earlier, which a Windows submenu then leaves out; `also`; the remaining
+  card last. A card with rules shows its one item, or a card with a submenu of what it found under its name, or nothing.
+  Items are keyed by their menu and id, as a submenu is read again when it opens. A card's `title` and `rename` (regex
+  replace) give the item's text. Cards get an id (`c1`, ...) when the layout has none.
+- The menu and the preview: the new kind of card (several found items); the dump names the card and rule that placed
+  each item. The preview reports a hover or click (card and rule) to the settings app and marks the items of the card
+  selected in the editor (`DexmenuPreviewSetCallback`, `DexmenuPreviewMark`).
+- The editor (`src/settings/web`): `layout-model.js` holds the operations (drop onto a card, move between and into
+  lines, delete, the last card of a submenu, the remaining card never deleted, add, make a menu, the priority list,
+  useless cards); `editor.js` the views: the cards (a tree, dragged; rules numbered by priority; useless cards outlined
+  red), the selected card (name, title, extra text, rename, its rules edited in place) and the rules in priority order
+  (dragged). Every change goes to the preview at once; Save, Save as, opening another layout and Make active
+  (`settings.json`). The editor adds ids and priorities to a layout it opens; saving writes plain JSON, so comments
+  written by hand in a layout file are not kept.
+- Tested: the DLL's unit tests now include the rules on a menu made in the test (every match kind, case, states, scope,
+  path, both given, a bad regex, the priority order both ways, subitems following and left out, also, the layout's
+  order, the remaining card in a submenu, a card with a menu holding rule cards, rename, title, found none): all pass.
+  The editor's self-test (`DexmenuSettings.exe --selftest`, in WebView2): all pass. `tests/run-tests.ps1` up to the
+  selection cases: all pass; the rest (Send to, a broken layout, the settings app's preview, the self-test in the
+  suite, a layout of rules at a right-click against the preview, a click inside a found card's submenu) was not run
+  through: the run was stopped for low memory.
+- Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
+  priority list with a rule's problem) and its preview.
+- Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

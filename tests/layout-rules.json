@@ -1,0 +1,8 @@
+// A layout of rules for the tests (tests/run-tests.ps1, step 5): LexPen's items in a card, 7-Zip in a card inside
+// "Tools", the rest after them.
+{ "default": [
+  { "line": [ { "id": "c1", "card": "LexPen", "rules": [ { "name": { "contains": "LexPen" }, "priority": 1 } ] } ] },
+  { "line": [ { "id": "c2", "card": "Tools", "menu": [
+      { "line": [ { "id": "c3", "card": "7-Zip", "rules": [ { "name": { "equals": "7-Zip" }, "priority": 2 } ] } ] } ] } ] },
+  { "line": [ { "id": "c4", "card": "Rest", "rules": [ "remaining" ] } ] }
+] }

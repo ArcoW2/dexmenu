@@ -42,7 +42,8 @@ function Measure(Level: TViewLevel): TGeometry;
 procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Selected: Integer; ScrollY, Scale: Single;
   VisibleHeight: Single);
 // The level drawn into a picture; the caller frees it.
-function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single): TPicture;
+function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single;
+  const Marked: string = ''): TPicture;
 // The box at a point (DIP within the level, scroll applied), or -1.
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
 
@@ -211,9 +212,9 @@ begin
 end;
 
 procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer; ScrollY, VisibleHeight: Single;
-  const Look: TLook);
+  const Look: TLook; const Marked: string);
 var
-  Bg, Border, Text, Dim, Hover, Sep: ID2D1SolidColorBrush;
+  Bg, Border, Text, Dim, Hover, Sep, Accent: ID2D1SolidColorBrush;
   I: Integer;
   R: TD2D1RectF;
   V: TViewCard;
@@ -230,6 +231,7 @@ begin
     T.CreateSolidColorBrush(Color($80, $80, $80), nil, Dim);
     T.CreateSolidColorBrush(Color($FF, $FF, $FF, 0.08), nil, Hover);
     T.CreateSolidColorBrush(Color($45, $45, $45), nil, Sep);
+    T.CreateSolidColorBrush(Color($6A, $A8, $FF), nil, Accent);
   end
   else
   begin
@@ -239,6 +241,7 @@ begin
     T.CreateSolidColorBrush(Color($A0, $A0, $A0), nil, Dim);
     T.CreateSolidColorBrush(Color($00, $00, $00, 0.06), nil, Hover);
     T.CreateSolidColorBrush(Color($E0, $E0, $E0), nil, Sep);
+    T.CreateSolidColorBrush(Color($2F, $6F, $D6), nil, Accent);
   end;
   T.Clear(D2D1ColorF(0, 0, 0, 0));
   R := D2D1RectF(0.5, 0.5, G.Width - 0.5, VisibleHeight - 0.5);
@@ -259,6 +262,10 @@ begin
       T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1);
       Continue;
     end;
+    // the items of the card selected in the settings app's editor (the preview only)
+    if (Marked <> '') and (V.CardId = Marked) then
+      T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
+        ItemRadius, ItemRadius), Accent, 1.5);
     if (I = Selected) and V.Enabled then
       T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
         ItemRadius, ItemRadius), Hover);
@@ -284,7 +291,8 @@ begin
   T.PopAxisAlignedClip;
 end;
 
-function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single): TPicture;
+function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single;
+  const Marked: string): TPicture;
 var
   BMI: TBitmapInfo;
   Bits: Pointer;
@@ -314,7 +322,7 @@ begin
     Rect := System.Types.Rect(0, 0, Result.Width, Result.Height);
     Target.BindDC(Result.DC, Rect);
     Target.BeginDraw;
-    DrawLevel(Target, G, Selected, ScrollY, VisibleHeight, TLook.Current);
+    DrawLevel(Target, G, Selected, ScrollY, VisibleHeight, TLook.Current, Marked);
     Target.EndDraw;
   end;
 end;

@@ -389,6 +389,8 @@ begin
   L.Opener := V;
   if V.Kind = vkMenu then
     L.View := FPlacement.MenuLevel(V.Card)
+  else if V.Kind = vkGroup then
+    L.View := FPlacement.GroupLevel(V)
   else
   begin
     if Notify then
@@ -608,7 +610,7 @@ begin
         for Box in Parent.Geometry.Boxes do
         begin
           V := Box.Card;
-          if ((OpenerCard <> nil) and (V.Kind = vkMenu) and (V.Card = OpenerCard)) or
+          if ((OpenerCard <> nil) and (V.Kind in [vkMenu, vkGroup]) and (V.Card.Id = OpenerCard.Id)) or
             ((OpenerCard = nil) and (V.Kind = vkItem) and (V.Node.Id = OpenerId) and (V.Node.SubMenu <> 0)) then
             Found := V;
         end;
@@ -622,6 +624,8 @@ begin
           L.Opener := Found;
           if Found.Kind = vkMenu then
             L.View := NewPlacement.MenuLevel(Found.Card)
+          else if Found.Kind = vkGroup then
+            L.View := NewPlacement.GroupLevel(Found)
           else
           begin
             ReadChildren(Found.Node);
@@ -685,11 +689,12 @@ begin
         case V.Kind of
           vkItem: begin Kind := 'item'; Id := V.Node.Id; end;
           vkMenu: Kind := 'menu';
+          vkGroup: Kind := 'group';
         else
           Kind := 'separator';
         end;
-        Lines.Add(Format('card %s id=%u enabled=%d checked=%d default=%d sub=%d selected=%d x=%d y=%d text=%s',
-          [Kind, Id, Ord(V.Enabled), Ord(V.Checked), Ord(V.IsDefault), Ord(V.HasSubmenu), Ord(B = L.Selected),
+        Lines.Add(Format('card %s id=%u enabled=%d checked=%d default=%d sub=%d selected=%d placed=%s/%d x=%d y=%d text=%s',
+          [Kind, Id, Ord(V.Enabled), Ord(V.Checked), Ord(V.IsDefault), Ord(V.HasSubmenu), Ord(B = L.Selected), V.CardId, V.RuleIndex,
           L.Pos.X + Round(((R.left + R.right) / 2) * L.Scale),
           L.Pos.Y + Round(((R.top + R.bottom) / 2 - L.ScrollY) * L.Scale), V.Title]));
       end;

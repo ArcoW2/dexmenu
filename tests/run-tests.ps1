@@ -131,7 +131,7 @@ function DumpCards([string]$path) {
     $levels = 0
     foreach ($line in Get-Content $path -Encoding utf8) {
         if ($line -like 'level *') { $levels++; if ($levels -gt 1) { break }; continue }
-        if ($line -match '^card (item|menu) id=\d+ enabled=(\d) checked=\d default=\d sub=(\d) selected=\d x=-?\d+ y=-?\d+ text=(.*)$') {
+        if ($line -match '^card (item|menu|group) id=\d+ enabled=(\d) .* sub=(\d) .* text=(.*)$') {
             [pscustomobject]@{ Kind = $matches[1]; Text = $matches[4]; Enabled = $matches[2] -eq '1'; Sub = $matches[3] -eq '1' }
         }
     }
@@ -142,7 +142,7 @@ function MenuCards([string[]]$hostOut) {
         if ($line -like "== Dexmenu's menu*") { $in = $true; continue }
         if (-not $in) { continue }
         if ($line -match '^\s+level [1-9]' -or $line -match '^(PASS|FAIL|==)') { break }
-        if ($line -match '^\s+(item|menu) "(.*)" id=\d+( disabled)?( submenu)?$') {
+        if ($line -match '^\s+(item|menu|group) "(.*)" id=\d+( disabled)?( submenu)?$') {
             [pscustomobject]@{ Kind = $matches[1]; Text = $matches[2]; Enabled = -not $matches[3]; Sub = [bool]$matches[4] }
         }
     }
@@ -184,6 +184,47 @@ finally {
     $env:DEXMENU_LAYOUT_FILE = $null
 }
 Report 'the settings app: the preview is the menu, and follows the layout file' $runs $problems ": $($menu.Count) cards"
+
+# Step 5: the editor's self-test (its operations: dropping, deleting, moving, the remaining card, the priority list).
+$selftestOut = Join-Path $Work 'selftest.txt'
+$st = Start-Process (Join-Path $root 'bin\DexmenuSettings.exe') -ArgumentList '--selftest', "`"$selftestOut`"" -PassThru
+if (-not $st.WaitForExit(60000)) { Stop-Process $st -Force }
+$stLines = @(Get-Content $selftestOut -ErrorAction SilentlyContinue)
+$stProblems = @($stLines | Where-Object { $_ -like 'FAIL*' })
+if ($stLines.Count -eq 0) { $stProblems += 'the self-test wrote nothing' }
+$runs = @()
+Report 'the editor''s operations (self-test in WebView2)' $runs $stProblems ''
+
+# Step 5: a layout of rules gives the same menu at a right-click as in the editor's preview; a card that found several
+# items opens them, and a click there hands back the item's id.
+$rulesLayout = Join-Path $Work 'rules.json'
+Copy-Item -Force (Join-Path $root 'tests\layout-rules.json') $rulesLayout
+$env:DEXMENU_LAYOUT_FILE = $rulesLayout
+WithLeft '' {
+    $script:runs = @(
+        (Run @("$Work\a.txt") $true @('--any-layout')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, a layout of rules' -PassThru
+        (Run @("$Work\a.txt") $true @('--any-layout', '--open', 'LexPen', '--choose', 'LexPen.View')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, View in LexPen chosen in the LexPen card' -PassThru
+    )
+}
+$menu = @(MenuCards $runs[0].Out)
+$problems = @()
+if ($menu.Count -lt 3 -or $menu[0].Kind -ne 'group' -or $menu[0].Text -ne 'LexPen' -or $menu[1].Kind -ne 'menu' -or $menu[1].Text -ne 'Tools') {
+    $problems += "the menu starts [$(($menu | Select-Object -First 3 | ForEach-Object { "$($_.Kind):$($_.Text)" }) -join '; ')], expected [group:LexPen; menu:Tools; ...]"
+}
+if ($menu | Where-Object { $_.Kind -eq 'item' -and ($_.Text -like '*LexPen*' -or $_.Text -eq '7-Zip') }) { $problems += 'an item a rule took is also at the top' }
+$env:DEXMENU_DUMP = Join-Path $Work 'preview-rules-dump.txt'
+$app = Start-Process (Join-Path $root 'bin\DexmenuSettings.exe') -ArgumentList '--kind', 'file' -PassThru
+try {
+    $preview = @()
+    for ($i = 0; $i -lt 150 -and $preview.Count -eq 0; $i++) { Start-Sleep -Milliseconds 100; $preview = @(DumpCards $env:DEXMENU_DUMP) }
+    if (-not (Same $preview $menu)) { $problems += "the preview differs from the menu: preview [$(($preview | ForEach-Object Text) -join '; ')], menu [$(($menu | ForEach-Object Text) -join '; ')]" }
+}
+finally {
+    if (-not $app.HasExited) { [void]$app.CloseMainWindow(); if (-not $app.WaitForExit(5000)) { Stop-Process $app -Force } }
+    $env:DEXMENU_DUMP = $null
+    $env:DEXMENU_LAYOUT_FILE = $null
+}
+Report 'a layout of rules: the right-click and the preview show the same menu' $runs $problems ": $($menu.Count) cards"
 
 Write-Output ($(if ($failed) { "$failed case(s) failed" } else { 'all cases passed' }))
 exit ($failed + $unitFailures)

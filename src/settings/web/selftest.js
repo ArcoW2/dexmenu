@@ -1,0 +1,102 @@
+// The editor's operations tested (plan 02 3.12 "Editing"; plan 00 step 5), run in WebView2 by
+// DexmenuSettings.exe --selftest <file>: each check PASS / FAIL, the failures counted; the app writes them to the file
+// and exits with that count.
+"use strict";
+
+(() => {
+  const M = LayoutModel;
+  const out = [];
+  let failures = 0;
+  const check = (ok, what) => { out.push((ok ? "PASS " : "FAIL ") + what); if (!ok) failures++; };
+  const titles = lines => lines.map(e => e.line.map(c => c.card + (c.menu ? "[" + titles(c.menu) + "]" : "")).join(" | ")).join(" / ");
+
+  function sample() {
+    return M.ensureIds({ default: [
+      { line: [ { card: "LexPen", rules: [ { name: { contains: "LexPen" } } ] } ] },
+      { line: [ { card: "Clip", rules: [ { name: { any: ["Cut", "Copy"] } } ] }, { card: "Zip", rules: [ { name: { startsWith: "7" } } ] } ] },
+      { line: [ { card: "Tools", menu: [ { line: [ { card: "Git", rules: [ { name: { contains: "Git" } } ] } ] } ] } ] },
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] }
+    ] });
+  }
+  const id = (layout, name) => [...M.cards(layout.default)].find(a => a.card.card === name).card.id;
+
+  // ids and priorities
+  let L = sample();
+  check([...M.cards(L.default)].every(a => /^c\d+$/.test(a.card.id)), "every card gets an id");
+  check(M.ruleList(L.default).map(r => r.rule.priority).join() === "1,2,3,4", "every rule a priority, in the layout's order");
+
+  // a card dropped onto a card with rules: that card becomes a card with a menu, its rules in a new first card
+  L = sample();
+  const clipRules = JSON.stringify([...M.cards(L.default)].find(a => a.card.card === "Clip").card.rules);
+  check(M.dropOnCard(L, L.default, id(L, "LexPen"), id(L, "Clip")), "drop LexPen onto Clip");
+  check(titles(L.default) === "Clip[Clip / LexPen] | Zip / Tools[Git] / Rest", "Clip has a menu: a first card Clip, then LexPen; LexPen's line gone: " + titles(L.default));
+  const clip = [...M.cards(L.default)].find(a => a.card.card === "Clip" && a.card.menu).card;
+  check(!clip.rules && JSON.stringify(clip.menu[0].line[0].rules) === clipRules, "Clip's rules moved to the first card in its menu, not lost");
+
+  // onto a card with a menu: a new line at its end
+  L = sample();
+  M.dropOnCard(L, L.default, id(L, "Zip"), id(L, "Tools"));
+  check(titles(L.default) === "LexPen / Clip / Tools[Git / Zip] / Rest", "drop Zip onto Tools (a menu): Zip joins it: " + titles(L.default));
+
+  // not into itself
+  L = sample();
+  check(!M.dropOnCard(L, L.default, id(L, "Tools"), id(L, "Git")), "a card is not dropped into its own menu");
+
+  // the last card of a submenu deleted: its rules go to the parent
+  L = sample();
+  const gitRules = JSON.stringify([...M.cards(L.default)].find(a => a.card.card === "Git").card.rules);
+  check(M.deleteCard(L.default, id(L, "Git")), "delete Git, the last card of Tools' menu");
+  const tools = [...M.cards(L.default)].find(a => a.card.card === "Tools").card;
+  check(!tools.menu && JSON.stringify(tools.rules) === gitRules, "Tools is a card with rules again, with Git's rules");
+
+  // the last card dragged out of a submenu: the parent keeps no rules and is outlined red
+  L = sample();
+  check(M.moveCard(L.default, id(L, "Git"), null, 0), "drag Git out of Tools, to the top");
+  const tools2 = [...M.cards(L.default)].find(a => a.card.card === "Tools").card;
+  check(!tools2.menu && tools2.rules.length === 0 && M.useless(tools2), "Tools: a card with rules but none, useless (red)");
+  check(titles(L.default) === "Git / LexPen / Clip | Zip / Tools / Rest", "Git is the first line now: " + titles(L.default));
+
+  // the remaining card: moved, never deleted, always one
+  L = sample();
+  check(!M.deleteCard(L.default, id(L, "Rest")), "the remaining card cannot be deleted");
+  check(M.moveCard(L.default, id(L, "Rest"), id(L, "Tools"), 1), "the remaining card moved into Tools' menu");
+  check(M.remainingCount(L.default) === 1 && titles(L.default) === "LexPen / Clip | Zip / Tools[Git / Rest]", "still exactly one, now in Tools: " + titles(L.default));
+  check(!M.deleteCard(L.default, id(L, "Tools")), "a card holding the remaining card cannot be deleted");
+  check(M.moveCard(L.default, id(L, "Rest"), null, 99), "and back to the top");
+  check(M.remainingCount(L.default) === 1 && titles(L.default) === "LexPen / Clip | Zip / Tools[Git] / Rest", "at the end of the top: " + titles(L.default));
+
+  // a card moved into a line (beside others)
+  L = sample();
+  check(M.moveCard(L.default, id(L, "LexPen"), null, 1, true), "LexPen moved into Clip's line");
+  check(titles(L.default) === "Clip | Zip | LexPen / Tools[Git] / Rest", "three cards on one line: " + titles(L.default));
+
+  // the priority list
+  L = sample();
+  M.moveRule(L.default, 3, 0);
+  check(M.ruleList(L.default).map(r => r.card.card).join() === "Git,LexPen,Clip,Zip", "Git's rule moved to the top of the priority list");
+  check(M.ruleList(L.default).map(r => r.rule.priority).join() === "1,2,3,4", "priorities renumbered 1..n");
+  const added = M.addRule(L.default, [...M.cards(L.default)].find(a => a.card.card === "Zip").card);
+  check(added.priority === 5 && M.ruleList(L.default).length === 5, "a new rule goes at the end of the list");
+  M.deleteRule(L.default, [...M.cards(L.default)].find(a => a.card.card === "Zip").card, 1);
+  check(M.ruleList(L.default).length === 4, "a rule deleted");
+
+  // useless cards and rule problems
+  check(M.useless({ card: "x", rules: [] }), "no rules: useless");
+  check(M.useless({ card: "x", rules: [ { name: { regex: "(" } } ] }), "a regex that does not compile: useless");
+  check(M.useless({ card: "x", rules: [ { name: { equals: "a" }, scope: "top", path: { equals: "b" } } ] }), "a scope and a path: useless");
+  check(M.useless({ card: "x", rules: [ { name: { contains: "" } } ] }), "nothing to match: useless");
+  check(!M.useless({ card: "x", rules: [ { name: { equals: "Cut" } } ] }), "a valid rule: not useless");
+  check(!M.useless({ card: "x", menu: [] }), "a card with a menu: not outlined");
+
+  // made a card with a menu
+  L = sample();
+  M.makeMenu(L, L.default, id(L, "Zip"));
+  const zip = [...M.cards(L.default)].find(a => a.card.card === "Zip" && a.card.menu).card;
+  check(zip && zip.menu[0].line[0].rules[0].name.startsWith === "7", "made a menu: its rules in the first card");
+
+  // comments
+  check(M.withoutComments('{ "r": "a//b" } // c') === '{ "r": "a//b" } \n', "// inside a string kept, after it a comment");
+
+  out.push(failures ? failures + " FAILED" : "OK");
+  chrome.webview.postMessage({ type: "selftest", lines: out, failures });
+})();

@@ -342,7 +342,7 @@ void Tick(HWND hwnd)
         [[fallthrough]];
     case 2:   // act
         if (state == 1) return;
-        if (!chooseVerb.empty())
+        if (!chooseVerb.empty() && openText.empty())
         {
             for (const auto& c : levels.front().cards)
                 if (c.id == chooseId && chooseId != 0)
@@ -377,10 +377,13 @@ void Tick(HWND hwnd)
         state = 2;
         Tick(hwnd);
         return;
-    case 3:   // waiting for the opened submenu
+    case 3:   // waiting for the opened submenu; then a click in it (--choose) or Esc
         if (levels.size() < 2 || levels[1].cards.empty()) return;
         ownOpened = levels;
         finished = true;
+        if (chooseId != 0)
+            for (const auto& c : levels[1].cards)
+                if (c.id == chooseId) { Click(levels[1], c); return; }
         PostMessageW(levels.front().wnd, WM_KEYDOWN, VK_ESCAPE, 0);
         PostMessageW(levels.front().wnd, WM_KEYDOWN, VK_ESCAPE, 0);
         return;
@@ -413,7 +416,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 int wmain(int argc, wchar_t** argv)
 {
     std::wstring prefix = L"LexPen.", invoke;
-    bool late = false, expectWindows = false;
+    bool late = false, expectWindows = false, anyLayout = false;
     std::vector<std::wstring> paths;
     for (int i = 1; i < argc; i++)
     {
@@ -425,6 +428,7 @@ int wmain(int argc, wchar_t** argv)
         else if (a == L"--late") late = true;
         else if (a == L"--hold" && i + 1 < argc) holdMs = _wtoi(argv[++i]);
         else if (a == L"--expect-windows") expectWindows = true;
+        else if (a == L"--any-layout") anyLayout = true;   // a layout of rules: no check of the base layout's cards
         else paths.push_back(a);
     }
     _setmode(_fileno(stdout), _O_U8TEXT);   // UTF-8, so titles beyond ASCII survive a redirect
@@ -563,7 +567,7 @@ int wmain(int argc, wchar_t** argv)
         for (size_t i = 0; same && i < got.size(); i++)
             same = got[i].id == expected[i].id && got[i].text == expected[i].text &&
                 got[i].enabled == expected[i].enabled && got[i].sub == expected[i].sub;
-        Check(same, L"every item of Windows' menu a card, in its order, with its id, text, state and submenu mark");
+        if (!anyLayout) Check(same, L"every item of Windows' menu a card, in its order, with its id, text, state and submenu mark");
         if (late)
         {
             Check(lateApplied && !ownLate.empty(), L"the menu was drawn again after the late changes");
@@ -576,15 +580,14 @@ int wmain(int argc, wchar_t** argv)
             Check(deletedGone, L"the item deleted while shown is gone");
             Check(disabledShown, L"the item disabled while shown is shown disabled");
         }
-        if (!chooseVerb.empty())
-            Check(chooseId != 0 && static_cast<UINT>(chosen) == chooseId,
-                L"a click on the card of " + chooseVerb + L" returned its id " + std::to_wstring(chooseId));
-        else if (!openText.empty())
+        if (!openText.empty())
         {
             Check(ownOpened.size() >= 2 && !ownOpened[1].cards.empty(), L"the submenu \"" + openText + L"\" opened with items");
             if (ownOpened.size() >= 2) PrintLevels(ownOpened);
-            Check(chosen == 0, L"closed without a choice: 0 returned");
         }
+        if (!chooseVerb.empty())
+            Check(chooseId != 0 && static_cast<UINT>(chosen) == chooseId,
+                L"a click on the card of " + chooseVerb + L" returned its id " + std::to_wstring(chooseId));
         else
             Check(chosen == 0, L"closed without a choice: 0 returned");
     }
