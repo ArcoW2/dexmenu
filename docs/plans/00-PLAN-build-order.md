@@ -258,6 +258,10 @@ None.
 - Hidden cards (plan 02 3.3): `"hidden": true` on a card; a checkbox in the card's panel, the card striped and
   dimmed in the cards view. Tested: unit tests (its items nowhere, also not in the remaining card; a hidden card with
   a menu; the remaining card not hidden).
+- Dragging next to a card: a card's left or right edge puts the dragged card beside it in its line, its top or bottom
+  edge on a line of its own above or below that line (a card that shared a line becomes menu-wide again), the middle
+  onto it as before; the edge drawn while dragging. Tested: the editor's self-test (beside, both sides; above and
+  below; into a card's menu; not into the card's own menu).
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

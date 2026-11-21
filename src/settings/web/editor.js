@@ -102,16 +102,38 @@ function renderCard(card) {
   if (card.menu) box.append(renderLines(card.menu, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
   box.addEventListener("dragstart", e => { e.stopPropagation(); e.dataTransfer.setData("text/card", card.id); });
-  box.addEventListener("dragover", e => { e.preventDefault(); e.stopPropagation(); box.classList.add("over"); });
-  box.addEventListener("dragleave", e => { e.stopPropagation(); box.classList.remove("over"); });
+  const zones = ["over", "over-before", "over-after", "over-above", "over-below"];
+  box.addEventListener("dragover", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    box.classList.remove(...zones);
+    box.classList.add(zoneClass(dropZoneOf(box, e)));
+  });
+  box.addEventListener("dragleave", e => { e.stopPropagation(); box.classList.remove(...zones); });
   box.addEventListener("drop", e => {
     e.preventDefault();
     e.stopPropagation();
-    box.classList.remove("over");
-    if (M.dropOnCard(layout, linesOf(), e.dataTransfer.getData("text/card"), card.id)) changed();
+    box.classList.remove(...zones);
+    const dragged = e.dataTransfer.getData("text/card"), zone = dropZoneOf(box, e);
+    const done = zone === "onto" ? M.dropOnCard(layout, linesOf(), dragged, card.id) : M.moveCardNext(linesOf(), dragged, card.id, zone);
+    if (done) changed();
   });
   return box;
 }
+
+// Where on a card a drop lands: its top or bottom edge, a line of its own above or below the card's line; its left or
+// right edge, beside it in its line; else onto it (it becomes a card with a menu).
+function dropZoneOf(box, e) {
+  const r = box.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const edgeY = Math.min(10, r.height / 4), edgeX = Math.max(14, r.width / 5);
+  if (y < edgeY) return "above";
+  if (y > r.height - edgeY) return "below";
+  if (x < edgeX) return "before";
+  if (x > r.width - edgeX) return "after";
+  return "onto";
+}
+const zoneClass = zone => zone === "onto" ? "over" : "over-" + zone;
 
 function select(id, ruleIndex) {
   selectedId = id;

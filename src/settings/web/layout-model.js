@@ -200,6 +200,23 @@ const LayoutModel = (() => {
     return true;
   }
 
+  // A card dropped next to another card: beside it in its line (side "before" / "after"), or on a line of its own
+  // just above or below that card's line ("above" / "below": a card that shared a line becomes menu-wide again).
+  function moveCardNext(lines, draggedId, targetId, side) {
+    if (draggedId === targetId) return false;
+    const dragged = find(lines, draggedId), target = find(lines, targetId);
+    if (!dragged || !target || contains(dragged.card, targetId)) return false;
+    if (side === "above" || side === "below") {
+      const parentId = target.parent ? target.parent.id : null;
+      return moveCard(lines, draggedId, parentId, target.lineIndex + (side === "below" ? 1 : 0));
+    }
+    const card = takeOut(lines, draggedId);
+    const t = find(lines, targetId);
+    const line = t.lines[t.lineIndex].line;
+    line.splice(t.cardIndex + (side === "after" ? 1 : 0), 0, card);
+    return true;
+  }
+
   // Deleting a card: never the remaining card; the last card of a submenu gives its rules to its parent, which becomes
   // a card with rules again (the reverse of dropping a card onto a card).
   function deleteCard(lines, id) {
@@ -263,5 +280,5 @@ const LayoutModel = (() => {
   }
 
   return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule,
-    addRule, deleteRule, takeOut, dropOnCard, moveCard, deleteCard, addCard, makeMenu, remainingCount, withoutComments };
+    addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard, addCard, makeMenu, remainingCount, withoutComments };
 })();

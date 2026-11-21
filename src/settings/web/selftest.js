@@ -84,6 +84,20 @@
   check(M.moveCard(L.default, id(L, "Zip"), null, 0), "Zip from a shared line to the top");
   check(titles(L.default) === "Zip / LexPen / Clip / Tools[Git] / Rest", "Zip first, Clip alone: " + titles(L.default));
 
+  // a card dropped next to another: beside it in its line, or on a line of its own above / below that line
+  L = sample();
+  check(M.moveCardNext(L.default, id(L, "LexPen"), id(L, "Zip"), "before"), "LexPen dropped left of Zip");
+  check(titles(L.default) === "Clip | LexPen | Zip / Tools[Git] / Rest", "LexPen between Clip and Zip: " + titles(L.default));
+  check(M.moveCardNext(L.default, id(L, "LexPen"), id(L, "Zip"), "after"), "LexPen dropped right of Zip");
+  check(titles(L.default) === "Clip | Zip | LexPen / Tools[Git] / Rest", "LexPen after Zip: " + titles(L.default));
+  check(M.moveCardNext(L.default, id(L, "LexPen"), id(L, "Clip"), "above"), "LexPen dropped above Clip's line");
+  check(titles(L.default) === "LexPen / Clip | Zip / Tools[Git] / Rest", "LexPen menu-wide again, above: " + titles(L.default));
+  check(M.moveCardNext(L.default, id(L, "Zip"), id(L, "Clip"), "below"), "Zip dropped below its own line");
+  check(titles(L.default) === "LexPen / Clip / Zip / Tools[Git] / Rest", "Zip on a line of its own: " + titles(L.default));
+  check(M.moveCardNext(L.default, id(L, "Rest"), id(L, "Git"), "after"), "the remaining card beside Git, in Tools' menu");
+  check(titles(L.default) === "LexPen / Clip / Zip / Tools[Git | Rest]", "Rest beside Git: " + titles(L.default));
+  check(!M.moveCardNext(L.default, id(L, "Tools"), id(L, "Git"), "before"), "a card not next to a card in its own menu");
+
   // the priority list
   L = sample();
   M.moveRule(L.default, 3, 0);

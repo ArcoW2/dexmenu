@@ -46,6 +46,10 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .card.hover { background: var(--hover); }
 .card.over { box-shadow: 0 0 0 2px var(--accent) inset; }
+.card.over-before { box-shadow: -3px 0 0 var(--accent); }
+.card.over-after { box-shadow: 3px 0 0 var(--accent); }
+.card.over-above { box-shadow: 0 -3px 0 var(--accent); }
+.card.over-below { box-shadow: 0 3px 0 var(--accent); }
 .card.useless { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
 .card.remaining { border-style: dashed; }
 .card.hidden { opacity: .55; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px), var(--card); }
