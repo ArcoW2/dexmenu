@@ -207,7 +207,7 @@ None.
   card last. A card with rules shows its one item, or a card with a submenu of what it found under its name, or nothing.
   Items are keyed by their menu and id, as a submenu is read again when it opens. A card's `title` and `rename` (regex
   replace) give the item's text. Cards get an id (`c1`, ...) when the layout has none.
-- The menu and the preview: the new kind of card (several found items); the dump names the card and rule that placed
+- The menu and the preview: the dump names the card and rule that placed
   each item. The preview reports a hover or click (card and rule) to the settings app and marks the items of the card
   selected in the editor (`DexmenuPreviewSetCallback`, `DexmenuPreviewMark`).
 - The editor (`src/settings/web`): `layout-model.js` holds the operations (drop onto a card, move between and into
@@ -238,6 +238,16 @@ None.
   shows LexPen's items of both, the ones of only one striped (`sometimes=1` in the dump), Edit and View in LexPen not.
   The suite names `tests\layout-base.json` for its base-layout cases, as an unset `DEXMENU_LAYOUT_FILE` picks the
   user's own chosen layout.
+- A card places what it found at its own place, each found item a card on its own line, as the remaining card does
+  (no card with a submenu of found items); its title is the item's only when it found one. A rule's `consume: false`
+  leaves what it found free for later rules and the remaining card (a checkbox "consumes the item" in the editor). A
+  click on the card of an open submenu closes it, in the menu and the preview. Dragging cards in the editor: a drop on
+  a gap or line end inside a card's menu no longer also drops onto that card, and a card alone on its line dropped
+  next to that line stays there instead of going to the end. Tested: unit tests (several found at the card's place,
+  in a card with a menu beside a card of its own, the title, `consume` for a later rule, the remaining card and
+  subitems); the editor's self-test (the drops next to a card's own line, `consume` valid or not); the suite's rules
+  case (LexPen's items at the top, then Tools; the preview the same; View in LexPen chosen). Not tested automatically:
+  the click closing a submenu.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

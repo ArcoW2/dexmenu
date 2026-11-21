@@ -8,6 +8,7 @@ unit Dexmenu.Rules;
 //     "path": { "startsWith": "7-Zip" },            or instead: (part of) the submenu path the item sits in
 //     "states": [ "enabled", "disabled" ],         the states taken (default: both)
 //     "caseSensitive": false, "also": false,       also: shown here even when an earlier rule took it
+//     "consume": true,                              false: the item stays free for later rules and the remaining card
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
 // A rule with both a scope and a path, an unknown match kind or a regex that does not compile is invalid: it finds
@@ -41,6 +42,7 @@ type
     States: TStates;
     CaseSensitive: Boolean;
     Also: Boolean;
+    Consume: Boolean;    // default True
     Priority: Integer;   // -1: none given
   end;
 
@@ -212,6 +214,9 @@ begin
     Result.CaseSensitive := TJSONBool(Obj.GetValue('caseSensitive')).AsBoolean;
   if Obj.GetValue('also') is TJSONBool then
     Result.Also := TJSONBool(Obj.GetValue('also')).AsBoolean;
+  Result.Consume := True;
+  if Obj.GetValue('consume') is TJSONBool then
+    Result.Consume := TJSONBool(Obj.GetValue('consume')).AsBoolean;
   if Obj.GetValue('priority') is TJSONNumber then
     Result.Priority := TJSONNumber(Obj.GetValue('priority')).AsInt;
   // regexes compiled once

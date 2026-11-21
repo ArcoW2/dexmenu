@@ -134,7 +134,7 @@ function DumpCards([string]$path) {
     $levels = 0
     foreach ($line in Get-Content $path -Encoding utf8) {
         if ($line -like 'level *') { $levels++; if ($levels -gt 1) { break }; continue }
-        if ($line -match '^card (item|menu|group) id=\d+ enabled=(\d) .* sub=(\d) .* text=(.*)$') {
+        if ($line -match '^card (item|menu) id=\d+ enabled=(\d) .* sub=(\d) .* text=(.*)$') {
             [pscustomobject]@{ Kind = $matches[1]; Text = $matches[4]; Enabled = $matches[2] -eq '1'; Sub = $matches[3] -eq '1' }
         }
     }
@@ -145,7 +145,7 @@ function MenuCards([string[]]$hostOut) {
         if ($line -like "== Dexmenu's menu*") { $in = $true; continue }
         if (-not $in) { continue }
         if ($line -match '^\s+level [1-9]' -or $line -match '^(PASS|FAIL|==)') { break }
-        if ($line -match '^\s+(item|menu|group) "(.*)" id=\d+( disabled)?( submenu)?$') {
+        if ($line -match '^\s+(item|menu) "(.*)" id=\d+( disabled)?( submenu)?$') {
             [pscustomobject]@{ Kind = $matches[1]; Text = $matches[2]; Enabled = -not $matches[3]; Sub = [bool]$matches[4] }
         }
     }
@@ -200,22 +200,28 @@ $runs = @()
 Report 'the editor''s operations (self-test in WebView2)' $runs $stProblems ''
 
 # Step 5: a layout of rules gives the same menu at a right-click as in the editor's preview; a card that found several
-# items opens them, and a click there hands back the item's id.
+# items places each where it stands, and a click on one hands back the item's id.
 $rulesLayout = Join-Path $Work 'rules.json'
 Copy-Item -Force (Join-Path $root 'tests\layout-rules.json') $rulesLayout
 $env:DEXMENU_LAYOUT_FILE = $rulesLayout
+# The preview shows the first run's items only: the seen items are merged, and runs differ in what Windows adds late.
+Remove-Item -Recurse -Force $env:DEXMENU_SEEN_FOLDER -ErrorAction SilentlyContinue
+$seenFolder = $env:DEXMENU_SEEN_FOLDER
 WithLeft '' {
-    $script:runs = @(
-        (Run @("$Work\a.txt") $true @('--any-layout')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, a layout of rules' -PassThru
-        (Run @("$Work\a.txt") $true @('--any-layout', '--open', 'LexPen', '--choose', 'LexPen.View')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, View in LexPen chosen in the LexPen card' -PassThru
-    )
+    $script:runs = @((Run @("$Work\a.txt") $true @('--any-layout')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, a layout of rules' -PassThru)
+    $env:DEXMENU_SEEN_FOLDER = Join-Path $Work 'seen-other'
+    $script:runs += @((Run @("$Work\a.txt") $true @('--any-layout', '--choose', 'LexPen.View')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, View in LexPen chosen, found by the LexPen card' -PassThru)
 }
+$env:DEXMENU_SEEN_FOLDER = $seenFolder
 $menu = @(MenuCards $runs[0].Out)
 $problems = @()
-if ($menu.Count -lt 3 -or $menu[0].Kind -ne 'group' -or $menu[0].Text -ne 'LexPen' -or $menu[1].Kind -ne 'menu' -or $menu[1].Text -ne 'Tools') {
-    $problems += "the menu starts [$(($menu | Select-Object -First 3 | ForEach-Object { "$($_.Kind):$($_.Text)" }) -join '; ')], expected [group:LexPen; menu:Tools; ...]"
+$start = ($menu | Select-Object -First 3 | ForEach-Object { "$($_.Kind):$($_.Text)" }) -join '; '
+if ($start -ne 'item:Edit in LexPen; item:View in LexPen; menu:Tools') {
+    $problems += "the menu starts [$start], expected [item:Edit in LexPen; item:View in LexPen; menu:Tools]"
 }
-if ($menu | Where-Object { $_.Kind -eq 'item' -and ($_.Text -like '*LexPen*' -or $_.Text -eq '7-Zip') }) { $problems += 'an item a rule took is also at the top' }
+if (@($menu | Where-Object { $_.Text -like '*in LexPen' }).Count -ne 2 -or ($menu | Where-Object { $_.Text -eq '7-Zip' })) {
+    $problems += 'an item a rule took is also elsewhere at the top'
+}
 $env:DEXMENU_DUMP = Join-Path $Work 'preview-rules-dump.txt'
 $app = Start-Process (Join-Path $root 'bin\DexmenuSettings.exe') -ArgumentList '--kind', 'file' -PassThru
 try {

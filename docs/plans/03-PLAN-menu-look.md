@@ -197,8 +197,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   (`hover` of its own).
 - **Template cards:** items Dexmenu places in a submenu itself are drawn with a template card's look (plan 02 3.3):
   the layout's, or a card's own submenu template. A template has the same look settings as a card, no rules.
-- **An action or a submenu:** the same card; the mark and the click differ (plan 02 3.3: one item found is an action,
-  several a submenu).
+- **An action or a submenu:** the same card; the mark and the click differ (an item, or a card with a menu or an
+  item with a Windows submenu).
 
 ### 3.7 States
 

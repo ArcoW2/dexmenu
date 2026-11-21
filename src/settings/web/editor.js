@@ -59,9 +59,15 @@ function describeCard(card) {
 
 function dropZone(cls, onDrop) {
   const z = el("div", cls);
-  z.addEventListener("dragover", e => { e.preventDefault(); z.classList.add("over"); });
-  z.addEventListener("dragleave", () => z.classList.remove("over"));
-  z.addEventListener("drop", e => { e.preventDefault(); z.classList.remove("over"); onDrop(e.dataTransfer.getData("text/card")); });
+  // stopPropagation: a zone inside a card's menu, else the card around it also takes the drop (dropped twice)
+  z.addEventListener("dragover", e => { e.preventDefault(); e.stopPropagation(); z.classList.add("over"); });
+  z.addEventListener("dragleave", e => { e.stopPropagation(); z.classList.remove("over"); });
+  z.addEventListener("drop", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    z.classList.remove("over");
+    onDrop(e.dataTransfer.getData("text/card"));
+  });
   return z;
 }
 
@@ -205,6 +211,16 @@ function ruleEditor(card, rule, index) {
     l.append(cb, " " + label);
     opts.append(l);
   }
+  {
+    const cb = el("input");   // on by default: the file has "consume": false only when off
+    cb.type = "checkbox";
+    cb.checked = rule.consume !== false;
+    cb.addEventListener("change", () => { if (cb.checked) delete rule.consume; else rule.consume = false; changed(); });
+    const l = el("label");
+    l.title = "Off: the item stays free, so later rules and the remaining card can show it too";
+    l.append(cb, " consumes the item");
+    opts.append(l);
+  }
   const del = el("button", "", "Delete rule");
   del.addEventListener("click", () => { M.deleteRule(linesOf(), card, index); selectedRule = -1; changed(); });
   opts.append(del);
@@ -259,6 +275,7 @@ function summary(rule) {
   else if (rule.scope === "anywhere") s += ", anywhere";
   if (rule.states && rule.states.length === 1) s += ", " + rule.states[0] + " only";
   if (rule.also) s += ", also";
+  if (rule.consume === false) s += ", not consumed";
   return s;
 }
 

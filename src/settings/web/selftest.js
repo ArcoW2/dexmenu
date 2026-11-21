@@ -70,6 +70,20 @@
   check(M.moveCard(L.default, id(L, "LexPen"), null, 1, true), "LexPen moved into Clip's line");
   check(titles(L.default) === "Clip | Zip | LexPen / Tools[Git] / Rest", "three cards on one line: " + titles(L.default));
 
+  // a card alone on its line moved to the gap before that line, or after it: it stays there (not to the end)
+  L = sample();
+  check(M.moveCard(L.default, id(L, "LexPen"), null, 0), "LexPen dropped on the gap before its own line");
+  check(titles(L.default) === "LexPen / Clip | Zip / Tools[Git] / Rest", "LexPen stays first: " + titles(L.default));
+  L = sample();
+  check(M.moveCard(L.default, id(L, "LexPen"), null, 1), "LexPen dropped on the gap after its own line");
+  check(titles(L.default) === "LexPen / Clip | Zip / Tools[Git] / Rest", "LexPen still first: " + titles(L.default));
+  L = sample();
+  check(M.moveCard(L.default, id(L, "Tools"), null, 3), "Tools dropped on the gap before Rest");
+  check(titles(L.default) === "LexPen / Clip | Zip / Tools[Git] / Rest", "Tools stays before Rest: " + titles(L.default));
+  L = sample();
+  check(M.moveCard(L.default, id(L, "Zip"), null, 0), "Zip from a shared line to the top");
+  check(titles(L.default) === "Zip / LexPen / Clip / Tools[Git] / Rest", "Zip first, Clip alone: " + titles(L.default));
+
   // the priority list
   L = sample();
   M.moveRule(L.default, 3, 0);
@@ -101,6 +115,8 @@
   check(M.useless({ card: "x", rules: [ { name: { equals: "a" }, scope: "top", path: { equals: "b" } } ] }), "a scope and a path: useless");
   check(M.useless({ card: "x", rules: [ { name: { contains: "" } } ] }), "nothing to match: useless");
   check(!M.useless({ card: "x", rules: [ { name: { equals: "Cut" } } ] }), "a valid rule: not useless");
+  check(!M.useless({ card: "x", rules: [ { name: { equals: "Cut" }, consume: false } ] }), "consume false: valid");
+  check(M.useless({ card: "x", rules: [ { name: { equals: "Cut" }, consume: "no" } ] }), "consume not true or false: useless");
   check(!M.useless({ card: "x", menu: [] }), "a card with a menu: not outlined");
 
   // made a card with a menu

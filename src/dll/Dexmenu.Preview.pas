@@ -166,8 +166,6 @@ begin
   L.Selected := -1;
   if V.Kind = vkMenu then
     L.View := Placement.MenuLevel(V.Card)
-  else if V.Kind = vkGroup then
-    L.View := Placement.GroupLevel(V)
   else
   begin
     ReadChildren(V.Node);
@@ -268,7 +266,6 @@ begin
         case V.Kind of
           vkItem: begin Kind := 'item'; Id := V.Node.Id; end;
           vkMenu: Kind := 'menu';
-          vkGroup: Kind := 'group';
         else
           Kind := 'separator';
         end;
@@ -376,7 +373,14 @@ begin
               P.Levels[Index].Geometry.Boxes[Box].Card.RuleIndex);
           if (Index >= 0) and (Box >= 0) and P.Levels[Index].Geometry.Boxes[Box].Card.HasSubmenu then
           begin
-            P.Open(Index, Box);
+            // a click on the card of an open submenu closes it
+            if (P.Levels.Count > Index + 1) and (P.Levels[Index + 1].Opener = P.Levels[Index].Geometry.Boxes[Box].Card) then
+            begin
+              KillTimer(Wnd, HoverTimer);
+              P.CloseFrom(Index + 1);
+            end
+            else
+              P.Open(Index, Box);
             Redraw(P);
           end;
         end;

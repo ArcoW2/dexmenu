@@ -71,6 +71,7 @@ const LayoutModel = (() => {
         return field + ": nothing to match";
       if (keys[0] === "regex") { try { new RegExp(m.regex); } catch (e) { return field + ": the regex does not compile"; } }
     }
+    if (rule.consume !== undefined && typeof rule.consume !== "boolean") return "consume is true or false";
     if (rule.states !== undefined && (!Array.isArray(rule.states) || rule.states.some(s => s !== "enabled" && s !== "disabled")))
       return "states: enabled and/or disabled";
     return "";
@@ -184,12 +185,16 @@ const LayoutModel = (() => {
     const levelOf = () => parentId ? find(lines, parentId).card.menu : lines;
     const level = levelOf();
     if (parentId && !level) return false;
-    const anchor = level[lineIndex];   // the line it goes before / into, kept across taking it out
+    // the lines it goes before / into, kept across taking it out: its own line may go with it (it was alone there),
+    // then the line after that one is the place
+    const intoAnchor = intoLine ? level[lineIndex] : null;
+    const anchors = level.slice(lineIndex);
     const card = takeOut(lines, draggedId);
     const now = parentId ? (find(lines, parentId).card.menu || (find(lines, parentId).card.menu = [])) : lines;
     if (parentId) delete find(lines, parentId).card.rules;
-    let at = anchor ? now.indexOf(anchor) : -1;
-    if (intoLine && at >= 0) now[at].line.push(card);
+    const survivor = anchors.find(a => now.includes(a));
+    let at = survivor ? now.indexOf(survivor) : -1;
+    if (intoLine && intoAnchor && now.includes(intoAnchor)) now[now.indexOf(intoAnchor)].line.push(card);
     else if (at >= 0) now.splice(at, 0, { line: [card] });
     else now.push({ line: [card] });
     return true;

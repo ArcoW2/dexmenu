@@ -116,10 +116,15 @@ in the layout is where its items show.
   remaining card's.
 - **Also:** a rule with `also: true` takes items even when an earlier rule has taken them, and shows them in its card
   as well (a favourite in the icon row that also stays in its group); both hand back the same id.
-- **One expected, several found:** a card is an action when its rules find one item, and a card with a submenu
-  holding all of them, under its own title, when they find more, without a change to the layout.
-- **Templates for items placed in a submenu:** items that Dexmenu puts in a submenu itself (the items of a card that
-  found several, the subitems following a found item) are cards that are not in the layout; they get their look from
+- **Consume:** a rule takes what it finds (`consume`, on by default). With `consume: false` it shows what it found
+  without taking it: later rules and the remaining card can show the same item too, each copy handing back the
+  same id. `also` is the same seen from the later rule's side.
+- **A card places what it found where it stands:** as the remaining card does, each found item a card of its own on
+  its own line at the card's place, in the order found: one item, several, or none (then nothing shows). The card's
+  title is the item's when it found one. So a card with a menu holds an unknown number of found items beside cards
+  of its own (a menu "Open..." with a card finding the items of Windows' "Open with" and a card of the user's own).
+- **Templates for items placed in a submenu:** items that Dexmenu puts in a submenu itself (the subitems following a
+  found item) are cards that are not in the layout; they get their look from
   a template card. A layout has one template card for them; it has no rules, only a look (plan 03 3.6). A card can
   overrule it with a submenu template card of its own, used for every item placed in its submenu, deeper levels
   included, unless a card further down has its own. The remaining card's items take the remaining card's own look
@@ -266,7 +271,7 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 - A Windows submenu filled only when opened (Send to, Open with, 7-Zip's): Dexmenu sends `WM_INITMENUPOPUP` for it to
   the owner window, as Windows' menu does when it opens, and reads it then. Whether every common extension fills it
   that way without Windows' menu window being there: [not yet checked], in the spike.
-- A card of the user's own with several items opens the same way.
+- A card with a menu opens the same way; a click on the card of an open submenu closes that submenu.
 
 ### 3.8 Drawing, icons and the preview
 
@@ -354,8 +359,8 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 - Rules on a tree made for the test, and on trees read by the test host (plan 01 6.1): every match kind, case,
   the states set, scope or path (both given: an error), a found item taking its subitems, the priority order (a
-  deeper item's rule before its parent's and after it, with the parent's submenu showing what is left), `also`, one
-  expected and several found,
+  deeper item's rule before its parent's and after it, with the parent's submenu showing what is left), `also`,
+  `consume`, one and several found at the card's place,
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
 - Templates: items a card found and its found items' subitems drawn with the layout's template; a card's own

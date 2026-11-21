@@ -166,8 +166,7 @@ begin
   Add(Result, 'P&roperties');
 end;
 
-// A level as text: lines with ' / ', cards in a line with ' | '; I: an item, G: a card holding found items,
-// M: a card with a menu, '-': a separator.
+// A level as text: lines with ' / ', cards in a line with ' | '; I: an item, M: a card with a menu, '-': a separator.
 function Describe(Level: TViewLevel): string;
 var
   L: TViewLine;
@@ -184,7 +183,6 @@ begin
         Line := Line + ' | ';
       case V.Kind of
         vkItem: Line := Line + 'I:' + V.Title;
-        vkGroup: Line := Line + 'G:' + V.Title;
         vkMenu: Line := Line + 'M:' + V.Title;
       else
         Line := Line + '-';
@@ -276,7 +274,6 @@ begin
             if (Result = nil) and (V.Title = Title) then
               case V.Kind of
                 vkItem: begin ReadChildren(V.Node); Result := P.SubmenuLevel(V.Node); end;
-                vkGroup: Result := P.GroupLevel(V);
                 vkMenu: Result := P.MenuLevel(V.Card);
               end;
       finally
@@ -291,21 +288,24 @@ procedure TestRules;
 begin
   Expect(Shows('[ ' + Rest + ' ]'), AllRest, 'the remaining card alone: Windows'' menu as cards');
   Expect(Shows('[ ' + Card('LexPen', '{ "name": { "contains": "LexPen" } }') + ', ' + Rest + ' ]'),
-    'G:LexPen / I:Open / I:Open with / - / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties',
-    'contains: two found, a card with a submenu where the card stands; the rest after it');
-  Expect(Shows('[ ' + Card('LexPen', '{ "name": { "contains": "LexPen" } }') + ', ' + Rest + ' ]', SubmenuOf('LexPen')),
-    'I:Edit in LexPen / I:View in LexPen', 'the found items in its submenu, in Windows'' order');
+    'I:Edit in LexPen / I:View in LexPen / I:Open / I:Open with / - / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties',
+    'contains: two found, each placed where the card stands, in Windows'' order; the rest after them');
+  Expect(Shows('[ ' + Card('LexPen', '{ "name": { "contains": "LexPen" } }', ', "title": "Mine"') + ' ]'),
+    'I:Edit in LexPen / I:View in LexPen', 'several found: the card''s title is not theirs');
+  Expect(Shows('[ { "line": [ { "card": "A", "rules": [ { "name": { "any": [ "Cut", "Copy" ] } } ] }, ' +
+    '{ "card": "B", "rules": [ { "name": { "equals": "Delete" } } ] } ] } ]'), 'I:Cut / I:Copy / I:Delete',
+    'several found by a card beside another: each on a line of its own, the other card after them');
   Expect(Shows('[ ' + Rest + ', ' + Card('Cut', '{ "name": { "equals": "Cut" } }') + ' ]'),
     'I:Open / I:Open with / - / I:Edit in LexPen / I:View in LexPen / I:Disabled thing / I:7-Zip / - / I:Copy / I:Delete / I:Properties / I:Cut',
     'equals, one found: the item itself, where its card stands (after the rest here)');
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "cut" }, "caseSensitive": true }') + ', ' + Rest + ' ]'), AllRest,
     'case sensitive: "cut" finds nothing, the card is not shown');
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "CUT" } }') + ' ]'), 'I:Cut', 'case insensitive by default');
-  Expect(Shows('[ ' + Card('X', '{ "name": { "startsWith": "open" } }') + ' ]'), 'G:X', 'startsWith');
-  Expect(Shows('[ ' + Card('X', '{ "name": { "endsWith": "lexpen" } }') + ' ]'), 'G:X', 'endsWith');
-  Expect(Shows('[ ' + Card('X', '{ "name": { "wildcard": "*in LexP?n" } }') + ' ]'), 'G:X', 'wildcard');
-  Expect(Shows('[ ' + Card('X', '{ "name": { "regex": "^(Cut|Copy)$" } }') + ' ]', SubmenuOf('X')), 'I:Cut / I:Copy', 'regex');
-  Expect(Shows('[ ' + Card('X', '{ "name": { "any": [ "Delete", "Cut" ] } }') + ' ]', SubmenuOf('X')), 'I:Cut / I:Delete',
+  Expect(Shows('[ ' + Card('X', '{ "name": { "startsWith": "open" } }') + ' ]'), 'I:Open / I:Open with', 'startsWith');
+  Expect(Shows('[ ' + Card('X', '{ "name": { "endsWith": "lexpen" } }') + ' ]'), 'I:Edit in LexPen / I:View in LexPen', 'endsWith');
+  Expect(Shows('[ ' + Card('X', '{ "name": { "wildcard": "*in LexP?n" } }') + ' ]'), 'I:Edit in LexPen / I:View in LexPen', 'wildcard');
+  Expect(Shows('[ ' + Card('X', '{ "name": { "regex": "^(Cut|Copy)$" } }') + ' ]'), 'I:Cut / I:Copy', 'regex');
+  Expect(Shows('[ ' + Card('X', '{ "name": { "any": [ "Delete", "Cut" ] } }') + ' ]'), 'I:Cut / I:Delete',
     'any: one of a list, in Windows'' order');
   Expect(Shows('[ ' + Card('X', '{ "name": { "contains": "thing" }, "states": [ "enabled" ] }') + ' ]'), '',
     'states enabled: a disabled item not taken');
@@ -316,7 +316,7 @@ begin
     'I:Extract here / ' + AllRest, 'scope anywhere: found in a submenu');
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "Extract here" }, "scope": "anywhere" }') + ', ' + Rest + ' ]',
     SubmenuOf('7-Zip')), 'I:Add to archive... / I:CRC SHA', 'a submenu shows what is left after a rule took an item');
-  Expect(Shows('[ ' + Card('Zip', '{ "name": { "wildcard": "*" }, "path": { "equals": "7-Zip" } }') + ' ]', SubmenuOf('Zip')),
+  Expect(Shows('[ ' + Card('Zip', '{ "name": { "wildcard": "*" }, "path": { "equals": "7-Zip" } }') + ' ]'),
     'I:Add to archive... / I:Extract here / I:CRC SHA', 'path: the items in a submenu');
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "Cut" }, "scope": "top", "path": { "equals": "7-Zip" } }') + ' ]'), '',
     'a scope and a path: invalid, finds nothing');
@@ -337,25 +337,37 @@ begin
     Card('Extract', '{ "name": { "equals": "Extract here" }, "scope": "anywhere", "priority": 2 }') + ' ]', SubmenuOf('7-Zip')),
     'I:Add to archive... / I:Extract here / I:CRC SHA', '... with all of them in its submenu');
   Expect(Shows('[ ' + Card('Clip', '{ "name": { "any": [ "Cut", "Copy" ] }, "priority": 1 }') + ', ' +
-    Card('Fav', '{ "name": { "equals": "Cut" }, "also": true, "priority": 2 }') + ' ]'), 'G:Clip / I:Cut',
+    Card('Fav', '{ "name": { "equals": "Cut" }, "also": true, "priority": 2 }') + ' ]'), 'I:Cut / I:Copy / I:Cut',
     'also: shown in a second card too');
   Expect(Shows('[ ' + Card('Clip', '{ "name": { "any": [ "Cut", "Copy" ] }, "priority": 1 }') + ', ' +
-    Card('Fav', '{ "name": { "equals": "Cut" }, "priority": 2 }') + ' ]'), 'G:Clip',
+    Card('Fav', '{ "name": { "equals": "Cut" }, "priority": 2 }') + ' ]'), 'I:Cut / I:Copy',
     'without also: a later rule does not get an item already taken');
+  Expect(Shows('[ ' + Card('Clip', '{ "name": { "any": [ "Cut", "Copy" ] }, "consume": false, "priority": 1 }') + ', ' +
+    Card('Fav', '{ "name": { "equals": "Cut" }, "priority": 2 }') + ' ]'), 'I:Cut / I:Copy / I:Cut',
+    'consume false: a later rule gets the item too');
+  Expect(Shows('[ ' + Card('Fav', '{ "name": { "equals": "Cut" }, "consume": false }') + ', ' + Rest + ' ]'),
+    'I:Cut / ' + AllRest, 'consume false: the remaining card shows it too');
+  Expect(Shows('[ ' + Card('Seven', '{ "name": { "equals": "7-Zip" }, "consume": false, "priority": 1 }') + ', ' +
+    Card('Extract', '{ "name": { "equals": "Extract here" }, "scope": "anywhere", "priority": 2 }') + ' ]'),
+    'I:7-Zip / I:Extract here', 'consume false: its subitems stay free too');
   Expect(Shows('[ ' + Card('Fav', '{ "name": { "equals": "Cut" } }') + ', ' +
     Card('Clip', '{ "name": { "any": [ "Cut", "Copy" ] } }') + ' ]'), 'I:Cut / I:Copy',
     'without priorities: the layout''s order (the first card gets Cut; the second holds only Copy)');
 
   // cards with a menu, the remaining card anywhere, titles
   Expect(Shows('[ ' + Card('LexPen', '{ "name": { "contains": "LexPen" } }') +
-    ', { "line": [ { "card": "More", "menu": [ ' + Rest + ' ] } ] } ]'), 'G:LexPen / M:More',
+    ', { "line": [ { "card": "More", "menu": [ ' + Rest + ' ] } ] } ]'), 'I:Edit in LexPen / I:View in LexPen / M:More',
     'the remaining card inside a card with a menu: the rest there');
   Expect(Shows('[ ' + Card('LexPen', '{ "name": { "contains": "LexPen" } }') +
     ', { "line": [ { "card": "More", "menu": [ ' + Rest + ' ] } ] } ]', SubmenuOf('More')),
     'I:Open / I:Open with / - / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties',
     '... its submenu holds the rest');
   Expect(Shows('[ { "line": [ { "card": "Edit", "menu": [ ' + Card('Clip', '{ "name": { "any": [ "Cut", "Copy" ] } }') +
-    ' ] } ] } ]', SubmenuOf('Edit')), 'G:Clip', 'a card with a menu holding a card with rules');
+    ' ] } ] } ]', SubmenuOf('Edit')), 'I:Cut / I:Copy', 'a card with a menu holding a card with rules');
+  Expect(Shows('[ { "line": [ { "card": "Open...", "menu": [ ' +
+    Card('Open with', '{ "name": { "wildcard": "*" }, "path": { "equals": "Open with" } }') + ', ' +
+    Card('Clip', '{ "name": { "equals": "Cut" } }') + ' ] } ] } ]', SubmenuOf('Open...')), 'I:Notepad / I:Paint / I:Cut',
+    'a card with a menu: what a card found (an unknown number) at its place, beside a card of its own');
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "Cut" } }', ', "rename": { "regex": "^Cu", "replace": "Ku" }') + ' ]'),
     'I:Kut', 'rename: a regex replace on the item''s text');
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "Cut" } }', ', "title": "Snip"') + ' ]'), 'I:Snip',
