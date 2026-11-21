@@ -64,10 +64,18 @@ Checked in the Delphi 10.4 on this machine: `Winapi.D2D1` (Direct2D 1.0 with Dir
 - **Text:** DirectWrite: any installed font, size, weight, one line with an ellipsis or wrapped to a number of
   lines, the `&` letter underlined, ClearType.
 - **Stripes:** diagonal stripes for unavailable items (plan 02 3.8), drawn as lines clipped to the card.
+- **See-through:** the menu is a layered window with a transparency per pixel: Direct2D draws into a 32-bit image
+  in memory (`ID2D1DCRenderTarget`, premultiplied alpha), which `UpdateLayeredWindow` shows. So a theme can have no
+  menu background at all: cards "in space", what is behind the menu visible between them and around their rounded
+  corners. Checked with a probe built with the Delphi here: three rounded cards (one with a gradient) over a coloured
+  window, that colour seen in the gaps and at the corners, edges smooth. A fully transparent pixel lets a click
+  through to the window behind; a pixel at alpha 1/255 looks the same but keeps the click (`WindowFromPoint`, in the
+  same probe). Dexmenu draws the gaps of its menu at that alpha, so a click between cards stays in the menu.
 - **Targets:** a window's own surface (the menu) and an image in memory (the preview's pictures for tests, plan 02
   3.12). The same drawing code for both.
-- **Window:** a popup window; with Windows 11, rounded corners and the shadow by DWM. Declared by Dexmenu itself, as
-  Delphi 10.4 does not have them: the Windows 11 corner and backdrop attributes.
+- **Window:** a layered popup window (see-through, above); its corners, border and shadow drawn by Dexmenu (3.4),
+  not by DWM. Only a blurred background would need DWM's Windows 11 backdrop attribute, which Dexmenu would declare
+  itself, as Delphi 10.4 does not have it (Open question 3).
 - **Not in Delphi 10.4:** Direct2D 1.1 (`D2D1_1`) and its effects (blur, drop shadow of an element). A blurred
   background (Acrylic, Mica) through DWM for a popup in another program's process: [not yet checked]; Open question 3.
 - **Per-monitor DPI:** everything in device-independent units, scaled to the monitor the menu is on.
@@ -85,7 +93,9 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
     new).
   - States: `normal`, `hover`, `pressed`, `focused` (the keyboard's), `disabled`, `checked`, `default` (Windows'
     default item, bold there), `unavailable` (the preview's stripes). A state lists only what differs from `normal`.
-  - Properties: `background` (3.4), `foreground` (the title, a divider's label), `extra` (the extra text's colour
+  - Properties (what the user sets per theme: the line around a card, the roundness of its corners, its background,
+    the menu's background, the space between cards and dividers): `background` (3.4; `none` for the menu: cards in
+    space), `foreground` (the title, a divider's label), `extra` (the extra text's colour
     and font), `mark` (the action and submenu marks' colour), `border` (colour and width), `radius`, `padding`,
     `gap` (between cards on a line and
     between lines), `font` (family, size, weight), `iconSize`, `opacity`.
@@ -123,8 +133,13 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   - `image`: a file, with `fit` (`fill`, `fit`, `center`, `tile`), `opacity`, and an optional `tint` colour over it
     so text stays readable;
   - layered: a colour under an image under a tint.
-- **The frame:** corners rounded as Windows 11 menus (DWM), or by the theme's `radius` where DWM does not round;
-  DWM's shadow; a border from the theme.
+- **No background:** `menu.background` can be `none`: only the cards, dividers and rows are drawn, with the
+  theme's `gap` between them, the rest see-through (3.1). With a background, the menu is the same layered window,
+  its background drawn as any other.
+- **The frame:** the menu's corners from the theme's `radius`, its border from the theme; drawn by Dexmenu, as the
+  layered window gets no corners or shadow from DWM. A shadow, per card or for the menu, drawn by Dexmenu too:
+  Direct2D 1.0 has no blur, so a soft shadow is built from layered translucent shapes or a prepared image; how
+  convincing that looks: [not yet checked].
 - **Placement:** as Windows' menu: at the mouse or at the point the program gives, flipped to the other side at a
   screen edge, on the monitor of that point.
 - **Too tall for the screen:** the menu is as tall as the work area and scrolls: the mouse wheel, the keys, a thin
@@ -221,8 +236,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
    last ones onto a new line, or make that level wider for this menu?
 2. **Cards of different heights on a line.** Stretch every card to the line's height, or keep each card's own height
    (aligned to the top)?
-3. **A blurred background (Acrylic / Mica) for the menu**, as Windows 11's own menus: wanted, if DWM gives it to a
-   popup in another program's process (to be tried)?
+3. **A blurred background (Acrylic / Mica) for the menu**, as Windows 11's own menus: wanted? DWM gives that to a
+   normal window, not to the layered window that cards in space need (3.1, 3.4), so it would be a second kind of
+   window for themes with a full menu background, and whether DWM gives it to a popup in another program's process
+   is still to be tried.
 4. **Animation.** Submenus and the `replace` change: none (as Windows' classic menus), or a short slide or fade?
 5. **LexPen's themes.** Carry every LexPen theme over (its app colours mapped onto the palette), as Foldex did, or ship
    only `light`, `dark` and a few of Dexmenu's own?
