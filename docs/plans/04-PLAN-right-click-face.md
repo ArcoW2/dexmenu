@@ -45,8 +45,8 @@ and the preview opens it on a right-click as the menu does.
 
 ### 3.1 The layout
 
-- `"rightClick": [ { "line": [ card, ... ] }, ... ]` on any card (a card with rules, with a menu, the remaining card:
-  see Open questions), next to its `rules` or `menu`. The cards in it are ordinary cards: rules, a menu, hidden,
+- `"rightClick": [ { "line": [ card, ... ] }, ... ]` on a card with rules or with a menu (the remaining card: Open
+  question 5), next to its `rules` or `menu`. The cards in it are ordinary cards: rules, a menu, hidden,
   titles; they get ids as all cards do.
 - Their rules are in the layout's one priority list (plan 02 3.3): who gets an item does not depend on which face it
   is in. A rule there with `consume: false`, or one elsewhere with `also`, shows an item on both faces.
@@ -69,15 +69,15 @@ and the preview opens it on a right-click as the menu does.
   submenu.
 - A mark shows which cards have a right-click face (its look in plan 03: a small mark at the card's right edge, apart
   from the submenu chevron).
-- Programs that show the menu with `TPM_RIGHTBUTTON` (Windows' menu then also chooses on a right click): see Open
-  questions.
+- Programs that show the menu with `TPM_RIGHTBUTTON` (Windows' menu then also chooses on a right click): Open
+  question 3.
 
 ### 3.4 The editor
 
 - In the cards view a card with a right-click menu shows it under its own lines, headed "right-click", drawn apart
   from a card's menu (another border style), so the two faces cannot be mistaken for each other.
 - The card's panel gets "+ Right-click menu" (an empty one with one new card) and, when there is one, "Remove
-  right-click menu" (its cards' rules go back to... see Open questions).
+  right-click menu" (what happens to its cards' rules: Open question 4).
 - Cards are dragged into and out of a right-click menu as into a card's menu (`moveCard`, `dropOnCard` in
   `layout-model.js` learn the second set of lines).
 - The rules view names the face: "LexPen (right-click of Open...)".
