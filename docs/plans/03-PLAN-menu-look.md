@@ -40,13 +40,14 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 |---|---|---|---|
 | Engine | Direct2D and DirectWrite in the DLL: brushes, rounded rectangles, text, images, stripes; drawing into a window or an image | plan 01 Delphi DLL | 3.1 |
 | Theme files | per element and state; base and differences; JSON with comments; light and dark roots | -- | 3.2; 3.3 |
-| Shipped themes | light and dark, and a few on them | Theme files; Open question 5 | 3.3 |
+| Shipped themes | light and dark, and a few on them | Theme files; Open question 4 | 3.3 |
 | Menu window | popup, corners, shadow, border, background colour / gradient / image, placement, scrolling | Engine | 3.4 |
 | Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
 | Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
 | Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
 | Other elements | icon row, search box, most used row, `<<` | Card | 3.8 |
 | Submenu panels | next, under, replace: where they appear and how they look | Card; plan 02 Submenus | 3.9 |
+| Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window; Card | 3.4 |
 | Preview marks | striped unavailable items, use counts, new | Card; plan 02 Preview | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
 
@@ -73,10 +74,9 @@ Checked in the Delphi 10.4 on this machine: `Winapi.D2D1` (Direct2D 1.0 with Dir
 - **Targets:** a window's own surface (the menu) and an image in memory (the preview's pictures for tests, plan 02
   3.12). The same drawing code for both.
 - **Window:** a layered popup window (see-through, above); its corners, border and shadow drawn by Dexmenu (3.4),
-  not by DWM. Only a blurred background would need DWM's Windows 11 backdrop attribute, which Dexmenu would declare
-  itself, as Delphi 10.4 does not have it (Open question 3).
-- **Not in Delphi 10.4:** Direct2D 1.1 (`D2D1_1`) and its effects (blur, drop shadow of an element). A blurred
-  background (Acrylic, Mica) through DWM for a popup in another program's process: [not yet checked]; Open question 3.
+  not by DWM.
+- **Not in Delphi 10.4:** Direct2D 1.1 (`D2D1_1`) and its effects (blur, drop shadow of an element). Blur is
+  Dexmenu's own (3.4).
 - **Per-monitor DPI:** everything in device-independent units, scaled to the monitor the menu is on.
 
 ### 3.2 Themes: the structure
@@ -122,7 +122,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - `light` and `dark`, complete, close to Windows 11's own menus so Dexmenu does not look foreign at first.
 - A few on them that change the palette only. Whether every LexPen theme is carried over (as Foldex did), its app
-  colours mapped onto the palette: Open question 5.
+  colours mapped onto the palette: Open question 4.
 
 ### 3.4 The menu window and backgrounds
 
@@ -131,7 +131,14 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   - `gradient`: two or more colours, an angle (linear) or a centre (radial): the shade;
   - `image`: a file, with `fit` (`fill`, `fit`, `center`, `tile`), `opacity`, and an optional `tint` colour over it
     so text stays readable;
-  - layered: a colour under an image under a tint.
+  - layered: a colour under an image under a tint;
+  - `blur` (a later step, Status): what is behind the menu, blurred, for the menu or per card (3.4 below).
+- **Blur, a later step:** just before the menu shows, Dexmenu copies the screen area behind it, blurs the copy with
+  its own code (Direct2D 1.0 has no blur), and uses it as a background image: for the whole menu, or per card, so
+  blurred cards can float in space with clear gaps. Documented calls only, and it fits the layered window. It is a
+  still picture: what moves behind the menu does not move in the blur. Its speed: [not yet checked]. Windows' own
+  blur (DWM's Acrylic) is not used: it covers a normal window's whole rectangle and does not fit cards in space; the
+  undocumented composition blur neither, and it can break with a Windows update.
 - **No background:** `menu.background` can be `none`: only the cards, dividers and rows are drawn, with the
   theme's `gap` between them, the rest see-through (3.1). Cards are then always opaque: a card's background is drawn
   without its alpha, and a card without a background gets the theme's card background. The settings app says so when
@@ -207,7 +214,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   its top-left corner.
 - **Opening on hover:** after Windows' own menu delay (the system setting), as Windows' menus; closing when the mouse
   goes to another card. On click only: as the global setting says.
-- **Animation:** Open question 4.
+- **Animation:** Open question 3.
 
 ### 3.10 Marks of the preview
 
@@ -240,16 +247,6 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
    last ones onto a new line, or make that level wider for this menu?
 2. **Cards of different heights on a line.** Stretch every card to the line's height, or keep each card's own height
    (aligned to the top)?
-3. **A blurred background.** Three ways, none tried yet:
-   - DWM's backdrop (Acrylic), documented in Windows 11: live, but for a normal window's whole rectangle, not the
-     layered window of cards in space (3.1, 3.4); a second kind of window, for themes with a full menu background;
-   - the undocumented `SetWindowCompositionAttribute` blur: also on popups, also the whole window, can break with a
-     Windows update;
-   - Dexmenu's own: the screen behind the menu copied just before it shows, blurred by Dexmenu's code (Direct2D 1.0
-     has no blur), and used as a background image for the menu or per card; fits the layered window and cards in
-     space, documented calls only, but a still picture (what moves behind the menu does not move in it), and its
-     speed: [not yet checked].
-   Which one, if any (the last is the one that fits cards in space)?
-4. **Animation.** Submenus and the `replace` change: none (as Windows' classic menus), or a short slide or fade?
-5. **LexPen's themes.** Carry every LexPen theme over (its app colours mapped onto the palette), as Foldex did, or ship
+3. **Animation.** Submenus and the `replace` change: none (as Windows' classic menus), or a short slide or fade?
+4. **LexPen's themes.** Carry every LexPen theme over (its app colours mapped onto the palette), as Foldex did, or ship
    only `light`, `dark` and a few of Dexmenu's own?
