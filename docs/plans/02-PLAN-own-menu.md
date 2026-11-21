@@ -162,7 +162,12 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   - deleting the last card of a submenu makes its parent a card with rules again: the deleted card's rules go to
     the parent, so they are not lost (the reverse of dropping a card onto a card). Dividers in that submenu go with
     it;
+  - dragging the last card out of a submenu: it keeps its rules, and the parent becomes a card with rules that has
+    none. It stays in the layout, finds nothing and is not shown in the menu;
   - the remaining card is moved as any other, never deleted;
+  - cards that can never show anything are marked in the editor and the preview with a red outline (plan 03 3.10):
+    a card with no rules, and a card with a rule that is invalid (a bad regex, a scope and a path both given). The
+    layout is still saved and used; such a card is left out of the menu.
   - a card made as a card with a menu starts with one empty card in its submenu, ready for rules.
 - A card or line without items is not shown (also when late states empty it).
 - An example, in the shape it may take:
@@ -308,7 +313,8 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
 - Editing: a card dropped onto a card with rules makes a card with a menu whose first card has those rules; onto a
-  card with a menu, it joins it; the last card of a submenu deleted, its parent a card with rules with its rules; the remaining card moved but never deleted; a layout without exactly one remaining
+  card with a menu, it joins it; the last card of a submenu deleted, its parent a card with rules with its rules;
+  the last card dragged out, its parent a card without rules, outlined red; an invalid rule outlined red; the remaining card moved but never deleted; a layout without exactly one remaining
   card reported as invalid.
 - Settings and layouts: valid and invalid files, comments (also `//` inside a string kept), save under a name, switch
   the active layout, the fallback.
@@ -327,6 +333,4 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 
 ## 4. Open questions
 
-1. **The last card dragged out of a submenu.** Deleting it gives its rules to the parent (3.5). Dragging it elsewhere
-   keeps its rules with it, leaving the parent with an empty submenu: does the parent then become a card with rules
-   without any (it finds nothing and is not shown), or is it removed?
+None.

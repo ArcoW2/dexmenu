@@ -198,6 +198,9 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   3.8), in the theme's `unavailable` colours.
 - **Use counts:** a small badge with the count on each item (plan 02 3.9), when the settings app asks for it.
 - **New:** a badge on items seen for the first time.
+- **Useless:** a red outline around a card that can never show anything (no rules, or an invalid rule; plan 02 3.5),
+  in the editor and the preview only; the theme's `invalid` colour. Distinct from the stripes: a striped card is
+  sometimes there, an outlined one never.
 
 ### 3.11 Tests
 
