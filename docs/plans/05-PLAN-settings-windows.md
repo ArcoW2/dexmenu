@@ -83,9 +83,14 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
     heights high;
   - else tabs, one panel at a time.
   Within a placement the panels share the room the window has (more than their minimum when there is).
-- The window's own minimum size (WinForms `MinimumSize`) is the larger of the panels' minimums, plus the window's
-  frame: a smaller window would cut a panel, so the window is not made smaller than that; when the screen is
-  smaller (a low resolution), [not yet checked] what then.
+- The window's minimum size is set for its inside (its client area; WinForms `MinimumSize` from it plus the frame):
+  - width: the largest of the panels' minimum widths, plus the page's margins at the sides;
+  - height: the largest of the panels' minimum heights, plus the page's margins at the top and bottom, plus the
+    tabs' height (the smallest window shows tabs).
+  So the smallest window holds one panel at its minimum, as a tab.
+- A screen smaller than that minimum (not expected: a 640x480 window should hold it): the window does not fit, and
+  the page's content scrolls.
+- The editor window (3.6) is much larger and has its own minimum, from its panes and the preview.
 - No preview here: the preview belongs to editing (3.6).
 - The panels are one page; the page measures the panels' minimums and tells the app (its `MinimumSize`), and on
   every resize chooses the placement, so resizing the window rearranges them at once, without a reload.
