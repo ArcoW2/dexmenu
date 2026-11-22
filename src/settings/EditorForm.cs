@@ -68,6 +68,13 @@ sealed class EditorForm : Form, IThemed
         Controls.Add(split);
         settle.Tick += (_, _) => { settle.Stop(); Reload(); };
         previewPanel.Resize += (_, _) => FitPreview();
+        // the splitter before the preview moves the panes while it is dragged (WinForms only draws a line, which the
+        // WebView2 page hides, and moves them on release)
+        split.SplitterMoving += (_, e) =>
+        {
+            var x = Math.Max(split.Panel1MinSize, Math.Min(e.SplitX, split.Width - split.Panel2MinSize - split.SplitterWidth));
+            if (x != split.SplitterDistance) split.SplitterDistance = x;
+        };
         HandleCreated += (_, _) => Themes.Apply(this, web);
         FormClosing += AskToSave;
         Load += async (_, _) => await Start();
@@ -125,7 +132,12 @@ sealed class EditorForm : Form, IThemed
         split.Panel1MinSize = (int)Math.Ceiling(660 * scale);
         split.Panel2MinSize = (int)Math.Ceiling(300 * scale);
         MinimumSize = SizeFromClientSize(new Size(split.Panel1MinSize + split.Panel2MinSize + split.SplitterWidth, (int)(520 * scale)));
-        split.SplitterDistance = Math.Max(split.Panel1MinSize, Width * 70 / 100);   // the page's three panes, then the preview
+        // the starting size in the display's scale, within the screen
+        var screen = Screen.FromControl(this).WorkingArea;
+        Size = new Size(Math.Min(screen.Width, Math.Max(MinimumSize.Width, (int)(1500 * scale))),
+            Math.Min(screen.Height, Math.Max(MinimumSize.Height, (int)(820 * scale))));
+        CenterToScreen();
+        split.SplitterDistance = Math.Max(split.Panel1MinSize, ClientSize.Width * 70 / 100);   // the page's three panes, then the preview
         if (selftest is null)
         {
             preview = Native.DexmenuPreviewCreate(previewPanel.Handle);
