@@ -81,6 +81,7 @@ type
     Marked: string;
     Settings: TMenuSettings;   // how submenus open (settings.json "menu"), read at each rebuild
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
+    Search: string;                       // typed into the preview's search (plan 02 3.6); '' : none
     Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): the most used row
     Tip: TTip;
     TipLevel, TipBox: Integer;
@@ -93,6 +94,8 @@ type
     function Scale: Single;
     procedure Open(LevelIndex, Box: Integer);
     procedure CloseFrom(Index: Integer);
+    // The top level shows the search for Search, or its own lines when Search is ''.
+    procedure ShowSearch;
     function LevelAt(X, Y: Single; out Box: Integer): Integer;
     procedure Paint(DC: HDC);
     procedure Dump;
@@ -169,6 +172,25 @@ begin
   L.Y := Margin;
   L.Selected := -1;
   Levels.Add(L);
+end;
+
+procedure TPreview.ShowSearch;
+var
+  L: TPreviewLevel;
+  Old: TViewLevel;
+begin
+  if (Levels.Count = 0) or (Placement = nil) then
+    Exit;
+  CloseFrom(1);
+  L := Levels[0];
+  Old := L.View;
+  if Search = '' then
+    L.View := Placement.TopLevel
+  else
+    L.View := Placement.SearchLevel(Search);
+  Old.Free;
+  L.Geometry := Measure(L.View);
+  L.Selected := -1;
 end;
 
 procedure TPreview.CloseFrom(Index: Integer);
@@ -501,9 +523,29 @@ begin
           end;
         end;
       WM_KEYDOWN:
-        if WP = VK_ESCAPE then
+        if (WP = VK_ESCAPE) and (P.Search <> '') then
+        begin
+          P.Search := '';   // Esc ends the search first
+          P.ShowSearch;
+          Redraw(P);
+        end
+        else if (WP = VK_BACK) and (P.Search <> '') then
+        begin
+          Delete(P.Search, Length(P.Search), 1);
+          P.ShowSearch;
+          Redraw(P);
+        end
+        else if WP = VK_ESCAPE then
         begin
           P.CloseFrom(P.Levels.Count - 1);
+          Redraw(P);
+        end;
+      WM_CHAR:
+        // typing searches, as in the menu (nothing is chosen in the preview, so every letter goes into the search)
+        if (WP > 32) or ((WP = 32) and (P.Search <> '')) then
+        begin
+          P.Search := P.Search + Char(WP);
+          P.ShowSearch;
           Redraw(P);
         end;
       WM_GETDLGCODE:
@@ -570,6 +612,7 @@ begin
     else
     begin
       P.Clear;
+      P.Search := '';   // a new preview: no search
       ForgetKeptIcons;   // read again: a right-click or the live menu may have kept new ones
       P.Kind := Kind;
       if P.Kind = '' then
