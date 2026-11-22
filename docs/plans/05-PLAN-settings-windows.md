@@ -16,14 +16,13 @@ folder's empty part gets is hidden inside one layout file and hard to see.
 
 ## 2. The solution, in brief
 
-The app opens a main window with the registration at the top (a line saying whether Dexmenu is registered, and
-Register, Unregister and Restart Explorer buttons) and two panels. "General" lists every kind of right-click, each
-with the layout it uses. "Layouts" lists the layouts with New..., Edit, Copy, Rename and Delete. The panels stand
-next to each other in a wide window, above each other in a narrow one, and become tabs only in a window both
-narrow and short. Edit and New open
-an editor window for one layout, named in its title: its name at the top (changeable), Save, Save as... and Close,
-and below it today's panes and preview. A layout is one menu; which kinds use it is set in General, not inside the
-layout. "Make active" and "Give it its own" go.
+The app opens a main window with two panels. "General" holds the registration (a line saying whether Dexmenu is
+registered, and Register, Unregister and Restart Explorer buttons) and every kind of right-click, the desktop's empty
+part among them, each with the layout it uses. "Layouts" lists the layouts with New..., Edit, Copy, Rename and
+Delete. The panels stand next to each other in a wide window, above each other in a narrow one, and become tabs
+only in a window both narrow and short. Edit and New open an editor window for one layout, named in its title: its
+name at the top (changeable), Save, Save as... and Close, and below it today's panes and preview. A layout is one
+menu; which kinds use it is set in General, not inside the layout. "Make active" and "Give it its own" go.
 
 ## Status
 
@@ -38,8 +37,9 @@ layout. "Make active" and "Give it its own" go.
 |---|---|---|---|
 | Layout format | a layout is one menu (its lines); old files with a menu per kind converted | Open question 1 | 3.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
-| Main window | registration line and buttons; the panels General and Layouts, side by side, stacked or as tabs by the window's size | Kinds setting | 3.3 |
-| General panel | each kind of right-click with its layout (or none) | Main window | 3.4 |
+| Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
+| Main window | the panels General and Layouts, side by side, stacked or as tabs by the window's size | Kinds setting | 3.3 |
+| General panel | the registration line and buttons; each kind of right-click with its layout (or none) | Main window | 3.4 |
 | Layouts panel | the list; New..., Edit, Copy, Rename, Delete | Main window | 3.5 |
 | Editor window | one layout: name, Save, Save as..., Close; the panes and preview of today | Layouts panel | 3.6 |
 | Tests | 3.7 | -- | 3.7 |
@@ -62,13 +62,18 @@ layout. "Make active" and "Give it its own" go.
   `kinds`, and reads that layout file (read again when it changes, as now). `DEXMENU_LAYOUT_FILE` stays for the
   tests: one layout for every kind.
 - `"layout"` in settings.json (today's "Make active") goes; on first start it becomes `"kinds": { "default": ... }`.
+- The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
+  other (`default`). More kinds (by file type, or by the program showing the menu): Open question 7.
+- The desktop's empty part (`desktop`): the handler is registered for it too (`DesktopBackground`, by
+  `Registration.cs` and `register.ps1`, removed with the others); the handler tells it from a folder's empty part
+  by its folder being the desktop. Its seen items, last right-click and live preview as for the other kinds; the
+  live preview asks the desktop's folder view (as for a folder's empty part, plan 02 3.8): [not yet checked]
+  whether it gives the desktop's own items (View, Sort by, Refresh, Display settings, Personalise) or only a
+  folder's.
 
 ### 3.3 The main window
 
-- At the top, the registration: a line ("Dexmenu is registered for you: <the DLL's path>", "not registered", or
-  "another DLL is registered: <path>") and the buttons Register, Unregister and Restart Explorer. Restart Explorer
-  is its own button (today a checkbox with Register), since a registration takes effect in Explorer only after it.
-- Below it two panels, General and Layouts, placed by the window's size:
+- Two panels, General and Layouts, placed by the window's size:
   - wide: next to each other, General left;
   - narrow: above each other, General on top, the window scrolling when they do not fit;
   - narrow and short (the panels above each other would need scrolling to reach the second): tabs, one panel at a
@@ -81,8 +86,10 @@ layout. "Make active" and "Give it its own" go.
 
 ### 3.4 The General panel
 
-- One row per kind of right-click: a file, a folder, several items, a folder's empty part, a drive, and "every
-  other" (`default`), each with a choice of the layouts (and none, Open question 2).
+- At its top, the registration: a line ("Dexmenu is registered for you: <the DLL's path>", "not registered", or
+  "another DLL is registered: <path>") and the buttons Register, Unregister and Restart Explorer. Restart Explorer
+  is its own button (today a checkbox with Register), since a registration takes effect in Explorer only after it.
+- Below it, one row per kind of right-click (3.2), each with a choice of the layouts (and none, Open question 2).
 - A change is written to settings.json at once (no Save here); the DLL reads it at the next right-click.
 - Beside each row, Edit opens that layout's editor (3.6).
 
@@ -115,7 +122,8 @@ layout. "Make active" and "Give it its own" go.
   copy, delete); the editor's self-test as now. The three arrangements of the panels seen by hand (a wide, a narrow
   and a narrow short window).
 - The suite: a right-click on a file and on a folder's empty part with two different layouts in `kinds`, each
-  showing its own menu; the conversion of an old file (Open question 1).
+  showing its own menu; the conversion of an old file (Open question 1); registration adds and removes the
+  desktop's handler key; the desktop's empty part right-clicked in the test host gives the kind `desktop`.
 
 ## 4. Open questions
 
@@ -127,5 +135,8 @@ layout. "Make active" and "Give it its own" go.
 3. May several layouts be open in editor windows at once, or one editor window at a time?
 4. Close with unsaved changes: ask Save / Discard / Cancel? Suggested: yes.
 5. Delete a layout that kinds use: refuse until no kind uses it, or set those kinds to none (Windows' menu)?
-6. Does the main window need anything of the editor (a preview, the last right-click), or is it only registration
-   and the two panels? Suggested: only those.
+6. Does the main window need anything of the editor (a preview, the last right-click), or is it only the two
+   panels? Suggested: only those.
+7. More kinds: a layout per file type (images, video, audio, text, documents, or one extension such as `.zip`), or
+   per program showing the menu (Explorer, an Open dialog, Foldex)? The handler knows both. When several fit (an
+   image in an Open dialog), which wins?
