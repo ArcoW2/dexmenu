@@ -21,6 +21,7 @@ let kind = "default";
 let selectedId = null;
 let selectedRule = -1;   // index on the selected card
 let hoverId = null;
+const collapsed = new Set();   // cards with a menu shown folded (this session only)
 let dirty = false;
 let lastSent = "";
 let loadedText = "";
@@ -67,22 +68,34 @@ function dropZone(cls, onDrop) {
     e.preventDefault();
     e.stopPropagation();
     z.classList.remove("over");
-    onDrop(e.dataTransfer.getData("text/card"));
+    withDragged(e, onDrop);
   });
   return z;
+}
+
+// The card being dropped: a card of the layout, or a new one ("+ Card" dragged: made now, at the end, then moved by
+// the drop like any card; taken out again when the drop cannot place it). place(id) moves it and says whether it did.
+function withDragged(e, place) {
+  let id = e.dataTransfer.getData("text/card");
+  const isNew = id === "new";
+  if (isNew) id = M.addCard(layout, linesOf(), null).id;
+  if (place(id)) {
+    if (isNew) select(id, -1);
+    changed();
+  } else if (isNew) M.deleteCard(linesOf(), id);
 }
 
 function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
-    box.append(dropZone("gap", id => { if (M.moveCard(linesOf(), id, parentId, index)) changed(); }));
+    box.append(dropZone("gap", id => M.moveCard(linesOf(), id, parentId, index)));
     if (!entry.line) return;
     const row = el("div", "line");
     for (const card of entry.line) row.append(renderCard(card));
-    row.append(dropZone("line-end", id => { if (M.moveCard(linesOf(), id, parentId, index, true)) changed(); }));
+    row.append(dropZone("line-end", id => M.moveCard(linesOf(), id, parentId, index, true)));
     box.append(row);
   });
-  box.append(dropZone("gap", id => { if (M.moveCard(linesOf(), id, parentId, lines.length)) changed(); }));
+  box.append(dropZone("gap", id => M.moveCard(linesOf(), id, parentId, lines.length)));
   return box;
 }
 
@@ -96,10 +109,22 @@ function renderCard(card) {
   const box = el("div", classes.join(" "));
   box.draggable = true;
   box.dataset.id = card.id;
+  // left, a gutter with the fold toggle of a card with a menu; right, the card
+  const gutter = el("div", "gutter");
+  const folded = !!card.menu && collapsed.has(card.id);
+  if (card.menu) {
+    const t = el("button", "toggle", folded ? "+" : "-");
+    t.title = folded ? "Expand" : "Collapse";
+    t.addEventListener("click", e => { e.stopPropagation(); folded ? collapsed.delete(card.id) : collapsed.add(card.id); render(); });
+    gutter.append(t);
+  }
+  const body = el("div", "body");
   const title = el("div", "title", card.card);
-  title.append(...ruleBadges(card));
-  box.append(title, el("div", "what", describeCard(card)));
-  if (card.menu) box.append(renderLines(card.menu, card.id));
+  title.append(...ruleBadges(card), el("span", "grow"), cardActions(card));
+  const cardsIn = card.menu ? [...M.cards(card.menu)].length : 0;
+  body.append(title, el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
+  if (card.menu && !folded) body.append(renderLines(card.menu, card.id));
+  box.append(gutter, body);
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
   box.addEventListener("dragstart", e => { e.stopPropagation(); e.dataTransfer.setData("text/card", card.id); });
   const zones = ["over", "over-before", "over-after", "over-above", "over-below"];
@@ -126,9 +151,33 @@ function renderCard(card) {
       if (placed) { selectedId = card.id; selectedRule = card.rules.indexOf(placed); post({ type: "mark", cardId: card.id }); changed(); }
       return;
     }
-    const dragged = e.dataTransfer.getData("text/card"), zone = dropZoneOf(box, e);
-    const done = zone === "onto" ? M.dropOnCard(layout, linesOf(), dragged, card.id) : M.moveCardNext(linesOf(), dragged, card.id, zone);
-    if (done) changed();
+    const zone = dropZoneOf(box, e);
+    withDragged(e, id => zone === "onto" ? M.dropOnCard(layout, linesOf(), id, card.id) : M.moveCardNext(linesOf(), id, card.id, zone));
+  });
+  return box;
+}
+
+// A card's own actions, shown on hover: a card beside it, a card in its menu, make it a card with a menu, delete.
+function cardActions(card) {
+  const box = el("span", "card-actions");
+  const action = (label, tip, fn) => {
+    const b = el("button", "", label);
+    b.title = tip;
+    b.addEventListener("click", e => { e.stopPropagation(); fn(); });
+    box.append(b);
+  };
+  action("+ beside", "A new card beside this one", () => { select(M.addCard(layout, linesOf(), null, card.id).id, -1); changed(); });
+  if (card.menu) action("+ in menu", "A new card at the end of its menu", () => {
+    collapsed.delete(card.id);
+    select(M.addCard(layout, linesOf(), card.id).id, -1);
+    changed();
+  });
+  if (!card.menu && !M.isRemaining(card)) action("menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
+    M.makeMenu(layout, linesOf(), card.id);
+    changed();
+  });
+  if (!M.isRemaining(card)) action("x", "Delete this card", () => {
+    if (M.deleteCard(linesOf(), card.id)) { if (selectedId === card.id) selectedId = null; changed(); }
   });
   return box;
 }
@@ -314,13 +363,8 @@ function renderCardPane() {
 
   const actions = el("div", "actions");
   const button = (label, fn) => { const b = el("button", "", label); b.addEventListener("click", fn); actions.append(b); };
-  button("+ Card beside", () => { select(M.addCard(layout, linesOf(), null, card.id).id, -1); changed(); });
-  if (card.menu) button("+ Card in its menu", () => { select(M.addCard(layout, linesOf(), card.id).id, -1); changed(); });
-  if (!card.menu && !M.isRemaining(card)) {
+  if (!card.menu && !M.isRemaining(card))
     button("+ Rule", () => { M.addRule(linesOf(), card); selectedRule = card.rules.length - 1; changed(); });
-    button("Make it a card with a menu", () => { M.makeMenu(layout, linesOf(), card.id); changed(); });
-  }
-  if (!M.isRemaining(card)) button("Delete card", () => { if (M.deleteCard(linesOf(), card.id)) { selectedId = null; changed(); } });
   box.append(actions);
   if (!card.menu && !M.isRemaining(card)) (card.rules || []).forEach((r, i) => box.append(ruleEditor(card, r, i)));
   if (M.isRemaining(card)) box.append(el("div", "what", "Every item of Windows' menu that no rule took is placed here, each a card of its own, with its submenu. It can be moved, also into a card with a menu, but not deleted."));
@@ -442,6 +486,46 @@ $("saveAs").addEventListener("click", async () => {
 });
 $("activate").addEventListener("click", () => post({ type: "activate", name: $("layouts").value }));
 $("addTop").addEventListener("click", () => { if (layout) { select(M.addCard(layout, linesOf(), null).id, -1); changed(); } });
+$("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
+$("collapseAll").addEventListener("click", () => {
+  if (!layout) return;
+  for (const at of M.cards(linesOf())) if (at.card.menu) collapsed.add(at.card.id);
+  render();
+});
+$("expandAll").addEventListener("click", () => { collapsed.clear(); render(); });
+
+// The splitters between the panes: dragging one gives the pane on its left a fixed width; the last pane takes the rest.
+// The widths are kept in this page's storage (a convenience: without it the panes start at their default widths).
+(() => {
+  const key = "dexmenu.paneWidths";
+  const fix = (pane, w) => { pane.style.flex = "0 0 " + Math.round(w) + "px"; };
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || "{}");
+    for (const [id, w] of Object.entries(saved)) if ($(id) && w > 0) fix($(id), w);
+  } catch (e) { /* no storage: default widths */ }
+  for (const splitter of document.querySelectorAll("#panes > .splitter")) {
+    const pane = splitter.previousElementSibling;
+    splitter.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      splitter.setPointerCapture(e.pointerId);
+      splitter.classList.add("dragging");
+      const startX = e.clientX, startW = pane.getBoundingClientRect().width;
+      const move = ev => fix(pane, Math.max(160, Math.min(startW + ev.clientX - startX, window.innerWidth - 320)));
+      const up = () => {
+        splitter.classList.remove("dragging");
+        splitter.removeEventListener("pointermove", move);
+        splitter.removeEventListener("pointerup", up);
+        try {
+          const saved = JSON.parse(localStorage.getItem(key) || "{}");
+          saved[pane.id] = pane.getBoundingClientRect().width;
+          localStorage.setItem(key, JSON.stringify(saved));
+        } catch (e) { /* not kept */ }
+      };
+      splitter.addEventListener("pointermove", move);
+      splitter.addEventListener("pointerup", up);
+    });
+  }
+})();
 $("makeOwn").addEventListener("click", () => { layout[kind] = JSON.parse(JSON.stringify(layout.default)); M.ensureIds(layout); changed(); });
 document.addEventListener("keydown", e => {
   if (e.key === "Delete" && selectedId && document.activeElement.tagName !== "INPUT" && M.deleteCard(linesOf(), selectedId)) {

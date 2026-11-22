@@ -164,6 +164,12 @@
   // comments
   check(M.withoutComments('{ "r": "a//b" } // c') === '{ "r": "a//b" } \n', "// inside a string kept, after it a comment");
 
-  out.push(failures ? failures + " FAILED" : "OK");
-  chrome.webview.postMessage({ type: "selftest", lines: out, failures });
+  // the editor's page script parses (not run: it needs the page); a syntax error there shows nowhere else
+  fetch("editor.js").then(r => r.text()).then(text => {
+    try { new Function(text); check(true, "editor.js parses"); }
+    catch (e) { check(false, "editor.js parses: " + e.message); }
+  }).catch(e => check(false, "editor.js read: " + e.message)).finally(() => {
+    out.push(failures ? failures + " FAILED" : "OK");
+    chrome.webview.postMessage({ type: "selftest", lines: out, failures });
+  });
 })();

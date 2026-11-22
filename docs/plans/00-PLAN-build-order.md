@@ -266,6 +266,12 @@ None.
   the card's panel) onto another card with rules is moved there, keeping its place in the priority list, or with
   Shift copied, the copy right after the original. Never the remaining card's rule, never onto a card with a menu
   or the remaining card. Tested: the editor's self-test.
+- The cards view: "+ Card" dragged to where the new card goes (a gap, a line's end, a card's edge or onto a card;
+  a click still adds it at the end); a card's own actions on hover (a card beside it, one in its menu, make it a card
+  with a menu, delete) instead of in the card's panel; a card with a menu folds and unfolds from a gutter on its
+  left, collapse all and expand all at the top (folding is not saved). Splitters between the rules, the cards and the
+  card's panel, their widths kept in the page's storage. The self-test also parses editor.js. Not tested: the
+  dragging, folding and splitters by hand.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.
