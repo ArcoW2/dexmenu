@@ -670,6 +670,15 @@ begin
       AddMostUsed(P, Result);
       Continue;
     end;
+    if Line.IsSearchBox then
+    begin
+      // the layout's search box: a line saying where typing goes; typing shows the search (SearchLevel)
+      V := TViewCard.Create;
+      V.Kind := vkSearch;
+      V.BackTitle := 'Search...';
+      NewLine(Result).Cards.Add(V);
+      Continue;
+    end;
     if Line.IsDivider then
     begin
       V := TViewCard.Create;

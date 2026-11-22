@@ -48,7 +48,7 @@ const LayoutModel = (() => {
   function* dividers(lines, parent = null) {
     for (let i = 0; i < lines.length; i++) {
       const entry = lines[i];
-      if (entry.divider !== undefined || entry.mostUsed) yield { entry, lines, index: i, parent };
+      if (entry.divider !== undefined || entry.mostUsed || entry.search) yield { entry, lines, index: i, parent };
       if (entry.line) for (const card of entry.line) if (card.menu) yield* dividers(card.menu, card);
     }
   }
@@ -278,6 +278,12 @@ const LayoutModel = (() => {
     return entry;
   }
 
+  function addSearch(layout, lines) {
+    const entry = { id: newId(layout), search: true };
+    lines.unshift(entry);
+    return entry;
+  }
+
   function deleteDivider(lines, id) {
     const d = findDivider(lines, id);
     if (!d) return false;
@@ -438,5 +444,5 @@ const LayoutModel = (() => {
 
   return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
-    dividers, findDivider, addDivider, addMostUsed, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
+    dividers, findDivider, addDivider, addMostUsed, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

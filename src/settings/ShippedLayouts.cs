@@ -81,6 +81,7 @@ static class ShippedLayouts
         {
           "format": 1,
           "lines": [
+            { "id": "search", "search": true },
             { "id": "most", "mostUsed": true },
             { "id": "d1", "divider": "" },
             { "line": [

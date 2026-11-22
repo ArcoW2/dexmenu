@@ -745,6 +745,7 @@ begin
     Expect(Search('/^(cut|copy)$'), 'S:Search: /^(cut|copy)$ / I:Cut / I:Copy', 'a leading / : a regex');
     Expect(Search('/('), 'S:Search: /( / S:No item found', 'a regex not yet whole: nothing found, no error');
     Expect(Search('zzz'), 'S:Search: zzz / S:No item found', 'nothing found: said so');
+    Expect(Shows('[ { "search": true }, ' + Rest + ' ]'), 'S:Search... / ' + AllRest, 'a layout''s search box where it stands');
   finally
     P.Free;
     Top.Free;

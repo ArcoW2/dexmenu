@@ -102,6 +102,7 @@ type
     DividerText: string;
     DividerAlign: TDividerAlign;
     IsMostUsed: Boolean;   // { "mostUsed": true }: the items chosen most, side by side (plan 02 3.9)
+    IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
     constructor Create;
     destructor Destroy; override;
   end;
@@ -406,6 +407,13 @@ begin
           Line.DividerAlign := daCenter
         else if TJSONObject(Entry).GetValue('align').Value = 'right' then
           Line.DividerAlign := daRight;
+      Continue;
+    end;
+    if TJSONObject(Entry).GetValue('search') is TJSONTrue then
+    begin
+      Line := TLine.Create;
+      Lines.Add(Line);
+      Line.IsSearchBox := True;
       Continue;
     end;
     if TJSONObject(Entry).GetValue('mostUsed') is TJSONTrue then

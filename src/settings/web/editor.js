@@ -148,16 +148,17 @@ function renderDivider(entry) {
   const box = el("div", "divider" + (entry.id === selectedId ? " selected" : "") + " align-" + (entry.align || "left"));
   box.draggable = true;
   box.dataset.id = entry.id;
-  if (entry.mostUsed) {
+  if (entry.mostUsed || entry.search) {
     box.classList.add("mostused");
-    box.append(el("span", "text", "Most used row: the items chosen most, side by side"));
+    box.append(el("span", "text", entry.search ? "Search box: what is typed searches every item"
+      : "Most used row: the items chosen most, side by side"));
   } else {
     box.append(el("span", "rule-line"), el("span", "text", entry.divider || ""), el("span", "rule-line"));
     if (!entry.divider) box.classList.add("plain");
   }
   const actions = el("div", "card-actions");
   const x = el("button", "", "x");
-  x.title = entry.mostUsed ? "Delete the most used row" : "Delete this divider";
+  x.title = entry.search ? "Delete the search box" : entry.mostUsed ? "Delete the most used row" : "Delete this divider";
   x.addEventListener("click", e => { e.stopPropagation(); if (M.deleteDivider(linesOf(), entry.id)) { if (selectedId === entry.id) selectedId = null; changed(); } });
   actions.append(x);
   box.append(actions);
@@ -187,7 +188,7 @@ function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
     box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index) : M.moveCard(linesOf(), id, parentId, index)));
-    if (entry.divider !== undefined || entry.mostUsed) { box.append(renderDivider(entry)); return; }
+    if (entry.divider !== undefined || entry.mostUsed || entry.search) { box.append(renderDivider(entry)); return; }
     if (!entry.line) return;
     const row = el("div", "line");
     for (const card of entry.line) row.append(renderCard(card));
@@ -453,6 +454,13 @@ function ruleEditor(card, rule, index) {
 
 function renderCardPane() {
   const div = selectedId ? M.findDivider(linesOf(), selectedId) : null;
+  if (div && div.entry.search) {
+    $("cardHeading").textContent = "The search box";
+    $("card").replaceChildren(el("p", "hint", "Shows where typing goes. A letter that is an access key picks its " +
+      "item; any other letter starts the search: every item at any depth whose name holds the text (a leading / for a " +
+      "regex). Without a search box, typing searches the same way."));
+    return;
+  }
   if (div && div.entry.mostUsed) {
     $("cardHeading").textContent = "The most used row";
     $("card").replaceChildren(el("p", "hint", "The items chosen most in this kind of right-click, side by side, most " +
@@ -782,6 +790,13 @@ $("addNote").addEventListener("dragstart", e => { e.dataTransfer.setData("text/c
 $("addDivider").addEventListener("click", () => {
   if (!layout) return;
   const d = M.addDivider(layout, linesOf(), null);
+  select(d.id, -1);
+  changed();
+  focusNew(d.id);
+});
+$("addSearch").addEventListener("click", () => {
+  if (!layout) return;
+  const d = M.addSearch(layout, linesOf());
   select(d.id, -1);
   changed();
   focusNew(d.id);
