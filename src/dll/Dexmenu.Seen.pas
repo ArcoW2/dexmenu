@@ -53,7 +53,7 @@ var
 begin
   if GetEnvironmentVariable('DEXMENU_SEEN_FOLDER', Env, MAX_PATH) > 0 then
     Exit(Env);
-  Result := RoamingAppData + '\Dexmenu\seen';
+  Result := DataFolder + '\seen';
 end;
 
 function ReadSeenText(const Kind: string): string;

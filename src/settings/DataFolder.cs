@@ -2,34 +2,106 @@ using System.Text.Json;
 
 namespace Dexmenu.Settings;
 
-/// <summary>Where Dexmenu keeps a user's things (docs/plans/02-PLAN-own-menu.md 3.4, 3.5): %APPDATA%\Dexmenu with
-/// settings.json ("layout": the active layout's name), layouts\&lt;name&gt;.json and seen\&lt;kind&gt;.json (the items each kind
-/// of right-click showed, written by the DLL). DEXMENU_LAYOUT_FILE and DEXMENU_SEEN_FOLDER override them for the tests,
-/// as in the DLL.</summary>
+/// <summary>Where Dexmenu keeps a user's things (docs/plans/02-PLAN-own-menu.md 3.4, 3.5; plan 05 3.2): %APPDATA%\Dexmenu
+/// with settings.json ("kinds": which layout each kind of right-click gets, in the order they are tried),
+/// layouts\&lt;name&gt;.json and seen\&lt;kind&gt;.json (the items each kind of right-click showed, written by the DLL).
+/// DEXMENU_DATA (the whole folder), DEXMENU_LAYOUT_FILE and DEXMENU_SEEN_FOLDER override them for the tests, as in the
+/// DLL.</summary>
 static class DataFolder
 {
-    public static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Dexmenu");
+    public static string Root => Environment.GetEnvironmentVariable("DEXMENU_DATA") is { Length: > 0 } d
+        ? d : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Dexmenu");
 
     public static string SeenFolder =>
         Environment.GetEnvironmentVariable("DEXMENU_SEEN_FOLDER") is { Length: > 0 } f ? f : Path.Combine(Root, "seen");
 
-    /// <summary>The layout file in use, or null when the built-in base layout is (no settings, no file).</summary>
+    static string SettingsFile => Path.Combine(Root, "settings.json");
+    public static string LayoutPath(string name) => Path.Combine(Root, "layouts", name + ".json");
+
+    /// <summary>The kinds of right-click, in the order they start in (plan 05 3.2): the dialog kinds first (not set, so
+    /// a dialog gets Explorer's kinds until the user sets them), every other last.</summary>
+    public static readonly string[] KindOrder =
+        ["dialog-file", "dialog-folder", "dialog-several", "dialog-background", "dialog-drive",
+         "file", "folder", "several", "background", "desktop", "drive", "default"];
+
+    static System.Text.Json.Nodes.JsonObject ReadSettings()
+    {
+        try
+        {
+            return File.Exists(SettingsFile) && System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(SettingsFile),
+                documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true })
+                is System.Text.Json.Nodes.JsonObject o ? o : [];
+        }
+        catch (Exception e) when (e is IOException or JsonException) { return []; }
+    }
+
+    static void WriteSettings(System.Text.Json.Nodes.JsonObject settings)
+    {
+        Directory.CreateDirectory(Root);
+        File.WriteAllText(SettingsFile, settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    /// <summary>First start (plan 05 3.1, 3.2): settings.json gets "kinds" when it has none: every kind in its starting
+    /// order, not set, and "every other" (default) set to the layout the older "layout" named, or to the Default layout
+    /// (only the remaining card), made when missing. The user's layouts are not touched.</summary>
+    public static void EnsureKinds(string baseLayout)
+    {
+        var settings = ReadSettings();
+        if (settings["kinds"] is System.Text.Json.Nodes.JsonArray) return;
+        var named = settings["layout"]?.GetValue<string>();
+        var defaultLayout = named is { Length: > 0 } && File.Exists(LayoutPath(named)) ? named : "Default";
+        if (defaultLayout == "Default" && !File.Exists(LayoutPath("Default")))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(LayoutPath("Default"))!);
+            File.WriteAllText(LayoutPath("Default"), baseLayout + Environment.NewLine);
+        }
+        var kinds = new System.Text.Json.Nodes.JsonArray();
+        foreach (var kind in KindOrder)
+        {
+            var entry = new System.Text.Json.Nodes.JsonObject { ["kind"] = kind };
+            if (kind == "default") entry["layout"] = defaultLayout;
+            kinds.Add(entry);
+        }
+        settings["kinds"] = kinds;
+        settings.Remove("layout");
+        WriteSettings(settings);
+    }
+
+    /// <summary>The layout a kind is set to: its name, "none" (Windows' own menu) or null (not set).</summary>
+    public static string? LayoutOf(string kind)
+    {
+        if (ReadSettings()["kinds"] is not System.Text.Json.Nodes.JsonArray kinds) return null;
+        foreach (var e in kinds)
+            if (e?["kind"]?.GetValue<string>() == kind) return e["layout"]?.GetValue<string>();
+        return null;
+    }
+
+    /// <summary>A kind set to a layout (a name, "none", or null: not set); a kind not listed is added before default.</summary>
+    public static void SetLayout(string kind, string? layout)
+    {
+        var settings = ReadSettings();
+        if (settings["kinds"] is not System.Text.Json.Nodes.JsonArray kinds) { kinds = []; settings["kinds"] = kinds; }
+        var entry = kinds.OfType<System.Text.Json.Nodes.JsonObject>().FirstOrDefault(e => e["kind"]?.GetValue<string>() == kind);
+        if (entry is null)
+        {
+            entry = new System.Text.Json.Nodes.JsonObject { ["kind"] = kind };
+            var at = kinds.Count;
+            for (var i = 0; i < kinds.Count; i++) if (kinds[i]?["kind"]?.GetValue<string>() == "default") at = i;
+            kinds.Insert(at, entry);
+        }
+        if (layout is null) entry.Remove("layout"); else entry["layout"] = layout;
+        WriteSettings(settings);
+    }
+
+    /// <summary>The layout file the editor opens (until plan 05's editor window: every other kind's), or null when the
+    /// built-in base layout is in use.</summary>
     public static string? LayoutFile
     {
         get
         {
             if (Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is { Length: > 0 } env) return env;
-            try
-            {
-                var settings = Path.Combine(Root, "settings.json");
-                if (!File.Exists(settings)) return null;
-                using var doc = JsonDocument.Parse(File.ReadAllText(settings),
-                    new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-                if (doc.RootElement.TryGetProperty("layout", out var name) && name.GetString() is { Length: > 0 } n)
-                    return Path.Combine(Root, "layouts", n + ".json");
-            }
-            catch (Exception e) when (e is IOException or JsonException) { }
-            return null;
+            var name = LayoutOf("default") ?? ReadSettings()["layout"]?.GetValue<string>();
+            return name is { Length: > 0 } && name != "none" ? LayoutPath(name) : null;
         }
     }
 

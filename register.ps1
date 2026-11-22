@@ -1,5 +1,5 @@
 # Registers bin\DexmenuShell.dll for the current user (HKCU\Software\Classes) as a context menu handler for files,
-# folders, a folder's empty part and drives (docs/plans/01-PLAN-dexmenu.md 3.1, 3.9). -Remove takes it away again.
+# folders, a folder's empty part, the desktop's empty part and drives (docs/plans/01-PLAN-dexmenu.md 3.1, 3.9). -Remove takes it away again.
 # Registered is not on: the DLL does nothing until HKCU\Software\Dexmenu Enabled is 1 (-Enable) or DEXMENU=1 is set
 # in the process (the tests). Explorer keeps a loaded DLL until it restarts.
 # -FullMenu: Windows 11 shows the full menu at once, not its short menu with "Show more options" (plan 3.10: Windows'
@@ -8,7 +8,7 @@ param([switch]$Remove, [switch]$Enable, [switch]$Disable, [switch]$FullMenu, [sw
 
 $clsid = '{CD4EEF01-47D9-4172-A48A-F6E61850D170}'
 $classes = 'HKCU:\Software\Classes'
-$kinds = 'AllFilesystemObjects', 'Directory\Background', 'Drive'
+$kinds = 'AllFilesystemObjects', 'Directory\Background', 'DesktopBackground', 'Drive'
 $dll = Join-Path $PSScriptRoot 'bin\DexmenuShell.dll'
 
 if ($FullMenu -or $ShortMenu) {

@@ -134,9 +134,9 @@ sealed class MainForm : Form
             var names = last.Items.Select(Path.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (itemBox.Visible)
                 for (var i = 0; i < itemBox.Items.Count; i++)
-                    if (names.Contains((string)itemBox.Items[i])) { itemBox.SelectedIndex = i; break; }
+                    if (itemBox.Items[i] is string name && names.Contains(name)) { itemBox.SelectedIndex = i; break; }
             if (itemsButton.Visible)
-                for (var i = 0; i < itemsList.Items.Count; i++) itemsList.SetItemChecked(i, names.Contains((string)itemsList.Items[i]));
+                for (var i = 0; i < itemsList.Items.Count; i++) itemsList.SetItemChecked(i, itemsList.Items[i] is string name && names.Contains(name));
             ItemsButtonText();
         }
         finally { applying = false; }
@@ -255,12 +255,8 @@ sealed class MainForm : Form
         return Directory.Exists(folder) ? Directory.GetFiles(folder, "*.json").Select(Path.GetFileNameWithoutExtension).OfType<string>().ToArray() : [];
     }
 
-    static string? ActiveName()
-    {
-        var path = Path.Combine(DataFolder.Root, "settings.json");
-        try { return File.Exists(path) && JsonNode.Parse(File.ReadAllText(path))?["layout"]?.GetValue<string>() is string n ? n : null; }
-        catch (Exception e) when (e is IOException or JsonException or InvalidOperationException) { return null; }
-    }
+    // the layout every other kind of right-click gets (until plan 05's main window shows them all)
+    static string? ActiveName() => DataFolder.LayoutOf("default");
 
     // The preview from the edit in progress or the file; the page gets the file's state when nothing is being edited.
     void Reload()
@@ -362,16 +358,11 @@ sealed class MainForm : Form
     }
 
     // settings.json's "layout": the layout Dexmenu uses at a right-click; its other settings kept.
+    // Until plan 05's main window: "Make active" sets the layout for every other kind of right-click (default).
     static void Activate(string name)
     {
         if (name.Length == 0) return;
-        var path = Path.Combine(DataFolder.Root, "settings.json");
-        JsonObject settings;
-        try { settings = File.Exists(path) && JsonNode.Parse(File.ReadAllText(path)) is JsonObject o ? o : []; }
-        catch (JsonException) { settings = []; }
-        settings["layout"] = name;
-        Directory.CreateDirectory(DataFolder.Root);
-        File.WriteAllText(path, settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        DataFolder.SetLayout("default", name);
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)

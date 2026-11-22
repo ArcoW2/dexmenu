@@ -13,9 +13,9 @@ unit Dexmenu.Layout;
 // "default" section; its other sections are ignored (plan 05 3.1). Which layout a kind of right-click gets is
 // settings.json's (plan 05 3.2), not the layout's.
 //
-// Which file: DEXMENU_LAYOUT_FILE (the tests), else %APPDATA%\Dexmenu\settings.json's "layout" (a name) as
-// %APPDATA%\Dexmenu\layouts\<name>.json; no settings or no file: the built-in base layout. Read again when the file
-// changes. A file that cannot be read or is not valid: no layout, the reason given (the menu then is Windows' own).
+// Which file for a kind of right-click: CurrentLayout (below; a name in settings.json as
+// %APPDATA%\Dexmenu\layouts\<name>.json). A file that cannot be read or is not valid: no layout, the reason given
+// (the menu then is Windows' own).
 
 interface
 
@@ -86,10 +86,14 @@ type
 
 // Parses a layout; nil and Error set when it is not valid.
 function ParseLayout(const Text, Source: string; out Error: string): ILayout;
-// The layout in use now (see above); nil and Error set when the file cannot be used.
-function CurrentLayout(out Error: string): ILayout;
-// The file CurrentLayout reads, or '' when it uses the built-in base layout.
-function LayoutFile: string;
+// The layout a kind of right-click gets now (plan 05 3.2): settings.json's "kinds", in their order, the first that
+// fits Kind and has a layout set ("dialog-file" fits "dialog-file", "file" and "default"); ToWindows when that one is
+// "none" (Windows' own menu: Result nil, no error). Without "kinds" the older "layout"; without either the built-in
+// base layout. DEXMENU_LAYOUT_FILE (the tests): that file for every kind. nil and Error set when the file cannot be
+// used. Each file is read again when it changes.
+function CurrentLayout(const Kind: string; out ToWindows: Boolean; out Error: string): ILayout;
+// The file CurrentLayout reads for a kind, or '' for the built-in base layout or Windows' menu (ToWindows).
+function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
 
 const
   FormatVersion = 1;   // the layout files' form this DLL writes and reads; older forms are read too
@@ -416,45 +420,87 @@ end;
 
 // ---- the layout in use ---------------------------------------------------------------------------------------------
 
+type
+  TCached = class
+    Stamp: TFileTime;
+    Layout: ILayout;
+    Error: string;
+  end;
+
 var
   Lock: TCriticalSection;
-  CachedPath: string;
-  CachedStamp: TFileTime;
-  Cached: ILayout;
-  CachedError: string;
+  Cache: TObjectDictionary<string, TCached>;   // per layout file, read again when it changes
   Base: ILayout;
 
-function LayoutFile: string;
+// Whether a kind set in settings.json fits a right-click's kind: itself, the same kind outside a dialog, or default.
+function Fits(const SetKind, Kind: string): Boolean;
+begin
+  Result := SameText(SetKind, Kind) or SameText(SetKind, 'default') or
+    (Kind.StartsWith('dialog-') and SameText(SetKind, Copy(Kind, Length('dialog-') + 1, MaxInt)));
+end;
+
+function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
 var
   Env: array[0..MAX_PATH] of Char;
   Text, Error, Name: string;
-  Settings: TJSONValue;
+  Settings, Kinds, Entry: TJSONValue;
 begin
+  ToWindows := False;
   if GetEnvironmentVariable('DEXMENU_LAYOUT_FILE', Env, MAX_PATH) > 0 then
     Exit(Env);
   Result := '';
-  if not ReadTextFile(RoamingAppData + '\Dexmenu\settings.json', Text) then
+  if not ReadTextFile(DataFolder + '\settings.json', Text) then
     Exit;
   Settings := ParseWithComments(Text, Error);
   try
-    if (Settings is TJSONObject) and (TJSONObject(Settings).GetValue('layout') is TJSONString) then
+    if not (Settings is TJSONObject) then
+      Exit;
+    Kinds := TJSONObject(Settings).GetValue('kinds');
+    if Kinds is TJSONArray then
+    begin
+      for Entry in TJSONArray(Kinds) do
+      begin
+        // not set (no layout): the next kind that fits decides
+        if not (Entry is TJSONObject) or not (TJSONObject(Entry).GetValue('kind') is TJSONString) or
+          not (TJSONObject(Entry).GetValue('layout') is TJSONString) then
+          Continue;
+        if not Fits(TJSONObject(Entry).GetValue('kind').Value, Kind) then
+          Continue;
+        Name := TJSONObject(Entry).GetValue('layout').Value;
+        if Name = '' then
+          Continue;
+        if SameText(Name, 'none') then
+        begin
+          ToWindows := True;
+          Exit;
+        end;
+        Exit(DataFolder + '\layouts\' + Name + '.json');
+      end;
+      Exit;   // none fits: the built-in base layout
+    end;
+    // the older setting: one layout for every kind
+    if TJSONObject(Settings).GetValue('layout') is TJSONString then
     begin
       Name := TJSONObject(Settings).GetValue('layout').Value;
       if Name <> '' then
-        Result := RoamingAppData + '\Dexmenu\layouts\' + Name + '.json';
+        Result := DataFolder + '\layouts\' + Name + '.json';
     end;
   finally
     Settings.Free;
   end;
 end;
 
-function CurrentLayout(out Error: string): ILayout;
+function CurrentLayout(const Kind: string; out ToWindows: Boolean; out Error: string): ILayout;
 var
   Path, Text: string;
   Data: TWin32FileAttributeData;
+  C: TCached;
 begin
   Error := '';
-  Path := LayoutFile;
+  Result := nil;
+  Path := LayoutFile(Kind, ToWindows);
+  if ToWindows then
+    Exit;
   Lock.Enter;
   try
     if (Path = '') or not GetFileAttributesEx(PChar(Path), GetFileExInfoStandard, @Data) then
@@ -463,21 +509,26 @@ begin
         Base := ParseLayout(BaseLayout, '(built in)', Error);
       Exit(Base);
     end;
-    if (Path <> CachedPath) or (CompareFileTime(Data.ftLastWriteTime, CachedStamp) <> 0) then
+    if not Cache.TryGetValue(AnsiLowerCase(Path), C) then
     begin
-      CachedPath := Path;
-      CachedStamp := Data.ftLastWriteTime;
-      Cached := nil;
-      CachedError := '';
-      if not ReadTextFile(Path, Text) then
-        CachedError := Path + ': cannot be read'
-      else
-        Cached := ParseLayout(Text, Path, CachedError);
-      if Cached = nil then
-        Log('layout not used: ' + CachedError);
+      C := TCached.Create;
+      C.Error := '(not read)';
+      Cache.Add(AnsiLowerCase(Path), C);
     end;
-    Error := CachedError;
-    Result := Cached;
+    if (C.Error = '(not read)') or (CompareFileTime(Data.ftLastWriteTime, C.Stamp) <> 0) then
+    begin
+      C.Stamp := Data.ftLastWriteTime;
+      C.Layout := nil;
+      C.Error := '';
+      if not ReadTextFile(Path, Text) then
+        C.Error := Path + ': cannot be read'
+      else
+        C.Layout := ParseLayout(Text, Path, C.Error);
+      if C.Layout = nil then
+        Log('layout not used: ' + C.Error);
+    end;
+    Error := C.Error;
+    Result := C.Layout;
   finally
     Lock.Leave;
   end;
@@ -485,5 +536,6 @@ end;
 
 initialization
   Lock := TCriticalSection.Create;
+  Cache := TObjectDictionary<string, TCached>.Create([doOwnsValues]);
 
 end.

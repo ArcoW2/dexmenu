@@ -336,7 +336,7 @@ Report 'the last right-click recorded for the preview' $runs $problems ''
 function RegState {
     $inproc = 'HKCU:\Software\Classes\CLSID\{CD4EEF01-47D9-4172-A48A-F6E61850D170}\InprocServer32'
     $dll = if (Test-Path $inproc) { (Get-ItemProperty $inproc).'(default)' } else { '' }
-    $handlers = @('AllFilesystemObjects', 'Directory\Background', 'Drive' | Where-Object { Test-Path "HKCU:\Software\Classes\$_\shellex\ContextMenuHandlers\Dexmenu" }).Count
+    $handlers = @('AllFilesystemObjects', 'Directory\Background', 'DesktopBackground', 'Drive' | Where-Object { Test-Path "HKCU:\Software\Classes\$_\shellex\ContextMenuHandlers\Dexmenu" }).Count
     [pscustomobject]@{ Dll = $dll; Handlers = $handlers; Enabled = (Get-ItemProperty HKCU:\Software\Dexmenu -ErrorAction SilentlyContinue).Enabled }
 }
 $settingsExe = Join-Path $root 'bin\DexmenuSettings.exe'
@@ -346,7 +346,7 @@ $s = RegState
 if ($s.Dll -or $s.Handlers -or $s.Enabled -ne 0) { $problems += "after --unregister: dll '$($s.Dll)', $($s.Handlers) handler key(s), enabled $($s.Enabled)" }
 Start-Process $settingsExe -ArgumentList '--register' -Wait
 $s = RegState
-if ($s.Dll -ne (Join-Path $root 'bin\DexmenuShell.dll') -or $s.Handlers -ne 3 -or $s.Enabled -ne 1) { $problems += "after --register: dll '$($s.Dll)', $($s.Handlers) handler key(s), enabled $($s.Enabled)" }
+if ($s.Dll -ne (Join-Path $root 'bin\DexmenuShell.dll') -or $s.Handlers -ne 4 -or $s.Enabled -ne 1) { $problems += "after --register: dll '$($s.Dll)', $($s.Handlers) handler key(s), enabled $($s.Enabled)" }
 $runs = @()
 Report 'register and unregister for the current user' $runs $problems ''
 

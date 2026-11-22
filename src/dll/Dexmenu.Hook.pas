@@ -138,12 +138,45 @@ end;
 // ---- the show call ---------------------------------------------------------------------------------------------
 
 // Dexmenu's menu for a noted menu; Shown False when Windows' menu has to be shown instead.
+// An Open or Save dialog (plan 05 3.2): the window showing the menu sits in a dialog window (class #32770) that holds
+// a shell folder view.
+function InFileDialog(Owner: HWND): Boolean;
+var
+  Root: HWND;
+  Name: array[0..63] of Char;
+
+  function FindView(Parent: HWND): Boolean;
+  var
+    Child: HWND;
+    N: array[0..63] of Char;
+  begin
+    Result := False;
+    Child := GetWindow(Parent, GW_CHILD);
+    while (Child <> 0) and not Result do
+    begin
+      GetClassName(Child, N, Length(N));
+      Result := (StrComp(N, 'SHELLDLL_DefView') = 0) or FindView(Child);
+      Child := GetWindow(Child, GW_HWNDNEXT);
+    end;
+  end;
+
+begin
+  Result := False;
+  if Owner = 0 then
+    Exit;
+  Root := GetAncestor(Owner, GA_ROOT);
+  if (Root = 0) or (GetClassName(Root, Name, Length(Name)) = 0) or (StrComp(Name, '#32770') <> 0) then
+    Exit;
+  Result := FindView(Root);
+end;
+
 function ShowOwn(Menu: HMENU; Flags: UINT; X, Y: Integer; Owner: HWND; Params: PTPMParams; out Shown: Boolean): BOOL;
 var
   Layout: ILayout;
   Error: string;
   Session: TMenuSession;
-  Kind, Where: string;
+  Kind, Where, LayoutKind: string;
+  ToWindows: Boolean;
 begin
   Result := False;
   Shown := False;
@@ -153,14 +186,23 @@ begin
       Log(Format('show %s (%d items): not noted, passed through', [Hex(Menu), GetMenuItemCount(Menu)]));
     Exit;
   end;
-  Layout := CurrentLayout(Error);
+  LayoutKind := Kind;   // the layout is chosen by the kind, in a dialog its dialog kind (plan 05 3.2)
+  if InFileDialog(Owner) then
+    LayoutKind := 'dialog-' + Kind;
+  Layout := CurrentLayout(LayoutKind, ToWindows, Error);
+  if ToWindows then
+  begin
+    if Tracing then
+      Log(Format('show %s: kind %s set to none: Windows'' menu', [Hex(Menu), LayoutKind]));
+    Exit;
+  end;
   if Layout = nil then
   begin
     Log('Windows'' menu shown: ' + Error);
     Exit;
   end;
   if Tracing then
-    Log(Format('show %s (%d items): Dexmenu''s menu, kind %s, layout %s', [Hex(Menu), GetMenuItemCount(Menu), Kind,
+    Log(Format('show %s (%d items): Dexmenu''s menu, kind %s, layout %s', [Hex(Menu), GetMenuItemCount(Menu), LayoutKind,
       Layout.Source]));
   Session := TMenuSession.Create(Menu, Owner, Flags, Layout, Kind);
   try

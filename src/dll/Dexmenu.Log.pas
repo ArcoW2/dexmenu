@@ -12,6 +12,8 @@ function Tracing: Boolean;
 procedure Log(const Text: string);
 function LocalAppData: string;
 function RoamingAppData: string;
+// The user's Dexmenu data (settings.json, layouts): %APPDATA%\Dexmenu, or DEXMENU_DATA (the tests).
+function DataFolder: string;
 function Hex(P: Pointer): string; overload;
 function Hex(H: NativeUInt): string; overload;
 
@@ -69,6 +71,15 @@ end;
 function RoamingAppData: string;
 begin
   Result := KnownFolder(FOLDERID_RoamingAppData);
+end;
+
+function DataFolder: string;
+var
+  Env: array[0..MAX_PATH] of Char;
+begin
+  if GetEnvironmentVariable('DEXMENU_DATA', Env, MAX_PATH) > 0 then
+    Exit(Env);
+  Result := RoamingAppData + '\Dexmenu';
 end;
 
 function Hex(P: Pointer): string;

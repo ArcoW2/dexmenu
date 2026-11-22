@@ -87,30 +87,83 @@ var
   Path, Error: string;
   L: ILayout;
   Stamp: TDateTime;
+  ToWindows: Boolean;
 begin
   Path := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-layout.json');
   SetEnvironmentVariable('DEXMENU_LAYOUT_FILE', PChar(Path));
   if TFile.Exists(Path) then
     TFile.Delete(Path);
-  L := CurrentLayout(Error);
+  L := CurrentLayout('file', ToWindows, Error);
   Check((L <> nil) and (L.Source = '(built in)'), 'no layout file: the built-in base layout');
 
   TFile.WriteAllText(Path, '{ "default": [ { "line": [ { "card": "First", "rules": [ "remaining" ] } ] } ] }');
-  L := CurrentLayout(Error);
+  L := CurrentLayout('file', ToWindows, Error);
   Check((L <> nil) and (L.Lines('default')[0].Cards[0].Title = 'First'), 'the layout file read');
-  Check((L <> nil) and (L.Lines('folder') = L.Lines('default')), 'a kind without lines of its own uses default');
+  Check((L <> nil) and (L.Lines('folder') = L.Lines('default')), 'one menu for every kind');
 
   Stamp := TFile.GetLastWriteTime(Path);
   TFile.WriteAllText(Path, '{ "default": [ { "line": [ { "card": "Second", "rules": [ "remaining" ] } ] } ] }');
   TFile.SetLastWriteTime(Path, Stamp + 1 / 86400);
-  L := CurrentLayout(Error);
+  L := CurrentLayout('file', ToWindows, Error);
   Check((L <> nil) and (L.Lines('default')[0].Cards[0].Title = 'Second'), 'read again when the file changed');
 
   TFile.WriteAllText(Path, '{ "default": [ ');
   TFile.SetLastWriteTime(Path, Stamp + 2 / 86400);
-  L := CurrentLayout(Error);
+  L := CurrentLayout('file', ToWindows, Error);
   Check((L = nil) and (Error <> ''), 'a broken file: no layout, a reason (the menu is then Windows'' own)');
   TFile.Delete(Path);
+  SetEnvironmentVariable('DEXMENU_LAYOUT_FILE', nil);
+end;
+
+// Which layout a kind of right-click gets (plan 05 3.2): settings.json's "kinds" in their order, in a data folder of
+// the test's own (DEXMENU_DATA).
+procedure TestKinds;
+var
+  Data, Layouts: string;
+  L: ILayout;
+  Error: string;
+  ToWindows: Boolean;
+
+  function Title(const Kind: string): string;
+  begin
+    L := CurrentLayout(Kind, ToWindows, Error);
+    if ToWindows then
+      Result := '(windows)'
+    else if L = nil then
+      Result := '(error) ' + Error
+    else
+      Result := L.Lines('')[0].Cards[0].Title;
+  end;
+
+  procedure Layout(const Name: string);
+  begin
+    TFile.WriteAllText(TPath.Combine(Layouts, Name + '.json'), '{ "format": 1, "lines": [ { "line": [ { "card": "' +
+      Name + '", "rules": [ "remaining" ] } ] } ] }');
+  end;
+
+begin
+  Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-data');
+  Layouts := TPath.Combine(Data, 'layouts');
+  TDirectory.CreateDirectory(Layouts);
+  SetEnvironmentVariable('DEXMENU_DATA', PChar(Data));
+  Layout('Files');
+  Layout('Dialog');
+  Layout('Default');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "kinds": [ ' +
+    '{ "kind": "dialog-file", "layout": "Dialog" }, { "kind": "dialog-folder" }, { "kind": "file", "layout": "Files" }, ' +
+    '{ "kind": "drive", "layout": "none" }, { "kind": "default", "layout": "Default" } ] }');
+  Check(Title('file') = 'Files', 'a kind set: its layout');
+  Check(Title('folder') = 'Default', 'a kind not listed: default''s');
+  Check(Title('dialog-file') = 'Dialog', 'a file in a dialog: the dialog kind first in the order');
+  Check(Title('dialog-folder') = 'Default', 'a dialog kind not set: the next that fits (default)');
+  Check(Title('drive') = '(windows)', 'none: Windows'' own menu');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "kinds": [ ' +
+    '{ "kind": "file", "layout": "Files" }, { "kind": "dialog-file", "layout": "Dialog" }, { "kind": "default", "layout": "Default" } ] }');
+  Check(Title('dialog-file') = 'Files', 'the order decides: file before dialog-file, so a file in a dialog gets Files');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "layout": "Files" }');
+  Check(Title('folder') = 'Files', 'the older setting ("layout"): that layout for every kind');
+  TDirectory.Delete(Data, True);
+  SetEnvironmentVariable('DEXMENU_DATA', nil);
 end;
 
 
@@ -664,6 +717,7 @@ begin
   TestComments;
   TestLayouts;
   TestCurrent;
+  TestKinds;
   TestRules;
   TestEmptySubmenu;
   TestEmptyMenuCard;

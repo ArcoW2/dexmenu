@@ -30,8 +30,8 @@ implementation
 uses
   System.SysUtils, System.Win.ComServ, Dexmenu.Hook, Dexmenu.Seen;
 
-// The kind of right-click (docs/plans/02-PLAN-own-menu.md 3.5): a folder's empty part (no items), several items, a
-// drive, a folder or a file; 'default' when it cannot be told.
+// The kind of right-click (docs/plans/02-PLAN-own-menu.md 3.5, plan 05 3.2): a folder's empty part (no items; the
+// desktop's: ShellInit), several items, a drive, a folder or a file; 'default' when it cannot be told.
 function KindOf(DataObject: IDataObject): string;
 var
   Items: IShellItemArray;
@@ -105,10 +105,29 @@ begin
     Result := RightClickJson(Kind, ExtractFileDir(Paths[0]), Paths);
 end;
 
+function ILIsEqual(pidl1, pidl2: PItemIDList): BOOL; stdcall; external 'shell32.dll' name 'ILIsEqual';
+
+// The desktop's empty part (plan 05 3.2): a background right-click whose folder is the desktop itself.
+function IsDesktop(pidlFolder: PItemIDList): Boolean;
+var
+  Desktop: PItemIDList;
+begin
+  Result := False;
+  if (pidlFolder = nil) or Failed(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, Desktop)) then
+    Exit;
+  try
+    Result := ILIsEqual(pidlFolder, Desktop);
+  finally
+    CoTaskMemFree(Desktop);
+  end;
+end;
+
 function TDexmenuHandler.ShellInit(pidlFolder: PItemIDList; lpdobj: IDataObject; hKeyProgID: HKEY): HResult;
 begin
   try
     FKind := KindOf(lpdobj);
+    if (FKind = 'background') and IsDesktop(pidlFolder) then
+      FKind := 'desktop';
   except
     FKind := 'default';
   end;

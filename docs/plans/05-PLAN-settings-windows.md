@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-22: draft.
 - 2026-11-22: partly executed: the layout format.
+- 2026-11-22: partly executed: the kinds setting, the dialog and desktop kinds.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md` 3.7, 3.9: the settings app, registration) and plan 02 (`02-PLAN-own-menu.md`
 3.4, 3.5: layouts, the editor). Changes how layouts are chosen per kind of right-click and where they are edited.
@@ -32,15 +33,16 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Part | What | Reference |
 |---|---|---|
 | Layout format | a layout is one menu (`format`, `lines`); an older file read by its default menu, brought to the current form by the editor | 3.1; 6.1 |
+| Kinds setting | settings.json's ordered `kinds`; the DLL takes the first that fits; none: Windows' menu; first start makes the list and the Default layout | 3.2; 6.2 |
+| Open dialog | the dialog kinds, the layout chosen by them inside an Open or Save dialog | 3.2; 6.2 |
+| Desktop kind | `desktop`: registered for, told apart from a folder's empty part | 3.2; 6.2 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Layout versions | a format number in each layout; the editor updates an older file when it opens it; the DLL shows a warning (a note card) and the remaining card for a file it cannot use | Layout format; plan 02 Note card | 3.1.1 |
-| Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
-| Open dialog | a right-click in an Open or Save dialog as kinds of their own (a file, a folder, several, an empty part, a drive in a dialog) | Kinds setting | 3.2 |
-| Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
+| Light and dark | every window light or dark as Windows is at its start, switched from its top right | Main window; Editor window | 3.3 |
 | Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
 | General panel | the registration line and buttons (Restart Explorer lit after a change); each kind of right-click with its layout (or none) | Main window | 3.4 |
 | Layouts panel | the list; New..., Edit, Copy, Rename, Delete | Main window | 3.5 |
@@ -136,6 +138,10 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - The panels are one page; the page measures the panels' minimums and tells the app (its `MinimumSize`), and on
   every resize chooses the placement, so resizing the window rearranges them at once, without a reload.
 - A WebView2 page as today's editor (`web/main.html`), the same host code serving it.
+- Light and dark: every window of the app (the main window and each editor window) opens light or dark as Windows'
+  apps are set, and has a switch at its top right (Light, Dark, as Windows) that changes it at once. The choice is
+  kept for the next start (settings.json `"theme"`: `light`, `dark` or `windows`) and goes for every window, an
+  editor's preview included (its look follows: the DLL draws light or dark as told).
 
 ### 3.4 The General panel
 
@@ -217,3 +223,26 @@ None.
   form read by its default menu, a broken other section ignored); the editor's self-test (an older file brought to
   the current form and marked changed, a current one unchanged); the settings app started on a format-1 layout: the
   preview showed it (its dump).
+
+### 6.2 The kinds setting, the dialog and desktop kinds
+
+- The DLL (`Dexmenu.Layout.CurrentLayout(Kind, ToWindows, Error)`): settings.json's `kinds` in their order, the
+  first that fits and has a layout; `none` gives Windows' menu (the show call passes the menu through); without
+  `kinds` the older `layout`; without either the built-in base layout. A layout per file, each read again when it
+  changes. `DEXMENU_DATA` (a data folder of its own, for the tests) in the DLL and the app.
+- The dialog kinds: the show call takes `dialog-<kind>` when the window showing the menu sits in a `#32770` window
+  holding a `SHELLDLL_DefView`. The seen items and the last right-click keep the kind without `dialog-`.
+- The desktop's empty part: the handler gives `desktop` for a background right-click whose folder is the desktop
+  (`ILIsEqual` with `CSIDL_DESKTOP`); `Registration.cs` and `register.ps1` register `DesktopBackground` too.
+- The app's first start (`DataFolder.EnsureKinds`, not for `--live`, `--selftest` or with `DEXMENU_LAYOUT_FILE`):
+  `kinds` in the starting order, all not set, `default` the older `layout`'s layout or the Default layout (made
+  when missing); the older `layout` removed; no layout file touched. Until the main window, the editor's "Make
+  active" sets `default`.
+- Tested: unit tests (a kind set; a kind not listed; a dialog kind first; a dialog kind not set falls to default;
+  none; the order deciding between file and dialog-file; the older `layout`); the first start on a test data folder
+  (`kinds` made, `default` the older layout, the layout file unchanged). Not tested yet: a right-click in an Open
+  dialog and on the desktop (the registered DLL is the published one); the suite's registration case counts the
+  desktop's key.
+- While testing, `--register` was run once and registered `bin` for the user; put back by hand at once (the path
+  to `C:\Win32App\Dexmenu`, the desktop key removed). Tests that start the app now pass `DEXMENU_DATA` and no
+  `--register`.

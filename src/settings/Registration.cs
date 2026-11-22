@@ -12,7 +12,8 @@ static class Registration
 {
     const string Clsid = "{CD4EEF01-47D9-4172-A48A-F6E61850D170}";
     const string Classes = @"Software\Classes";
-    static readonly string[] Kinds = ["AllFilesystemObjects", @"Directory\Background", "Drive"];
+    // files and folders, a folder's empty part, the desktop's empty part (plan 05 3.2), drives
+    static readonly string[] Kinds = ["AllFilesystemObjects", @"Directory\Background", "DesktopBackground", "Drive"];
 
     public static string DllPath => Path.Combine(AppContext.BaseDirectory, "DexmenuShell.dll");
 
