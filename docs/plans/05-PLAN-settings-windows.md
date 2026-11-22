@@ -274,8 +274,14 @@ None.
 - Light and dark: settings.json `theme` (`windows`, `light`, `dark`); `theme.js` draws the switch; the app sets
   WebView2's preferred colour scheme (the pages' CSS follows `prefers-color-scheme`), the title bar (DWM dark mode)
   and the preview (`DexmenuSetTheme` in the DLL) for every window at once.
-- `DEXMENU_SCREENSHOT=<png>`: a window's page saved as a PNG after it loaded, then the window closes (to check the
-  look; used for the screenshots while building).
+- The editor's page fills its window with four panes: the rules, the cards, the selected card and the preview, with
+  the same splitters between them (a splitter changes only the pane on its left; minimums 160, 260, 200 and 300 CSS
+  pixels; the preview takes the rest). The preview's bar (the kind, the folder, the item(s), Last right-click, "not
+  meant for this kind") is page controls; the app keeps its state. The DLL's preview window is placed over the
+  pane's area (the page reports where it is), so nothing of the page may float there (the items list opens inside
+  the bar).
+- `DEXMENU_SCREENSHOT=<png>`: a window saved as a PNG after its page loaded (the whole window, the preview over the
+  page included), then the window closes (to check the look; used for the screenshots while building).
 - Tested: `--selftest-files` (all pass); the editor's self-test (paste: new ids, the line after, rules at the end,
   the remaining card refused, a rule onto a card, other text ignored; every page script parses); both windows
   opened on a test data folder and closed; screenshots of both checked. Not tested by a script: dragging kinds,

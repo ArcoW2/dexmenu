@@ -121,6 +121,9 @@ static class Themes
 /// served (WebFiles), the clipboard granted to it.</summary>
 static class Pages
 {
+    [DllImport("user32.dll")]
+    static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
+
     static Task<CoreWebView2Environment>? environment;
 
     public static async Task Start(WebView2 web, string page, Action<string> received, Action loaded)
@@ -142,9 +145,18 @@ static class Pages
             // closes
             if (Environment.GetEnvironmentVariable("DEXMENU_SCREENSHOT") is { Length: > 0 } shot && web.FindForm() is { } form)
             {
-                await Task.Delay(1500);
-                using (var file = File.Create(shot))
-                    await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, file);
+                await Task.Delay(2500);
+                // the whole window as it shows (the page and the preview window over it)
+                using (var bmp = new Bitmap(form.Width, form.Height))
+                {
+                    using (var g = Graphics.FromImage(bmp))
+                    {
+                        var dc = g.GetHdc();
+                        PrintWindow(form.Handle, dc, 2);   // PW_RENDERFULLCONTENT
+                        g.ReleaseHdc(dc);
+                    }
+                    bmp.Save(shot, System.Drawing.Imaging.ImageFormat.Png);
+                }
                 form.Close();
             }
         };

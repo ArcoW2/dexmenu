@@ -678,43 +678,42 @@ $("collapseAll").addEventListener("click", () => {
 });
 $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); });
 
-// The splitters between the panes: a splitter changes only the pane on its left (and so the room of the card's panel
-// on the right, which takes the rest). The rules pane and the cards pane keep the width they were dragged to (kept in
-// this page's storage, a convenience). Each pane has a minimum; a drag stops there. When the window is too narrow for
-// the kept widths, both left panes shrink in proportion for now; the kept widths stay for a wider window.
+// The splitters between the panes: a splitter changes only the pane on its left (and so the room of the preview on
+// the right, which takes the rest). The rules pane, the cards pane and the card's panel keep the width they were
+// dragged to (kept in this page's storage, a convenience). Each pane has a minimum; a drag stops there. When the
+// window is too narrow for the kept widths, they shrink in proportion for now; the kept widths stay for a wider one.
 (() => {
   const key = "dexmenu.paneWidths";
-  const min = { rulesPane: 160, cardsPane: 260, cardPane: 200 };
+  const min = { rulesPane: 160, cardsPane: 260, cardPane: 200, previewPane: 300 };
   let wish = {};
   try { wish = JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) { /* no storage: default widths */ }
-  const left = ["rulesPane", "cardsPane"];
-  const room = () => $("panes").clientWidth - min.cardPane -
+  const left = ["rulesPane", "cardsPane", "cardPane"];
+  const room = () => $("panes").clientWidth - min.previewPane -
     [...document.querySelectorAll("#panes > .splitter")].reduce((n, s) => n + s.getBoundingClientRect().width, 0);
   const set = (id, w) => { $(id).style.flex = w ? "0 0 " + Math.round(w) + "px" : ""; };
 
   function apply() {
     const w = {};
     for (const id of left) w[id] = wish[id] > 0 ? Math.max(min[id], wish[id]) : null;
-    const total = (w.rulesPane || $("rulesPane").getBoundingClientRect().width) + (w.cardsPane || $("cardsPane").getBoundingClientRect().width);
+    const total = left.reduce((n, id) => n + (w[id] || $(id).getBoundingClientRect().width), 0);
     const r = room();
-    if (total > r && (w.rulesPane || w.cardsPane))
+    if (total > r && left.some(id => w[id]))
       for (const id of left) if (w[id]) w[id] = Math.max(min[id], w[id] * r / total);
     for (const id of left) set(id, w[id]);
   }
 
   for (const splitter of document.querySelectorAll("#panes > .splitter")) {
     const pane = splitter.previousElementSibling;
-    const other = left.find(id => id !== pane.id);
     splitter.addEventListener("pointerdown", e => {
       e.preventDefault();
       splitter.setPointerCapture(e.pointerId);
       splitter.classList.add("dragging");
-      // both left panes as they are now; during the drag only this one changes
+      // the panes as they are now; during the drag only this one changes
       for (const id of left) { wish[id] = $(id).getBoundingClientRect().width; set(id, wish[id]); }
       const startX = e.clientX, startW = wish[pane.id];
+      const others = left.filter(id => id !== pane.id).reduce((n, id) => n + wish[id], 0);
       const move = ev => {
-        const most = room() - wish[other];   // the card's panel keeps its minimum
-        wish[pane.id] = Math.max(min[pane.id], Math.min(startW + ev.clientX - startX, most));
+        wish[pane.id] = Math.max(min[pane.id], Math.min(startW + ev.clientX - startX, room() - others));   // the preview keeps its minimum
         set(pane.id, wish[pane.id]);
       };
       const up = () => {
@@ -730,6 +729,64 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
   window.addEventListener("resize", apply);
   apply();
 })();
+
+// ---- the preview pane ------------------------------------------------------------------------------------------------
+
+// Where the preview's area is (CSS pixels within the page): the app places the preview window there (it lies over the
+// page; nothing of the page shows below it).
+(() => {
+  let last = "";
+  const report = () => {
+    const r = $("previewArea").getBoundingClientRect();
+    const rect = { x: r.left, y: r.top, w: r.width, h: r.height };
+    const text = JSON.stringify(rect);
+    if (text !== last) { last = text; post({ type: "previewRect", ...rect }); }
+  };
+  new ResizeObserver(report).observe($("previewArea"));
+  window.addEventListener("resize", report);
+  setInterval(report, 500);   // also when it moves without changing size (a splitter, the bar wrapping)
+  report();
+})();
+
+// The preview's bar: the kind of right-click, the folder and the item(s) in it (the app keeps them and sends them back).
+function showPreviewBar(b) {
+  const kindSel = $("pvKind");
+  if (kindSel.options.length !== b.kinds.length)
+    kindSel.replaceChildren(...b.kinds.map(k => { const o = el("option", "", k.name); o.value = k.kind; return o; }));
+  kindSel.value = b.kind;
+  $("pvFolder").textContent = b.folder || "";
+  $("pvNoFolder").hidden = !b.folder;
+  $("pvWhere").hidden = b.kind === "desktop";
+  const one = $("pvItem"), many = $("pvItems");
+  one.hidden = !(b.folder && b.pick === "one");
+  many.hidden = !(b.folder && b.pick === "many");
+  if (!one.hidden) {
+    one.replaceChildren(...b.entries.map(n => { const o = el("option", "", n); o.value = n; return o; }));
+    one.value = b.chosen[0] || "";
+  }
+  if (!many.hidden) {
+    const n = b.chosen.length;
+    $("pvItemsText").textContent = n === 0 ? "Choose items..." : n + (n === 1 ? " item: " : " items: ") + b.chosen.slice(0, 2).join(", ") + (n > 2 ? ", ..." : "");
+    $("pvItemsList").replaceChildren(...b.entries.map(name => {
+      const l = el("label"), cb = el("input");
+      cb.type = "checkbox";
+      cb.checked = b.chosen.includes(name);
+      cb.addEventListener("change", () => post({ type: "pickItems",
+        names: [...$("pvItemsList").querySelectorAll("input")].filter(c => c.checked).map(c => c.parentElement.textContent.trim()) }));
+      l.append(cb, " " + name);
+      return l;
+    }));
+  }
+  $("pvLast").disabled = !b.last;
+  $("pvNotMeant").hidden = !b.notMeant;
+  $("pvError").hidden = !b.liveError;
+  $("pvError").textContent = b.liveError || "";
+}
+$("pvKind").addEventListener("change", () => post({ type: "previewKind", kind: $("pvKind").value }));
+$("pvPick").addEventListener("click", () => post({ type: "pickFolder" }));
+$("pvNoFolder").addEventListener("click", () => post({ type: "noFolder" }));
+$("pvItem").addEventListener("change", () => post({ type: "pickItems", names: [$("pvItem").value] }));
+$("pvLast").addEventListener("click", () => post({ type: "last" }));
 document.addEventListener("keydown", async e => {
   const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
   if (typing || !layout) return;
@@ -773,6 +830,7 @@ document.addEventListener("keydown", async e => {
 chrome.webview.addEventListener("message", e => {
   const m = e.data;
   if (m.type === "state") load(m);
+  else if (m.type === "previewBar") showPreviewBar(m);
   else if (m.type === "theme") Theme.show(m.theme);
   else if (m.type === "problem") { $("error").hidden = false; $("error").textContent = m.text; }
   else if (m.type === "preview") { $("error").hidden = !m.error; $("error").textContent = m.error || ""; }

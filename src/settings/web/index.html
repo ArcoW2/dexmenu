@@ -49,6 +49,25 @@
       <h2 id="cardHeading">Card</h2>
       <div id="card"></div>
     </section>
+    <div class="splitter" title="Drag to resize"></div>
+    <!-- the preview: its bar here; its area is a window the DLL draws the menu into, placed over #previewArea -->
+    <section class="pane" id="previewPane">
+      <h2>Preview</h2>
+      <div id="previewBar">
+        <label>Right-click on <select id="pvKind"></select></label>
+        <span id="pvWhere">
+          in <span id="pvFolder" class="folder"></span>
+          <button id="pvPick" title="The folder in which the preview's right-click is">Folder...</button>
+          <button id="pvNoFolder" title="No folder: the items that kind of right-click showed (the seen items)">x</button>
+        </span>
+        <select id="pvItem" hidden></select>
+        <details id="pvItems" hidden><summary id="pvItemsText"></summary><div id="pvItemsList"></div></details>
+        <button id="pvLast" title="The kind, folder and items of the last right-click Dexmenu showed its menu for">Last right-click</button>
+        <div id="pvNotMeant" class="notmeant" hidden>This layout is not meant for this kind</div>
+        <div id="pvError" class="problem" hidden></div>
+      </div>
+      <div id="previewArea"></div>
+    </section>
   </main>
   <dialog id="nameDialog">
     <form method="dialog">

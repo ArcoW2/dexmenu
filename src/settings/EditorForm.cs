@@ -1,51 +1,40 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace Dexmenu.Settings;
 
 /// <summary>A layout's editor window (plan 00 steps 4 and 5; docs/plans/05-PLAN-settings-windows.md 3.6): one layout,
-/// named in the title; several can be open. Left, the layout editor (web\index.html in WebView2); right, the preview, a window DexmenuShell.dll draws the menu into from the layout being edited and the
-/// items that kind of right-click showed. Every edit goes to the preview at once; saving writes the layout file. The
-/// file, settings.json and the seen items are watched: a change reloads them (an unsaved edit is kept). An item hovered
-/// or clicked in the preview selects the card and rule that placed it; a card selected marks its items there.
-/// Above the preview: the kind of right-click, and a base folder with the item(s) right-clicked in it; with a folder
-/// the preview shows Windows' real menu of that right-click there (ShellMenu: a Git folder differs from an SVN one),
-/// the seen items' others striped; without one, the seen items of that kind.
-/// Every kind can be chosen for the preview; one this layout is not set for says so. Closing with unsaved changes
-/// asks to save them. With --selftest &lt;file&gt; it runs the editor's self-test (web\selftest.html) instead, writes
-/// its lines to the file and exits with the number of failures.</summary>
+/// named in the title; several can be open. The page (web\index.html in WebView2) fills the window with four panes:
+/// the rules, the cards, the selected card and the preview, with the same splitters between them. The preview pane's
+/// area is a window DexmenuShell.dll draws the menu into, from the layout being edited and the items that kind of
+/// right-click showed; the page tells where that area is (previewRect) and the window is placed over it. Every edit
+/// goes to the preview at once; saving writes the layout file. The file, settings.json and the seen items are
+/// watched: a change reloads them (an unsaved edit is kept). An item hovered or clicked in the preview selects the
+/// card and rule that placed it; a card selected marks its items there.
+/// The preview's bar (in the page): the kind of right-click, and a base folder with the item(s) right-clicked in it;
+/// with a folder the preview shows Windows' real menu of that right-click there (ShellMenu: a Git folder differs from
+/// an SVN one), the seen items' others striped; without one, the seen items of that kind. Every kind can be chosen;
+/// one this layout is not set for says so. Closing with unsaved changes asks to save them. With --selftest &lt;file&gt;
+/// it runs the editor's self-test (web\selftest.html) instead, writes its lines to the file and exits with the number
+/// of failures.</summary>
 sealed class EditorForm : Form, IThemed
 {
-    readonly Label notMeant = new() { AutoSize = true, ForeColor = Color.DarkGoldenrod, Padding = new Padding(0, 6, 0, 0),
-        Text = "This layout is not meant for this kind" };
     readonly WebView2 web = new() { Dock = DockStyle.Fill };
-    readonly Panel previewPanel = new() { Dock = DockStyle.Fill };
-    readonly FlowLayoutPanel previewBar = new() { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4) };
-    readonly ComboBox kindBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
-    readonly TextBox folderBox = new() { ReadOnly = true, Width = 230, PlaceholderText = "no folder: the seen items" };
-    readonly Button folderButton = new() { Text = "Folder...", AutoSize = true };
-    readonly Button noFolderButton = new() { Text = "x", Width = 24 };
-    readonly Button lastButton = new() { Text = "Last right-click", AutoSize = true };
-    bool applying;           // the bar set from the last right-click: its own change events wait
-    readonly bool startOnLast;   // no --kind given: the preview starts on the last right-click
-    readonly ComboBox itemBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
-    readonly Button itemsButton = new() { AutoSize = true };
-    readonly CheckedListBox itemsList = new() { CheckOnClick = true, Width = 260, Height = 300, BorderStyle = BorderStyle.None };
-    readonly ToolStripDropDown itemsDrop = new() { Padding = Padding.Empty };
-    readonly Label liveError = new() { AutoSize = true, ForeColor = Color.Firebrick, Padding = new Padding(0, 6, 0, 0) };
-    string? folder;          // the base folder; null: the seen items
-    string? liveSeen;        // Windows' real menu there, as seen items' text (merged with the seen file)
-    readonly SplitContainer split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterWidth = 6 };
+    readonly Panel previewHost = new() { Visible = false };   // over the page's preview area; the DLL draws in it
     readonly System.Windows.Forms.Timer settle = new() { Interval = 150 };
     readonly List<FileSystemWatcher> watchers = [];
     readonly Native.PreviewCallback callback;   // kept: the DLL holds it
     readonly string? selftest;
+    readonly bool startOnLast;   // no --kind given: the preview starts on the last right-click
     IntPtr preview;
     string kind;
-    string? currentFile;     // the layout file being edited; null: the built-in base layout
-    string? editedText;      // an edit not yet saved
+    string? folder;              // the preview's base folder; null: the seen items
+    List<string> entries = [];   // what can be right-clicked in it for the kind
+    List<string> chosen = [];    // the item(s) right-clicked there
+    string liveError = "";
+    string? liveSeen;            // Windows' real menu there, as seen items' text (merged with the seen file)
+    string? currentFile;         // the layout file being edited; null: the built-in base layout
+    string? editedText;          // an edit not yet saved
     bool pageReady;
 
     /// <summary>layoutFile: the layout this window edits (null: the built-in base layout, the tests).</summary>
@@ -57,24 +46,15 @@ sealed class EditorForm : Form, IThemed
         selftest = selftestFile;
         currentFile = layoutFile;
         kind = kindArgument ?? FirstKindOfThis() ?? DataFolder.SeenKinds().FirstOrDefault() ?? "file";
+        if (!Kinds.Any(x => x.Kind == kind)) kind = "file";
         startOnLast = kindArgument is null;
         SetTitle();
         callback = Placed;
-        split.Panel1.Controls.Add(web);
-        split.Panel2.Controls.Add(previewPanel);
-        split.Panel2.Controls.Add(previewBar);
-        previewPanel.BringToFront();   // docked last: the room the bar leaves
-        BuildPreviewBar();
-        Controls.Add(split);
+        Controls.Add(previewHost);
+        Controls.Add(web);
+        previewHost.BringToFront();
         settle.Tick += (_, _) => { settle.Stop(); Reload(); };
-        previewPanel.Resize += (_, _) => FitPreview();
-        // the splitter before the preview moves the panes while it is dragged (WinForms only draws a line, which the
-        // WebView2 page hides, and moves them on release)
-        split.SplitterMoving += (_, e) =>
-        {
-            var x = Math.Max(split.Panel1MinSize, Math.Min(e.SplitX, split.Width - split.Panel2MinSize - split.SplitterWidth));
-            if (x != split.SplitterDistance) split.SplitterDistance = x;
-        };
+        previewHost.Resize += (_, _) => FitPreview();
         HandleCreated += (_, _) => Themes.Apply(this, web);
         FormClosing += AskToSave;
         Load += async (_, _) => await Start();
@@ -83,6 +63,10 @@ sealed class EditorForm : Form, IThemed
     public string? LayoutName => currentFile is null ? null : Path.GetFileNameWithoutExtension(currentFile);
 
     void SetTitle() => Text = "Dexmenu - " + (LayoutName ?? "(built in)");
+
+    static readonly (string Kind, string Name)[] Kinds =
+        [("file", "a file"), ("folder", "a folder"), ("several", "several items"), ("background", "a folder's empty part"),
+         ("desktop", "the desktop's empty part"), ("drive", "a drive")];
 
     // A kind of right-click this layout is set for, for the preview to start on.
     string? FirstKindOfThis() =>
@@ -93,13 +77,7 @@ sealed class EditorForm : Form, IThemed
     public void ApplyTheme()
     {
         Themes.Apply(this, web);
-        // the splitter before the preview: in the line colour, so it shows on either theme (it is drawn in the
-        // SplitContainer's own colour; the panes keep the window's)
-        split.BackColor = Themes.Dark ? Color.FromArgb(0x3A, 0x3A, 0x3A) : Color.FromArgb(0xD0, 0xD0, 0xD0);
-        split.Panel1.BackColor = split.Panel2.BackColor = BackColor;
-        previewBar.BackColor = BackColor;
-        previewBar.ForeColor = ForeColor;
-        if (preview != IntPtr.Zero) Native.MoveWindow(preview, 0, 0, previewPanel.ClientSize.Width, previewPanel.ClientSize.Height, true);
+        previewHost.BackColor = BackColor;
         Post(new { type = "theme", theme = DataFolder.Theme });
         Reload();
     }
@@ -125,24 +103,19 @@ sealed class EditorForm : Form, IThemed
 
     async Task Start()
     {
-        // Each half a minimum (plan 05 3.6): the page holds its three panes at their minimum (rules 160, cards 260, the
-        // card's panel 200 CSS pixels, the splitters and the scrollbar), the preview a narrow menu; the window not
-        // smaller than both.
+        // The window's minimum: the page's four panes at their minimum (rules 160, cards 260, the card's panel 200, the
+        // preview 300 CSS pixels, with the splitters), in the display's scale; the starting size within the screen.
         var scale = DeviceDpi / 96.0;
-        split.Panel1MinSize = (int)Math.Ceiling(660 * scale);
-        split.Panel2MinSize = (int)Math.Ceiling(300 * scale);
-        MinimumSize = SizeFromClientSize(new Size(split.Panel1MinSize + split.Panel2MinSize + split.SplitterWidth, (int)(520 * scale)));
-        // the starting size in the display's scale, within the screen
+        MinimumSize = SizeFromClientSize(new Size((int)Math.Ceiling(940 * scale), (int)(520 * scale)));
         var screen = Screen.FromControl(this).WorkingArea;
         Size = new Size(Math.Min(screen.Width, Math.Max(MinimumSize.Width, (int)(1500 * scale))),
             Math.Min(screen.Height, Math.Max(MinimumSize.Height, (int)(820 * scale))));
         CenterToScreen();
-        split.SplitterDistance = Math.Max(split.Panel1MinSize, ClientSize.Width * 70 / 100);   // the page's three panes, then the preview
         if (selftest is null)
         {
-            preview = Native.DexmenuPreviewCreate(previewPanel.Handle);
+            preview = Native.DexmenuPreviewCreate(previewHost.Handle);
             if (preview != IntPtr.Zero) Native.DexmenuPreviewSetCallback(preview, callback);
-            FitPreview();
+            FillItems();
             Watch();
             if (startOnLast) ApplyLastRightClick();
             Reload();
@@ -151,70 +124,26 @@ sealed class EditorForm : Form, IThemed
             () => { pageReady = true; ApplyTheme(); });
     }
 
-    static readonly (string Kind, string Name)[] Kinds =
-        [("file", "a file"), ("folder", "a folder"), ("several", "several items"), ("background", "a folder's empty part"),
-         ("desktop", "the desktop's empty part"), ("drive", "a drive")];
-
-    void BuildPreviewBar()
-    {
-        Label Text(string t) => new() { Text = t, AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
-        foreach (var (k, name) in Kinds) kindBox.Items.Add(name);
-        if (!Kinds.Any(x => x.Kind == kind)) kind = "file";
-        kindBox.SelectedIndex = Array.FindIndex(Kinds, x => x.Kind == kind);
-        itemsDrop.Items.Add(new ToolStripControlHost(itemsList) { Padding = Padding.Empty, AutoSize = false, Size = itemsList.Size });
-        previewBar.Controls.AddRange([Text("Right-click on"), kindBox, Text("in"), folderBox, folderButton, noFolderButton, itemBox, itemsButton,
-            lastButton, notMeant, liveError]);
-        kindBox.SelectedIndexChanged += (_, _) => { if (applying) return; kind = Kinds[kindBox.SelectedIndex].Kind; FillItems(); Live(); Reload(); };
-        lastButton.Click += (_, _) => ApplyLastRightClick();
-        lastButton.Enabled = DataFolder.LastRightClick() is not null;
-        folderButton.Click += (_, _) =>
-        {
-            using var dialog = new FolderBrowserDialog { SelectedPath = folder ?? "", Description = "The folder in which the preview's right-click is" };
-            if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            folder = dialog.SelectedPath;
-            FillItems();
-            Live();
-            Reload();
-        };
-        noFolderButton.Click += (_, _) => { folder = null; FillItems(); Live(); Reload(); };
-        itemBox.SelectedIndexChanged += (_, _) => { if (itemBox.Visible && !applying) { Live(); Reload(); } };
-        itemsButton.Click += (_, _) => itemsDrop.Show(itemsButton, 0, itemsButton.Height);
-        itemsList.ItemCheck += (_, _) => { if (!applying) BeginInvoke(() => { ItemsButtonText(); Live(); Reload(); }); };
-        FillItems();
-    }
-
     // The preview set to the last right-click Dexmenu showed its menu for (DataFolder.LastRightClick): its kind, its
     // folder and the items right-clicked there, so the live menu is that right-click's.
     void ApplyLastRightClick()
     {
         if (DataFolder.LastRightClick() is not { } last || !Kinds.Any(x => x.Kind == last.Kind) || !Directory.Exists(last.Folder)) return;
-        applying = true;
-        try
-        {
-            kind = last.Kind;
-            kindBox.SelectedIndex = Array.FindIndex(Kinds, x => x.Kind == kind);
-            folder = last.Folder;
-            FillItems();
-            var names = last.Items.Select(Path.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (itemBox.Visible)
-                for (var i = 0; i < itemBox.Items.Count; i++)
-                    if (itemBox.Items[i] is string name && names.Contains(name)) { itemBox.SelectedIndex = i; break; }
-            if (itemsButton.Visible)
-                for (var i = 0; i < itemsList.Items.Count; i++) itemsList.SetItemChecked(i, itemsList.Items[i] is string name && names.Contains(name));
-            ItemsButtonText();
-        }
-        finally { applying = false; }
+        kind = last.Kind;
+        folder = last.Folder;
+        FillItems();
+        var names = last.Items.Select(Path.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var picked = entries.Where(names.Contains).ToList();
+        if (picked.Count > 0) chosen = kind == "several" ? picked : [picked[0]];
         Live();
         Reload();
     }
 
     // The items the kind right-clicks in the folder: files (a file), subfolders (a folder), both (several); the first
-    // ones chosen. The folder's empty part and the drive need none.
+    // ones chosen. The folder's empty part, the desktop's and the drive need none.
     void FillItems()
     {
-        folderBox.Text = folder ?? "";
-        noFolderButton.Visible = folder is not null;
-        var entries = new List<string>();
+        entries = [];
         if (folder is not null && Directory.Exists(folder))
         {
             var info = new DirectoryInfo(folder);
@@ -228,25 +157,12 @@ sealed class EditorForm : Form, IThemed
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
-        var one = folder is not null && kind is "file" or "folder";
-        itemBox.Visible = false;
-        itemBox.Items.Clear();
-        if (one)
+        chosen = kind switch
         {
-            itemBox.Items.AddRange([.. entries]);
-            if (entries.Count > 0) itemBox.SelectedIndex = 0;
-        }
-        itemBox.Visible = one;
-        itemsList.Items.Clear();
-        for (var i = 0; i < entries.Count; i++) itemsList.Items.Add(entries[i], kind == "several" && i < 2);
-        itemsButton.Visible = folder is not null && kind == "several";
-        ItemsButtonText();
-    }
-
-    void ItemsButtonText()
-    {
-        var n = itemsList.CheckedItems.Count;
-        itemsButton.Text = n == 0 ? "Choose items..." : n + (n == 1 ? " item: " : " items: ") + string.Join(", ", itemsList.CheckedItems.Cast<string>().Take(2)) + (n > 2 ? ", ..." : "");
+            "file" or "folder" => entries.Take(1).ToList(),
+            "several" => entries.Take(2).ToList(),
+            _ => [],
+        };
     }
 
     // Windows' real menu of the right-click in the folder, or none (the seen items). The desktop's empty part is the
@@ -254,28 +170,17 @@ sealed class EditorForm : Form, IThemed
     void Live()
     {
         liveSeen = null;
-        liveError.Text = "";
+        liveError = "";
         if (kind == "desktop")
         {
             liveSeen = ShellMenu.SeenOf(Handle, "background", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), [],
-                DataFolder.ReadSeen(kind), out var desktopError);
-            liveError.Text = desktopError;
+                DataFolder.ReadSeen(kind), out liveError);
             return;
         }
         if (folder is null) return;
-        IReadOnlyList<string> chosen = kind switch
-        {
-            "file" or "folder" => itemBox.SelectedItem is string s ? [Path.Combine(folder, s)] : [],
-            "several" => itemsList.CheckedItems.Cast<string>().Select(s => Path.Combine(folder, s)).ToList(),
-            _ => [],
-        };
-        if (kind is "file" or "folder" or "several" && chosen.Count == 0) { liveError.Text = "nothing to right-click here"; return; }
+        if (kind is "file" or "folder" or "several" && chosen.Count == 0) { liveError = "nothing to right-click here"; return; }
         Cursor = Cursors.WaitCursor;
-        try
-        {
-            liveSeen = ShellMenu.SeenOf(Handle, kind, folder, chosen, DataFolder.ReadSeen(kind), out var error);
-            liveError.Text = error;
-        }
+        try { liveSeen = ShellMenu.SeenOf(Handle, kind, folder, chosen.Select(c => Path.Combine(folder, c)).ToList(), DataFolder.ReadSeen(kind), out liveError); }
         finally { Cursor = Cursors.Default; }
     }
 
@@ -284,7 +189,7 @@ sealed class EditorForm : Form, IThemed
     void FitPreview()
     {
         if (preview != IntPtr.Zero)
-            Native.MoveWindow(preview, 0, 0, previewPanel.ClientSize.Width, previewPanel.ClientSize.Height, true);
+            Native.MoveWindow(preview, 0, 0, previewHost.ClientSize.Width, previewHost.ClientSize.Height, true);
     }
 
     // The layout file's folder, the data folder (settings.json) and the seen items: a change reloads (after it settles).
@@ -294,10 +199,10 @@ sealed class EditorForm : Form, IThemed
         watchers.Clear();
         var folders = new List<string> { DataFolder.SeenFolder, DataFolder.Root };
         if (currentFile is not null && Path.GetDirectoryName(currentFile) is string dir) folders.Add(dir);
-        foreach (var folder in folders.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var f in folders.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (!Directory.Exists(folder)) continue;
-            var w = new FileSystemWatcher(folder) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName, EnableRaisingEvents = true };
+            if (!Directory.Exists(f)) continue;
+            var w = new FileSystemWatcher(f) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName, EnableRaisingEvents = true };
             w.Changed += Changed;
             w.Created += Changed;
             w.Renamed += Changed;
@@ -319,26 +224,38 @@ sealed class EditorForm : Form, IThemed
         return Native.BaseLayout();
     }
 
+    // The preview's bar as the page shows it.
+    void PostPreviewBar()
+    {
+        // a kind this layout is not set for (as the DLL decides; tests: one layout for every kind)
+        var notMeant = LayoutName is { } me && Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is not { Length: > 0 }
+            && !string.Equals(DataFolder.Resolve(kind), me, StringComparison.OrdinalIgnoreCase);
+        Post(new
+        {
+            type = "previewBar",
+            kinds = Kinds.Select(k => new { kind = k.Kind, name = k.Name }),
+            kind, folder, entries, chosen,
+            pick = kind switch { "file" or "folder" => "one", "several" => "many", _ => "none" },
+            liveError, notMeant, last = DataFolder.LastRightClick() is not null,
+        });
+    }
+
     // The preview from the edit in progress or the file; the page gets the file's state when nothing is being edited.
     void Reload()
     {
         if (selftest is not null) return;
-        lastButton.Enabled = DataFolder.LastRightClick() is not null;
-        // a kind this layout is not set for (as the DLL decides; tests: one layout for every kind)
-        notMeant.Visible = LayoutName is { } me && Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is not { Length: > 0 }
-            && !string.Equals(DataFolder.Resolve(kind), me, StringComparison.OrdinalIgnoreCase);
         var text = FileText(out var source);
         var error = preview == IntPtr.Zero
             ? "DexmenuShell.dll did not make the preview"
             : Native.SetPreview(preview, editedText ?? text, SeenText(), kind);
         if (!pageReady) return;
+        PostPreviewBar();
         if (editedText is not null)
         {
             Post(new { type = "preview", error });
             return;
         }
-        Post(new { type = "state", kind, kindName = Kinds.FirstOrDefault(x => x.Kind == kind).Name ?? kind, layout = text, source,
-            name = LayoutName, theme = DataFolder.Theme, error });
+        Post(new { type = "state", kind, layout = text, source, name = LayoutName, theme = DataFolder.Theme, error });
     }
 
     void Post(object message) => web.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message));
@@ -375,11 +292,45 @@ sealed class EditorForm : Form, IThemed
                 break;
             case "theme":
                 DataFolder.Theme = Str("theme");
-                DexmenuApp.Instance?.ThemeChanged();
-                if (DexmenuApp.Instance is null) ApplyTheme();
+                DexmenuApp.Instance.ThemeChanged();
                 break;
             case "mark":
                 if (preview != IntPtr.Zero) Native.DexmenuPreviewMark(preview, Str("cardId"));
+                break;
+            case "previewRect":
+                // the page's preview area (CSS pixels, within the page) as the preview window's place
+                var scale = DeviceDpi / 96.0;
+                var r = new Rectangle((int)Math.Round(m.GetProperty("x").GetDouble() * scale), (int)Math.Round(m.GetProperty("y").GetDouble() * scale),
+                    (int)Math.Round(m.GetProperty("w").GetDouble() * scale), (int)Math.Round(m.GetProperty("h").GetDouble() * scale));
+                previewHost.Bounds = r;
+                previewHost.Visible = r.Width > 0 && r.Height > 0;
+                break;
+            case "previewKind":
+                if (Kinds.Any(x => x.Kind == Str("kind"))) { kind = Str("kind"); FillItems(); Live(); Reload(); }
+                break;
+            case "pickFolder":
+                using (var dialog = new FolderBrowserDialog { SelectedPath = folder ?? "", Description = "The folder in which the preview's right-click is" })
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK) break;
+                    folder = dialog.SelectedPath;
+                }
+                FillItems();
+                Live();
+                Reload();
+                break;
+            case "noFolder":
+                folder = null;
+                FillItems();
+                Live();
+                Reload();
+                break;
+            case "pickItems":
+                chosen = m.GetProperty("names").EnumerateArray().Select(n => n.GetString() ?? "").Where(entries.Contains).ToList();
+                Live();
+                Reload();
+                break;
+            case "last":
+                ApplyLastRightClick();
                 break;
         }
     }
@@ -408,7 +359,7 @@ sealed class EditorForm : Form, IThemed
                 if (LayoutFiles.Problem(name) is { } problem) { Post(new { type = "problem", text = "not saved: " + problem }); return false; }
                 var from = LayoutName!;
                 LayoutFiles.Rename(from, name);
-                foreach (var other in DexmenuApp.Instance?.Editors ?? []) if (other != this && other.LayoutName == from) other.FileRenamed(path);
+                foreach (var other in DexmenuApp.Instance.Editors) if (other != this && other.LayoutName == from) other.FileRenamed(path);
             }
         }
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);

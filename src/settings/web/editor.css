@@ -33,6 +33,19 @@ body { display: flex; flex-direction: column; }
 #panes > .pane { border-bottom: none; overflow: auto; min-width: 160px; box-sizing: border-box; }
 #cardsPane { min-width: 260px; }
 #cardPane { min-width: 200px; }
+#previewPane { min-width: 300px; flex: 1.2 1 0; display: flex; flex-direction: column; overflow: hidden; }
+#previewBar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+#previewBar .folder { color: var(--dim); overflow-wrap: anywhere; }
+#previewBar .folder:empty::before { content: "no folder: the seen items"; font-style: italic; }
+#previewBar select { max-width: 100%; }
+#pvItems { flex-basis: 100%; }
+#pvItems summary { cursor: pointer; border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; }
+/* open inside the bar (the preview window lies over the page below it: nothing may float there) */
+#pvItemsList { background: var(--card); border: 1px solid var(--line); border-radius: 4px; max-height: 220px; overflow: auto;
+  padding: 4px 8px; margin-top: 4px; }
+#pvItemsList label { display: block; white-space: nowrap; }
+.notmeant { color: #b8860b; width: 100%; font-size: 12px; }
+#previewArea { flex: 1; min-height: 200px; }
 #rulesPane { flex: 1 1 0; }
 #cardsPane { flex: 1.3 1 0; }
 #cardPane { flex: 1.3 1 0; }   /* takes the rest: never given a fixed width */
