@@ -26,7 +26,8 @@ uses
   Winapi.Windows, System.Generics.Collections, Dexmenu.Tree, Dexmenu.Layout;
 
 type
-  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote);   // vkNote: a note card (Card), no button
+  // vkNote: a note card (Card), no button; vkBack: "<<" at the top of a submenu that replaced its menu (plan 02 3.7)
+  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack);
 
   TFound = record
     Node: TNode;
@@ -42,6 +43,7 @@ type
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
+    BackTitle: string;  // vkBack: "<<" and what it goes back from
     function Title: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
@@ -100,6 +102,10 @@ function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
 // The hint shown on hover over a card: its layout card's hint (a text, or a regex on the item's own hint), else the
 // item's own hint (Regular: from the seen items, Dexmenu.Seen.HintsOf); '' for none.
 function ShownHint(V: TViewCard; const Regular: string): string;
+// How the submenu of a card opens (plan 02 3.7): its layout card's own "submenus", else the global setting.
+function SubmenuModeOf(V: TViewCard; const Settings: TMenuSettings): TSubmenuMode;
+// "<<" at the top of a level that replaced its menu: back to the menu it replaced.
+procedure AddBackLine(Level: TViewLevel; Opener: TViewCard);
 
 implementation
 
@@ -109,6 +115,26 @@ uses
 function TPlacement.Hides(Node: TNode): Boolean;
 begin
   Result := (Empty <> nil) and (Node.SubMenu <> 0) and Empty.ContainsKey(Node.SubMenu);
+end;
+
+function SubmenuModeOf(V: TViewCard; const Settings: TMenuSettings): TSubmenuMode;
+begin
+  Result := Settings.Submenus;
+  if (V <> nil) and (V.Card <> nil) and (V.Card.SubmenuMode <> smDefault) then
+    Result := V.Card.SubmenuMode;
+end;
+
+procedure AddBackLine(Level: TViewLevel; Opener: TViewCard);
+var
+  Line: TViewLine;
+  V: TViewCard;
+begin
+  V := TViewCard.Create;
+  V.Kind := vkBack;
+  V.BackTitle := '<<  ' + Opener.Title;
+  Line := TViewLine.Create;
+  Line.Cards.Add(V);
+  Level.Lines.Insert(0, Line);
 end;
 
 function KeyOf(Node: TNode): string;
@@ -134,6 +160,7 @@ begin
           end;
       end;
     vkNote: Result := Card.NoteText;
+    vkBack: Result := BackTitle;
     vkMenu:
       if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
@@ -148,7 +175,7 @@ function TViewCard.Enabled: Boolean;
 begin
   case Kind of
     vkItem: Result := Node.Enabled;
-    vkMenu: Result := True;
+    vkMenu, vkBack: Result := True;
   else
     Result := False;
   end;

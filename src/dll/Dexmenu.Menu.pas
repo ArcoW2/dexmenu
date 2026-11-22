@@ -34,6 +34,7 @@ type
     ScrollY: Single;     // DIP
     VisibleHeight: Single;
     Opener: TViewCard;   // the card in the level above that opened it; nil at the top
+    Replaces: Boolean;   // opened in place of the level above (that one hidden until this one closes; "<<" back)
     destructor Destroy; override;
     procedure Redraw;
     function BoxOfCard(V: TViewCard): Integer;
@@ -62,6 +63,8 @@ type
     FChosen: UINT;
     FRefreshPosted: Boolean;
     FHoverTimerLevel: Integer;
+    FSettings: TMenuSettings;   // the global settings (settings.json "menu"), read when the menu shows
+    function OpensOnHover(V: TViewCard): Boolean;
     procedure HoverTip(L: TLevelWindow; Box: Integer);
     procedure ShowTip(L: TLevelWindow);
     procedure HideTip;
@@ -304,6 +307,7 @@ begin
     SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(FOriginal), MakeLParam(0, 0));
   end;
   FTop := ReadLevel(FOriginal, '');
+  FSettings := MenuSettings;
   FHints := HintsOf(ReadSeenText(FKind));
   FDeep := RulesLookDeeper(FLayout, FKind);
   FindEmpty(FTop);
@@ -385,8 +389,20 @@ begin
     // one opened early stays open until the menu closes (Run)
     if Notify and (L.Opener <> nil) and (L.Opener.Kind = vkItem) and not FEarly.Contains(L.Opener.Node.SubMenu) then
       SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(L.Opener.Node.SubMenu), 0);
+    if L.Replaces then
+    begin
+      // the level it replaced shows again
+      ShowWindow(FLevels[I - 1].Wnd, SW_SHOWNOACTIVATE);
+      FLevels[I - 1].Redraw;
+    end;
     FLevels.Delete(I);
   end;
+end;
+
+// Submenus open on hover unless only on a click is set, or they open in place of the menu (plan 02 3.7).
+function TMenuSession.OpensOnHover(V: TViewCard): Boolean;
+begin
+  Result := not FSettings.OnClickOnly and (SubmenuModeOf(V, FSettings) <> smReplace);
 end;
 
 procedure TMenuSession.Cancel;
@@ -405,6 +421,7 @@ end;
 
 procedure TMenuSession.Open(LevelIndex, Box: Integer; SelectFirst: Boolean);
 var
+  Mode: TSubmenuMode;
   Parent, L: TLevelWindow;
   V: TViewCard;
   R: TD2D1RectF;
@@ -442,13 +459,32 @@ begin
     FindEmpty(V.Node.Children);
     L.View := FPlacement.SubmenuLevel(V.Node);
   end;
+  Mode := SubmenuModeOf(V, FSettings);
+  L.Replaces := Mode = smReplace;
+  if L.Replaces then
+    AddBackLine(L.View, V);
   FLevels.Add(L);
   L.Wnd := MakeWindow(L.Index, False);
   SetWindowLongPtr(L.Wnd, GWLP_USERDATA, LONG_PTR(L));
 
+  // where it opens (plan 02 3.7): next to its card, under it from its middle (over the lines below), or in place of
+  // the menu
   R := Parent.Geometry.Boxes[Box].Rect;
-  X := Parent.Pos.X + Round(R.right * Parent.Scale) - 2;
-  Y := Parent.Pos.Y + Round((R.top - Parent.ScrollY - OuterPad) * Parent.Scale);
+  case Mode of
+    smUnder:
+      begin
+        X := Parent.Pos.X + Round((R.left + 16) * Parent.Scale);
+        Y := Parent.Pos.Y + Round(((R.top + R.bottom) / 2 - Parent.ScrollY) * Parent.Scale);
+      end;
+    smReplace:
+      begin
+        X := Parent.Pos.X;
+        Y := Parent.Pos.Y;
+      end;
+  else
+    X := Parent.Pos.X + Round(R.right * Parent.Scale) - 2;
+    Y := Parent.Pos.Y + Round((R.top - Parent.ScrollY - OuterPad) * Parent.Scale);
+  end;
   SetWindowPos(L.Wnd, 0, X, Y, 1, 1, SWP_NOZORDER or SWP_NOACTIVATE);
   Dpi := GetDpiForWindow(L.Wnd);
   if Dpi = 0 then
@@ -456,6 +492,8 @@ begin
   L.Scale := Dpi / 96;
   L.Geometry := Measure(L.View);
   FitOnScreen(L, X, Y, False, False, Parent.Pos.X + Round(R.left * Parent.Scale) + 2);
+  if L.Replaces then
+    ShowWindow(Parent.Wnd, SW_HIDE);
   if SelectFirst then
     MoveSelection(L, 1);
   L.Redraw;
@@ -527,7 +565,9 @@ begin
       if (V <> nil) and V.HasSubmenu then
         Open(L.Index, L.Selected, True);
     VK_RETURN, VK_SPACE:
-      if V <> nil then
+      if (V <> nil) and (V.Kind = vkBack) then
+        CloseFrom(L.Index)
+      else if V <> nil then
         if V.HasSubmenu then
           Open(L.Index, L.Selected, True)
         else
@@ -775,6 +815,8 @@ begin
             FindEmpty(Found.Node.Children);
             L.View := NewPlacement.SubmenuLevel(Found.Node);
           end;
+          if L.Replaces then
+            AddBackLine(L.View, Found);
         end;
       end;
       L.Geometry := Measure(L.View);
@@ -835,6 +877,7 @@ begin
           vkItem: begin Kind := 'item'; Id := V.Node.Id; end;
           vkMenu: Kind := 'menu';
           vkNote: Kind := 'note';
+          vkBack: Kind := 'back';
         else
           Kind := 'separator';
         end;
@@ -882,7 +925,7 @@ begin
           L.Redraw;
           S.HoverTip(L, Box);
           KillTimer(Wnd, HoverTimer);
-          if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu then
+          if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu and S.OpensOnHover(L.Geometry.Boxes[Box].Card) then
           begin
             Delay := 400;
             SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, @Delay, 0);
@@ -925,7 +968,9 @@ begin
         if Box >= 0 then
         begin
           V := L.Geometry.Boxes[Box].Card;
-          if V.HasSubmenu and (S.FLevels.Count > L.Index + 1) and (S.FLevels[L.Index + 1].Opener = V) then
+          if V.Kind = vkBack then
+            S.CloseFrom(L.Index)   // "<<": back to the menu this one replaced
+          else if V.HasSubmenu and (S.FLevels.Count > L.Index + 1) and (S.FLevels[L.Index + 1].Opener = V) then
             S.CloseFrom(L.Index + 1)   // a click on the card of an open submenu closes it
           else if V.HasSubmenu then
             S.Open(L.Index, Box, False)

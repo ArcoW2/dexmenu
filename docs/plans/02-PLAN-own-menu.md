@@ -6,6 +6,7 @@ Status: partly executed; see Status.
 - 2026-11-21: partly executed: the item tree and the window's first form (plan 00 steps 2 and 3).
 - 2026-11-21: partly executed: the preview's first form (plan 00 step 4).
 - 2026-11-22: partly executed: the rules, layout editing, layouts and the preview (plan 00 step 5 and after; plan 05).
+- 2026-11-22: partly executed: note cards; how submenus open.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -44,6 +45,7 @@ the preview is the result.
 | Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the priority list, several found at the card's place, `also`, `consume`, `skipDuplicates`, hidden cards, the remaining card; submenus filled only when opened opened first for rules that look inside | 3.3; plan 00 6.5 |
 | Layout editing | the cards view and the rules view (priority list, draggable); dragging cards and dividers (onto a card, beside, above or below), the remaining card; preview and editor tied; comments, hints | 3.5; plan 00 6.5; plan 05 6.3 |
 | Layouts | saved under a name, JSON with comments, one menu per layout; which kinds use which layout: plan 05 | 3.4; 3.5; plan 05 |
+| Submenus | `next` (beside the card), `under` (from the card's middle, over the lines below), `replace` (in place of the menu, "<<" back, on a click only); on hover or only on a click; set for every menu (main window, settings.json `menu`) or per card (`submenus`); the same in the preview | 3.4; 3.7 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -51,8 +53,7 @@ the preview is the result.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Global settings | the settings for every layout (submenus on hover or on click, the most used row's size, ...) | -- | 3.4 |
-| Submenus | half under, or in place of the menu (with `<<`); on click only | Global settings | 3.7 |
+| Global settings, the rest | marks, menu width per level, the default states of a rule, the most used row, animation (submenus and `onClickOnly` are built; themes are plan 03; the active layout is plan 05's kinds) | -- | 3.4 |
 | Edit menu | "Edit menu..." in the menu: the settings app's layout editor opened on this menu as it is | -- | 3.6 |
 | Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | -- | 3.8 |
 | Use counts | every choice counted per item; the most used row; counts shown while editing | -- | 3.9 |

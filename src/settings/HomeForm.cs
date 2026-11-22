@@ -91,6 +91,7 @@ sealed class HomeForm : Form, IThemed
             kinds = DataFolder.Kinds().Select(k => new { kind = k.Kind, name = DataFolder.KindNames.GetValueOrDefault(k.Kind, k.Kind), layout = k.Layout }),
             layouts = layouts.Select(n => new { name = n, kinds = LayoutFiles.KindsOf(n).Select(k => DataFolder.KindNames.GetValueOrDefault(k, k)) }),
             theme = Themes.Name,
+            menu = new { submenus = DataFolder.Menu.Submenus, onClickOnly = DataFolder.Menu.OnClickOnly },
         });
     }
 
@@ -122,6 +123,11 @@ sealed class HomeForm : Form, IThemed
                     break;
                 case "setKind":
                     DataFolder.SetLayout(Str("kind"), m.TryGetProperty("layout", out var l) && l.ValueKind == JsonValueKind.String ? l.GetString() : null);
+                    PostState();
+                    break;
+                case "setMenu":
+                    DataFolder.Menu = (Str("submenus") is "under" or "replace" ? Str("submenus") : "next",
+                        m.TryGetProperty("onClickOnly", out var c) && c.ValueKind == JsonValueKind.True);
                     PostState();
                     break;
                 case "moveKind":

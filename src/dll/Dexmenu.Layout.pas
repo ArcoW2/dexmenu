@@ -39,6 +39,15 @@ type
   end;
 
   TNoteAlign = (naLeft, naText, naCenter, naRight);   // a note's text: left, with the items' text, center, right
+  // How a submenu opens (plan 02 3.4, 3.7): as the global setting, next to its card, under it (from its middle), or
+  // in place of the menu (with "<<" back)
+  TSubmenuMode = (smDefault, smNext, smUnder, smReplace);
+
+  // The global settings for every menu (settings.json "menu"; plan 02 3.4).
+  TMenuSettings = record
+    Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
+    OnClickOnly: Boolean;     // submenus open only on a click, never on hover
+  end;
 
   TCard = class
   public
@@ -61,6 +70,7 @@ type
     IsNote: Boolean;
     NoteText: string;
     NoteAlign: TNoteAlign;   // "align": left (default), text (with the items' text), center, right
+    SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -99,6 +109,9 @@ function ParseLayout(const Text, Source: string; out Error: string): ILayout;
 // base layout. DEXMENU_LAYOUT_FILE (the tests): that file for every kind. nil and Error set when the file cannot be
 // used. Each file is read again when it changes.
 function CurrentLayout(const Kind: string; out ToWindows: Boolean; out Error: string): ILayout;
+// The global settings (settings.json "menu": { "submenus": "next" | "under" | "replace", "onClickOnly": true });
+// next and on hover when not set.
+function MenuSettings: TMenuSettings;
 // The file CurrentLayout reads for a kind, or '' for the built-in base layout or Windows' menu (ToWindows).
 function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
 
@@ -196,6 +209,18 @@ function ParseLines(Value: TJSONValue; const Where: string; Parent: TCard; Lines
 threadvar
   NextCardId: Integer;   // ids made up per parse; a layout may be parsed on several threads
 
+function ParseSubmenuMode(const Text: string): TSubmenuMode;
+begin
+  if Text = 'under' then
+    Result := smUnder
+  else if Text = 'replace' then
+    Result := smReplace
+  else if Text = 'next' then
+    Result := smNext
+  else
+    Result := smDefault;
+end;
+
 function ParseCard(Value: TJSONValue; const Where: string; Parent: TCard; out Card: TCard; var Error: string): Boolean;
 var
   Obj: TJSONObject;
@@ -256,6 +281,8 @@ begin
       if TJSONObject(Obj.GetValue('hint')).GetValue('replace') <> nil then
         Card.HintTo := TJSONObject(Obj.GetValue('hint')).GetValue('replace').Value;
     end;
+    if Obj.GetValue('submenus') is TJSONString then
+      Card.SubmenuMode := ParseSubmenuMode(Obj.GetValue('submenus').Value);
     if Obj.GetValue('skipDuplicates') is TJSONBool then
       Card.SkipDuplicates := TJSONBool(Obj.GetValue('skipDuplicates')).AsBoolean;
     if Obj.GetValue('hidden') is TJSONBool then
@@ -458,6 +485,33 @@ var
   Lock: TCriticalSection;
   Cache: TObjectDictionary<string, TCached>;   // per layout file, read again when it changes
   Base: ILayout;
+
+function MenuSettings: TMenuSettings;
+var
+  Text, Error: string;
+  Settings, Menu: TJSONValue;
+begin
+  Result.Submenus := smNext;
+  Result.OnClickOnly := False;
+  if not ReadTextFile(DataFolder + '\settings.json', Text) then
+    Exit;
+  Settings := ParseWithComments(Text, Error);
+  try
+    if not (Settings is TJSONObject) then
+      Exit;
+    Menu := TJSONObject(Settings).GetValue('menu');
+    if not (Menu is TJSONObject) then
+      Exit;
+    if TJSONObject(Menu).GetValue('submenus') is TJSONString then
+      Result.Submenus := ParseSubmenuMode(TJSONObject(Menu).GetValue('submenus').Value);
+    if Result.Submenus = smDefault then
+      Result.Submenus := smNext;
+    if TJSONObject(Menu).GetValue('onClickOnly') is TJSONBool then
+      Result.OnClickOnly := TJSONBool(TJSONObject(Menu).GetValue('onClickOnly')).AsBoolean;
+  finally
+    Settings.Free;
+  end;
+end;
 
 // Whether a kind set in settings.json fits a right-click's kind: itself, the same kind outside a dialog, or default.
 function Fits(const SetKind, Kind: string): Boolean;

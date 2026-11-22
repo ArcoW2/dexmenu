@@ -28,6 +28,15 @@
           <button id="restart" title="Explorer takes a registration change only when it starts again; its windows close">Restart Explorer</button>
         </div>
       </div>
+      <h3>Every menu</h3>
+      <div id="menuSettings" class="settings">
+        <label>Submenus open <select id="submenus">
+          <option value="next">next to their card</option>
+          <option value="under">under their card</option>
+          <option value="replace">in place of the menu (&lt;&lt; back)</option>
+        </select></label>
+        <label><input type="checkbox" id="onClickOnly"> only on a click, not on hover</label>
+      </div>
       <h3>Which layout each right-click gets <span class="hint">(tried from the top: the first that fits and is set decides, Not set passes to the next; drag to reorder)</span></h3>
       <ol id="kinds" class="list"></ol>
     </section>

@@ -136,6 +136,9 @@ $("rename").addEventListener("click", async () => {
   if (n && n !== selected) { post({ type: "rename", from: selected, to: n }); selected = n; }
 });
 $("delete").addEventListener("click", async () => { if (selected && await confirmDelete(selected)) post({ type: "delete", name: selected }); });
+const postMenu = () => post({ type: "setMenu", submenus: $("submenus").value, onClickOnly: $("onClickOnly").checked });
+$("submenus").addEventListener("change", postMenu);
+$("onClickOnly").addEventListener("change", postMenu);
 $("register").addEventListener("click", () => post({ type: "register" }));
 $("unregister").addEventListener("click", () => post({ type: "unregister" }));
 $("restart").addEventListener("click", () => post({ type: "restart" }));
@@ -179,6 +182,9 @@ chrome.webview.addEventListener("message", e => {
     $("problem").hidden = true;
     Theme.show(m.theme);
     renderRegistration(m.registration);
+    $("submenus").value = m.menu.submenus;
+    $("onClickOnly").checked = m.menu.onClickOnly;
+    $("onClickOnly").disabled = m.menu.submenus === "replace";   // in place of the menu: always on a click
     renderKinds();
     renderLayouts();
   } else if (m.type === "problem") {

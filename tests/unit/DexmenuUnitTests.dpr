@@ -174,6 +174,11 @@ begin
   L := CurrentLayout('file', ToWindows, Error);
   Check((L <> nil) and L.Lines('')[0].Cards[0].IsNote and (Pos('needs updating', L.Lines('')[0].Cards[0].NoteText) > 0) and
     L.Lines('')[1].Cards[0].IsRemaining, 'a newer format: a note with the warning, then the remaining card');
+  // the global menu settings (plan 02 3.4): how submenus open, on a click only
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "submenus": "replace", "onClickOnly": true } }');
+  Check((MenuSettings.Submenus = smReplace) and MenuSettings.OnClickOnly, 'the menu settings read: replace, on a click only');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ }');
+  Check((MenuSettings.Submenus = smNext) and not MenuSettings.OnClickOnly, 'no menu settings: next to the card, on hover');
   TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "layout": "Files" }');
   Check(Title('folder') = 'Files', 'the older setting ("layout"): that layout for every kind');
   TDirectory.Delete(Data, True);
@@ -437,6 +442,37 @@ begin
     P.Free;
     Top.Free;
     DestroyMenu(Menu);
+  end;
+end;
+
+// How a submenu opens (plan 02 3.7): a card's own "submenus" before the global setting; "<<" on top of a replacing
+// level.
+procedure TestSubmenuModes;
+var
+  C: TCard;
+  V: TViewCard;
+  Settings: TMenuSettings;
+  Level: TViewLevel;
+begin
+  C := TCard.Create;
+  V := TViewCard.Create;
+  Level := TViewLevel.Create;
+  try
+    C.Title := 'Tools';
+    V.Kind := vkMenu;
+    V.Card := C;
+    Settings.Submenus := smUnder;
+    Settings.OnClickOnly := False;
+    Check(SubmenuModeOf(V, Settings) = smUnder, 'a card without its own: the global setting');
+    C.SubmenuMode := smReplace;
+    Check(SubmenuModeOf(V, Settings) = smReplace, 'a card''s own "submenus" overrules it');
+    AddBackLine(Level, V);
+    Check((Level.Lines.Count = 1) and (Level.Lines[0].Cards[0].Kind = vkBack) and (Level.Lines[0].Cards[0].Title = '<<  Tools') and
+      Level.Lines[0].Cards[0].Enabled, '"<<" at the top of a replacing level, naming what it goes back from');
+  finally
+    Level.Free;
+    V.Free;
+    C.Free;
   end;
 end;
 
@@ -741,6 +777,7 @@ begin
   TestEmptyMenuCard;
   TestHints;
   TestDuplicates;
+  TestSubmenuModes;
   TestSeen;
   if Failures = 0 then
     Writeln('OK')

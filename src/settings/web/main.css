@@ -45,6 +45,9 @@ h2 { font-size: 14px; margin: 2px 0 8px; }
 h3 { font-size: 13px; margin: 12px 0 6px; }
 .buttons { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 
+/* every menu's settings */
+.settings { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+
 /* the registration */
 #registration { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
 #regLine.on { color: var(--accent); }

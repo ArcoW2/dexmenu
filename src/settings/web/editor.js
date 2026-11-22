@@ -531,6 +531,22 @@ function renderCardPane() {
     l.lastChild.append(cb, " not shown: what it finds is left out of the menu");
     box.append(l);
   }
+  // how what opens from this card opens: as set for every menu (main window), or its own way
+  {
+    const way = el("select");
+    for (const [v, label] of [["", "as set for every menu"], ["next", "next to the card"], ["under", "under the card"],
+      ["replace", "in place of the menu (<< back)"]]) {
+      const o = el("option", "", label);
+      o.value = v;
+      way.append(o);
+    }
+    way.value = card.submenus || "";
+    way.addEventListener("change", () => { if (way.value) card.submenus = way.value; else delete card.submenus; changed(); });
+    const row = el("label", "field");
+    row.title = card.menu ? "How this card's menu opens" : "How the submenus of the items this card shows open";
+    row.append(el("span", "", "Submenus open"), way);
+    box.append(row);
+  }
   if (!card.menu && !M.isRemaining(card)) {
     // one item per name over all its rules (Windows 11 shows some items twice: a newer and an older copy)
     const cb = el("input");

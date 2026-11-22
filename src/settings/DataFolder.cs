@@ -72,6 +72,24 @@ static class DataFolder
         return null;
     }
 
+    /// <summary>The global menu settings (plan 02 3.4; settings.json "menu"): how submenus open (next, under, replace)
+    /// and whether only on a click.</summary>
+    public static (string Submenus, bool OnClickOnly) Menu
+    {
+        get
+        {
+            var m = ReadSettings()["menu"] as System.Text.Json.Nodes.JsonObject;
+            var submenus = m?["submenus"]?.GetValue<string>() is "under" or "replace" ? m!["submenus"]!.GetValue<string>() : "next";
+            return (submenus, m?["onClickOnly"]?.GetValue<bool>() == true);
+        }
+        set
+        {
+            var s = ReadSettings();
+            s["menu"] = new System.Text.Json.Nodes.JsonObject { ["submenus"] = value.Submenus, ["onClickOnly"] = value.OnClickOnly };
+            WriteSettings(s);
+        }
+    }
+
     internal static System.Text.Json.Nodes.JsonObject ReadSettings()
     {
         try

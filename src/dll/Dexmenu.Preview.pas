@@ -61,6 +61,7 @@ type
     X, Y: Single;          // DIP within the preview
     Selected: Integer;
     Opener: TViewCard;
+    Replaces: Boolean;     // opened in place of the level before it (that one not shown; "<<" back)
     destructor Destroy; override;
   end;
 
@@ -75,9 +76,11 @@ type
     Levels: TObjectList<TPreviewLevel>;
     Callback: TPreviewCallback;
     Marked: string;
+    Settings: TMenuSettings;   // how submenus open (settings.json "menu"), read at each rebuild
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
     Tip: TTip;
     TipLevel, TipBox: Integer;
+    function Hidden(Index: Integer): Boolean;
     procedure ShowTip;
     constructor Create;
     destructor Destroy; override;
@@ -142,6 +145,7 @@ begin
   Levels.Clear;
   FreeAndNil(Placement);
   FreeAndNil(Top);
+  Settings := MenuSettings;
   if (Menu = 0) or (Layout = nil) then
     Exit;
   Top := ReadLevel(Menu, '');
@@ -161,10 +165,18 @@ begin
     Levels.Delete(Levels.Count - 1);
 end;
 
+// A level replaced by the one after it (plan 02 3.7) is not shown and takes no mouse.
+function TPreview.Hidden(Index: Integer): Boolean;
+begin
+  Result := (Index + 1 < Levels.Count) and Levels[Index + 1].Replaces;
+end;
+
 procedure TPreview.Open(LevelIndex, Box: Integer);
 var
   Parent, L: TPreviewLevel;
   V: TViewCard;
+  Mode: TSubmenuMode;
+  R: TD2D1RectF;
 begin
   Parent := Levels[LevelIndex];
   V := Parent.Geometry.Boxes[Box].Card;
@@ -183,9 +195,28 @@ begin
     ReadChildren(V.Node);
     L.View := Placement.SubmenuLevel(V.Node);
   end;
+  // as at a right-click (Dexmenu.Menu): next to its card, under it from its middle, or in place of the menu
+  Mode := SubmenuModeOf(V, Settings);
+  L.Replaces := Mode = smReplace;
+  if L.Replaces then
+    AddBackLine(L.View, V);
   L.Geometry := Measure(L.View);
-  L.X := Parent.X + Parent.Geometry.Width - 2;
-  L.Y := Parent.Y + Parent.Geometry.Boxes[Box].Rect.top - OuterPad;
+  R := Parent.Geometry.Boxes[Box].Rect;
+  case Mode of
+    smUnder:
+      begin
+        L.X := Parent.X + R.left + 16;
+        L.Y := Parent.Y + (R.top + R.bottom) / 2;
+      end;
+    smReplace:
+      begin
+        L.X := Parent.X;
+        L.Y := Parent.Y;
+      end;
+  else
+    L.X := Parent.X + Parent.Geometry.Width - 2;
+    L.Y := Parent.Y + R.top - OuterPad;
+  end;
   Levels.Add(L);
 end;
 
@@ -198,6 +229,8 @@ begin
   for I := Levels.Count - 1 downto 0 do
   begin
     L := Levels[I];
+    if Hidden(I) then
+      Continue;
     if (X >= L.X) and (X < L.X + L.Geometry.Width) and (Y >= L.Y) and (Y < L.Y + L.Geometry.Height) then
     begin
       Box := BoxAt(L.Geometry, X - L.X, Y - L.Y, 0);
@@ -214,6 +247,7 @@ var
   Bmp, Old: HBITMAP;
   Brush: HBRUSH;
   L: TPreviewLevel;
+  I: Integer;
   P: TPicture;
   S: Single;
 begin
@@ -229,8 +263,11 @@ begin
     FillRect(MemDC, R, Brush);
     DeleteObject(Brush);
     S := Scale;
-    for L in Levels do
+    for I := 0 to Levels.Count - 1 do
     begin
+      L := Levels[I];
+      if Hidden(I) then
+        Continue;
       P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked, True);
       try
         P.PaintOnto(MemDC, Round(L.X * S), Round(L.Y * S));
@@ -306,6 +343,7 @@ begin
           vkItem: begin Kind := 'item'; Id := V.Node.Id; end;
           vkMenu: Kind := 'menu';
           vkNote: Kind := 'note';
+          vkBack: Kind := 'back';
         else
           Kind := 'separator';
         end;
@@ -380,7 +418,8 @@ begin
             if (Box >= 0) and Assigned(P.Callback) then
               P.Callback(1, PWideChar(L.Geometry.Boxes[Box].Card.CardId), L.Geometry.Boxes[Box].Card.RuleIndex);
             KillTimer(Wnd, HoverTimer);
-            if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu then
+            if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu and not P.Settings.OnClickOnly and
+              (SubmenuModeOf(L.Geometry.Boxes[Box].Card, P.Settings) <> smReplace) then
             begin
               Delay := 400;
               SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, @Delay, 0);
@@ -430,7 +469,12 @@ begin
           if (Index >= 0) and (Box >= 0) and Assigned(P.Callback) then
             P.Callback(2, PWideChar(P.Levels[Index].Geometry.Boxes[Box].Card.CardId),
               P.Levels[Index].Geometry.Boxes[Box].Card.RuleIndex);
-          if (Index >= 0) and (Box >= 0) and P.Levels[Index].Geometry.Boxes[Box].Card.HasSubmenu then
+          if (Index >= 0) and (Box >= 0) and (P.Levels[Index].Geometry.Boxes[Box].Card.Kind = vkBack) then
+          begin
+            P.CloseFrom(Index);   // "<<": back to the menu this one replaced
+            Redraw(P);
+          end
+          else if (Index >= 0) and (Box >= 0) and P.Levels[Index].Geometry.Boxes[Box].Card.HasSubmenu then
           begin
             // a click on the card of an open submenu closes it
             if (P.Levels.Count > Index + 1) and (P.Levels[Index + 1].Opener = P.Levels[Index].Geometry.Boxes[Box].Card) then
