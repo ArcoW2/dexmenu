@@ -1,6 +1,6 @@
 namespace Dexmenu.Settings;
 
-/// <summary>The layouts as files (docs/plans/05-PLAN-settings-windows.md 3.5): layouts\&lt;name&gt;.json in the data
+/// <summary>The layouts as files (docs/plans/executed/05-PLAN-settings-windows.md 3.5): layouts\&lt;name&gt;.json in the data
 /// folder. New, copy, rename and delete; a rename or delete keeps settings.json's kinds right (they follow a rename;
 /// a deleted layout's kinds are set to none, Windows' own menu). Tested by --selftest-files (Program).</summary>
 static class LayoutFiles

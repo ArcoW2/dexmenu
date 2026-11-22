@@ -4,7 +4,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace Dexmenu.Settings;
 
-/// <summary>The main window (docs/plans/05-PLAN-settings-windows.md 3.3 - 3.5): only about Dexmenu itself, never inside
+/// <summary>The main window (docs/plans/executed/05-PLAN-settings-windows.md 3.3 - 3.5): only about Dexmenu itself, never inside
 /// a layout. The page (web\main.html) has two panels: General (the registration; which layout each kind of
 /// right-click gets, in the order they are tried) and Layouts (new, edit, copy, rename, delete). The page measures the
 /// panels and tells the window its minimum size. settings.json and the layouts are watched, so another window's

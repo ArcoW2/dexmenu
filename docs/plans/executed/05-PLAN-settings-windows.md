@@ -1,12 +1,13 @@
 # Plan 05: The settings app as a main window and an editor window per layout
 
-Status: partly executed; see Status.
+Status: executed; see Status.
 
 - 2026-11-22: draft.
 - 2026-11-22: partly executed: the layout format.
 - 2026-11-22: partly executed: the kinds setting, the dialog and desktop kinds.
 - 2026-11-22: partly executed: the main window, the editor window, light and dark.
 - 2026-11-22: partly executed: the layout versions' warning.
+- 2026-11-22: executed.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md` 3.7, 3.9: the settings app, registration) and plan 02 (`02-PLAN-own-menu.md`
 3.4, 3.5: layouts, the editor). Changes how layouts are chosen per kind of right-click and where they are edited.
@@ -43,12 +44,12 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Editor window | `EditorForm`: one layout per window, several at once; name, Save, Save as..., Close (asks to save); every kind in the preview, marked when not meant for it; Ctrl+C / Ctrl+X / Ctrl+V of cards, dividers and rules between windows | 3.6; 6.3 |
 | Light and dark | the app starts as Windows is at that moment; a sun / moon button at every window's top right turns every window (page, title bar, preview) to the other; not kept | 3.3; 6.3 |
 | Layout versions | `format` in each layout; the editor brings an older file to the current form; a newer format gives a note with the warning and the remaining card | 3.1.1; 6.4 |
+| Tests | the DLL's unit tests (kinds, reading again, the warning card), the editor's and the app's self-tests (an older file brought up to date, the main page's operations, copying between layouts), the suite's cases (layouts per kind, none, the dialog, the desktop, registration) | 3.7 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Tests | 3.7 | -- | 3.7 |
 
 ## 3. Details
 
@@ -189,8 +190,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - The editor's self-test: an older file opened is brought to the current form and marked not saved.
 - The settings app: its self-test extended with the main page's operations (the kinds written, rename following,
   copy, delete); the editor's self-test as now, plus a card and a rule copied into another layout (new id, end of
-  the priority list) and the remaining card refused. The three arrangements of the panels seen by hand (a wide, a narrow
-  and a narrow short window), and the window refusing to get smaller than a panel's minimum.
+  the priority list) and the remaining card refused. The panels as tabs seen by hand, and the window refusing to get
+  smaller than a panel's minimum.
 - The suite: a right-click on a file and on a folder's empty part with two different layouts in `kinds`, each
   showing its own menu; a kind set to none showing Windows' menu; a right-click in an Open dialog with `dialog` set
   showing that layout; an old file read by its default menu, the file itself unchanged until saved; registration

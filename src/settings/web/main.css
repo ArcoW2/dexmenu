@@ -1,4 +1,4 @@
-/* The main window (docs/plans/05-PLAN-settings-windows.md 3.3). Light or dark as WebView2's colour scheme says (the app
+/* The main window (docs/plans/executed/05-PLAN-settings-windows.md 3.3). Light or dark as WebView2's colour scheme says (the app
    sets it from the theme switch). */
 :root {
   --bg: #f3f3f3; --fg: #1b1b1b; --dim: #6b6b6b; --line: #d0d0d0; --card: #ffffff; --accent: #2f6fd6; --bad: #c42b1c;

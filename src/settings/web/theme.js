@@ -1,4 +1,4 @@
-// The light / dark button at the top right of every window (docs/plans/05-PLAN-settings-windows.md 3.3): a moon while
+// The light / dark button at the top right of every window (docs/plans/executed/05-PLAN-settings-windows.md 3.3): a moon while
 // light (to go dark), a sun while dark (to go light). The app starts as Windows is set at that moment and turns every
 // window (the page's colour scheme, the title bar, the preview) at once. Theme.show(current) draws the button.
 "use strict";

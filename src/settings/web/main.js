@@ -1,4 +1,4 @@
-// The main window's page (docs/plans/05-PLAN-settings-windows.md 3.3 - 3.5). The app (HomeForm.cs) sends
+// The main window's page (docs/plans/executed/05-PLAN-settings-windows.md 3.3 - 3.5). The app (HomeForm.cs) sends
 //   { type: "state", registration, kinds: [ { kind, name, layout } ], layouts: [ { name, kinds } ], theme }
 //   { type: "problem", text }
 // and gets { type: "register" | "unregister" | "restart" | "setKind" | "moveKind" | "edit" | "new" | "copy" | "rename"

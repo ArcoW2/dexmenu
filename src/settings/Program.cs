@@ -2,7 +2,7 @@ namespace Dexmenu.Settings;
 
 static class Program
 {
-    /// <summary>DexmenuSettings.exe: the main window (HomeForm; docs/plans/05-PLAN-settings-windows.md).
+    /// <summary>DexmenuSettings.exe: the main window (HomeForm; docs/plans/executed/05-PLAN-settings-windows.md).
     /// DexmenuSettings.exe --edit &lt;layout&gt;: that layout's editor window.
     /// DexmenuSettings.exe --kind &lt;kind&gt; | --selftest &lt;file&gt;, or with DEXMENU_LAYOUT_FILE set (the tests): an
     /// editor window on the layout in use (DataFolder.LayoutFile), the preview on that kind.

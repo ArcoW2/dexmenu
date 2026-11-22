@@ -4,7 +4,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace Dexmenu.Settings;
 
-/// <summary>The settings app's windows (docs/plans/05-PLAN-settings-windows.md): the main window and any number of
+/// <summary>The settings app's windows (docs/plans/executed/05-PLAN-settings-windows.md): the main window and any number of
 /// editor windows, one per layout. The app ends when its last window closes. The theme (light, dark, as Windows) goes
 /// for every window at once.</summary>
 sealed class DexmenuApp : ApplicationContext
@@ -77,7 +77,7 @@ interface IThemed
     void ApplyTheme();
 }
 
-/// <summary>Light or dark (docs/plans/05-PLAN-settings-windows.md 3.3): the app starts as Windows' apps are set at
+/// <summary>Light or dark (docs/plans/executed/05-PLAN-settings-windows.md 3.3): the app starts as Windows' apps are set at
 /// that moment; the sun / moon button at every window's top right turns every window to the other (not kept: the next
 /// start follows Windows again). A window's title bar (DWM), its page (WebView2's preferred colour scheme, which the
 /// pages' CSS follows) and the preview the DLL draws.</summary>

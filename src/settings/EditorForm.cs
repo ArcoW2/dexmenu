@@ -3,7 +3,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace Dexmenu.Settings;
 
-/// <summary>A layout's editor window (plan 00 steps 4 and 5; docs/plans/05-PLAN-settings-windows.md 3.6): one layout,
+/// <summary>A layout's editor window (plan 00 steps 4 and 5; docs/plans/executed/05-PLAN-settings-windows.md 3.6): one layout,
 /// named in the title; several can be open. The page (web\index.html in WebView2) fills the window with four panes:
 /// the rules, the cards, the selected card and the preview, with the same splitters between them. The preview pane's
 /// area is a window DexmenuShell.dll draws the menu into, from the layout being edited and the items that kind of
