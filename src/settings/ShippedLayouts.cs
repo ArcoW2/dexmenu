@@ -40,6 +40,63 @@ static class ShippedLayouts
           ]
         }
         """),
+        ("Default C", """
+        {
+          "format": 1,
+          "lines": [
+            { "line": [
+              { "id": "open", "card": "Open", "icon": "E8E5", "menu": [
+                { "line": [ { "id": "openrules", "card": "Open and edit", "rules": [ { "name": { "regex": "^(Open|Edit|View|Print|Run)\\b" } } ] } ] }
+              ] },
+              { "id": "share", "card": "Share and send", "icon": "E72D", "menu": [
+                { "line": [ { "id": "sharerules", "card": "Share", "rules": [ { "name": { "regex": "^(Share|Send to|Copy as path|Give access)" } } ] } ] }
+              ] }
+            ] },
+            { "line": [
+              { "id": "archive", "card": "Archive", "icon": "E7B8", "menu": [
+                { "line": [ { "id": "archiverules", "card": "Archive", "rules": [ { "name": { "regex": "zip|7z|archive|extract|compress" } } ] } ] }
+              ] },
+              { "id": "vcs", "card": "Version control", "icon": "E8D4", "menu": [
+                { "line": [ { "id": "vcsrules", "card": "Version control", "rules": [ { "name": { "regex": "git|svn|tortoise" } } ] } ] }
+              ] }
+            ] },
+            { "line": [
+              { "id": "file", "card": "File", "icon": "E7C3", "menu": [
+                { "line": [ { "id": "filerules", "card": "File", "rules": [ { "name": { "any": [ "Cut", "Copy", "Paste", "Rename", "Delete", "Properties" ] } } ] } ] }
+              ] },
+              { "id": "more", "card": "More", "icon": "E712", "menu": [
+                { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] }
+              ] }
+            ] },
+            { "id": "d9", "divider": "" },
+            { "line": [
+              { "id": "about", "note": "Dexmenu - by task" },
+              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
+              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+            ] }
+          ]
+        }
+        """),
+        ("Default D", """
+        {
+          "format": 1,
+          "lines": [
+            { "id": "most", "mostUsed": true },
+            { "id": "d1", "divider": "" },
+            { "line": [
+              { "id": "all", "card": "All items", "icon": "E700", "menu": [
+                { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] }
+              ] }
+            ] },
+            { "id": "d9", "divider": "" },
+            { "line": [
+              { "id": "about", "note": "Dexmenu - minimal" },
+              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
+              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+            ] }
+          ]
+        }
+        """),
     ];
 
     /// <summary>Every shipped layout not written before written now, when no layout of that name is there.</summary>

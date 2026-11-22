@@ -228,15 +228,16 @@ sealed class EditorForm : Form, IThemed
     void PostPreviewBar()
     {
         // a kind this layout is not set for (as the DLL decides; tests: one layout for every kind)
+        var used = DataFolder.Resolve(kind);
         var notMeant = LayoutName is { } me && Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is not { Length: > 0 }
-            && !string.Equals(DataFolder.Resolve(kind), me, StringComparison.OrdinalIgnoreCase);
+            && !string.Equals(used, me, StringComparison.OrdinalIgnoreCase);
         Post(new
         {
             type = "previewBar",
             kinds = Kinds.Select(k => new { kind = k.Kind, name = k.Name }),
             kind, folder, entries, chosen,
             pick = kind switch { "file" or "folder" => "one", "several" => "many", _ => "none" },
-            liveError, notMeant, last = DataFolder.LastRightClick() is not null,
+            liveError, notMeant, used = used switch { null => "the built-in layout", "none" => "Windows' own menu", _ => "\"" + used + "\"" }, last = DataFolder.LastRightClick() is not null,
         });
     }
 

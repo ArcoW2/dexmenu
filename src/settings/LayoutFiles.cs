@@ -65,8 +65,8 @@ static class LayoutFiles
         void Check(bool ok, string what) => lines.Add((ok ? "PASS " : "FAIL ") + what);
         ShippedLayouts.Ensure();
         DataFolder.EnsureKinds();
-        Check(Names().SequenceEqual([ShippedLayouts.First]) && KindsOf(ShippedLayouts.First).SequenceEqual(["default"]),
-            "first start: the shipped layout Default A, set for every other right-click");
+        Check(Names().SequenceEqual(["Default A", "Default C", "Default D"]) && KindsOf(ShippedLayouts.First).SequenceEqual(["default"]),
+            "first start: the shipped layouts, Default A set for every other right-click");
         File.Delete(DataFolder.LayoutPath(ShippedLayouts.First));
         ShippedLayouts.Ensure();
         Check(!Names().Contains(ShippedLayouts.First), "a shipped layout the user deleted is not written again");

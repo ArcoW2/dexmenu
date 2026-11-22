@@ -934,6 +934,7 @@ function showPreviewBar(b) {
   }
   $("pvLast").disabled = !b.last;
   $("pvNotMeant").hidden = !b.notMeant;
+  $("pvNotMeant").textContent = `Not used here: this right-click gets ${b.used}. Which layout each right-click gets is set in the main window.`;
   $("pvError").hidden = !b.liveError;
   $("pvError").textContent = b.liveError || "";
 }

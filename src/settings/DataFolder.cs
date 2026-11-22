@@ -73,7 +73,8 @@ static class DataFolder
     }
 
     /// <summary>The global menu settings (plan 02 3.4; settings.json "menu"), with their defaults: how submenus open
-    /// (next, under, replace), only on a click, "Windows' menu" and "Edit menu..." at the end.</summary>
+    /// (next, under, replace), only on a click, the marks, the most used row, the text size, a rule's states, the
+    /// widths.</summary>
     public static System.Text.Json.Nodes.JsonObject Menu()
     {
         var m = ReadSettings()["menu"] as System.Text.Json.Nodes.JsonObject;

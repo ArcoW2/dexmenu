@@ -13,7 +13,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: the text size (Ctrl+scroll).
 - 2026-11-22: partly executed: the use counts in the editor.
 - 2026-11-22: partly executed: icons (the layout's, the item's own bitmap, the first letter).
-- 2026-11-22: partly executed: Dexmenu's own items as cards; the shipped layout Default A.
+- 2026-11-22: partly executed: Dexmenu's own items as cards; the shipped layouts Default A, C and D.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -59,7 +59,7 @@ the preview is the result.
 | Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider; in the editor every card's count in the cards view's gutter (a card with a menu: the sum of what is in it); none on the preview | 3.9 |
 | Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
 | Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else the title's first letter; set in the editor's card panel | 3.8 |
-| Default A | the shipped layout "Default A", written once into the layouts folder (settings.json `shipped`), every other kind on it at a first start | 3.10 |
+| Shipped layouts | "Default A", "Default C" (by task) and "Default D" (minimal, without its search box yet), each written once into the layouts folder (settings.json `shipped`); every other kind on Default A at a first start; each ends with a note, "Edit menu..." and "Windows' menu" | 3.10 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -69,7 +69,8 @@ the preview is the result.
 |---|---|---|---|
 | Icons in the preview | every right-click saves the icons of the items it shows (PNG files next to the seen items), the preview draws them | Icons | 3.8 |
 | Explorer's own icons | Explorer asked to draw its owner-drawn items into Dexmenu's memory, the icon cut out; first a probe in Explorer | Icons | 3.8 |
-| Default layouts B - D | Default B, C and D shipped | -- | 3.10 |
+| Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | items as buttons in a card; the search box | 3.10 |
+| Search box in Default D | Default D's search box | the search box (3.6) | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 ## 3. Details
@@ -383,7 +384,7 @@ Windows' texts, so they fit an English Windows until a rule on the verb is possi
   Dexmenu - default menu  [Edit menu...] [Windows' menu]
   ```
 
-- **B. Cards per program.** Each program's card shows its items as buttons in it (not a submenu); the icon row on
+- **B. Default B, cards per program** (not yet shipped: it needs items as buttons in a card). Each program's card shows its items as buttons in it (not a submenu); the icon row on
   top; a search box.
 
   ```
@@ -396,11 +397,12 @@ Windows' texts, so they fit an English Windows until a rule on the verb is possi
   +----------------+ +----------------+
   ```
 
-- **C. By task.** Places named after what is done, filled by rules across programs: Open (Open, Open with, Edit in
+- **C. Default C, by task.** Places named after what is done, filled by rules across programs: Open (Open, Open with, Edit in
   ...), Share and send (Share, Send to, Copy as path), Archive (`regex: zip|7z|archive|extract`), Version control
   (Git, SVN), File (Rename, Delete, Properties), More. Best when the rules fit the programs installed, which Dexmenu
   cannot know in advance; hence not the default.
-- **D. Minimal.** A search box, the most used row, and "All items" (Windows' menu in Windows' order) one click away.
+- **D. Default D, minimal.** A search box (not yet: it comes with the search box, 3.6), the most used row, and "All
+  items" (Windows' menu in Windows' order) one click away.
 
 ### 3.11 Safety
 
