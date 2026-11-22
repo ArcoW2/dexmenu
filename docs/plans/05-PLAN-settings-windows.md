@@ -37,7 +37,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 |---|---|---|---|
 | Layout format | a layout is one menu (its lines); the Default layout; old files with a menu per kind converted | -- | 3.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
-| Open dialog | a right-click in an Open or Save dialog as a choice of its own | Kinds setting; Open question 1 | 3.2 |
+| Open dialog | a right-click in an Open or Save dialog as kinds of their own (a file, a folder, several, an empty part, a drive in a dialog) | Kinds setting | 3.2 |
 | Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
 | Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
 | General panel | the registration line and buttons (Restart Explorer lit after a change); each kind of right-click with its layout (or none) | Main window | 3.4 |
@@ -71,15 +71,17 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   (`"kinds": [ ..., { "kind": "default", "layout": "<that name>" } ]`), else the Default layout (3.1).
 - The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
   other (`default`). No kinds by file type: one menu per type has no use seen.
-- An Open or Save dialog (`dialog`): a right-click there may want another menu than in Explorer (no "Open in new
-  window", fewer programs): a kind of its own, fitting every right-click inside an Open or Save dialog. Per kind
-  inside a dialog: Open question 1.
+- In an Open or Save dialog a right-click may want another menu than in Explorer (no "Open in new window", fewer
+  programs): the kinds there are kinds of their own, `dialog-file`, `dialog-folder`, `dialog-several`,
+  `dialog-background` and `dialog-drive` (the desktop's empty part does not occur in a dialog). One menu for all of
+  them is one layout set for each.
 - The kinds are in an order, and a right-click gets the layout of the first kind that fits it: a right-click on a
-  file in an Open dialog fits both `dialog` and `file`, and whichever is first wins. In settings.json the order is
-  kept: `"kinds": [ { "kind": "dialog", "layout": "Dialog" }, { "kind": "file", "layout": "First" }, ...,
+  file in an Open dialog fits both `dialog-file` and `file`, and whichever is first wins. In settings.json the order
+  is kept: `"kinds": [ { "kind": "dialog-file", "layout": "Dialog" }, { "kind": "file", "layout": "First" }, ...,
   { "kind": "default", "layout": "Default" } ]`. A kind without a layout set is skipped (the next that fits
   decides); one set to `none` decides: Windows' own menu. `default` fits every right-click and is always last. The
-  starting order: dialog, file, folder, several, background, desktop, drive, default.
+  starting order: the dialog kinds (not set, so a dialog gets Explorer's kinds until the user sets them), then file,
+  folder, several, background, desktop, drive, default.
 - The handler tells a dialog by the window that shows the menu: its top window is a file dialog
   (class `#32770` holding a shell view): [not yet checked] that this holds for every program's dialog.
 - The desktop's empty part (`desktop`): the handler is registered for it too (`DesktopBackground`, by
@@ -126,7 +128,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - After Register or Unregister, Restart Explorer gets the focus and is lit (drawn as the main button, in the accent
   colour), with the line saying the change takes effect in Explorer after a restart. It stays lit until Explorer has
   restarted (from this button, or Explorer started again otherwise, which the app sees by Explorer's process).
-- Below it, one row per kind of right-click (3.2), "In an Open or Save dialog" among them, each with a choice of the
+- Below it, one row per kind of right-click (3.2), the dialog kinds among them ("a file in an Open or Save dialog",
+  ...), each with a choice of the
   layouts, None (Windows' own menu) and Not set (the next kind that fits decides). The rows are in the order the
   kinds are tried, dragged to sort them; "Every other" (`default`) stays last and has no Not set.
 - A change is written to settings.json at once (no Save here); the DLL reads it at the next right-click.
@@ -178,5 +181,4 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 
 ## 4. Open questions
 
-1. An Open or Save dialog: one layout for every right-click in it (as planned), or a layout per kind there too (a
-   file in a dialog, a folder's empty part in a dialog, ...)?
+None.
