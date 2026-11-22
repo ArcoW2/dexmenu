@@ -325,6 +325,44 @@ begin
   end;
 end;
 
+// A card with a menu whose cards find nothing: left out at a right-click; in the preview shown, marked (striped).
+procedure TestEmptyMenuCard;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+begin
+  Layout := ParseLayout('{ "default": [ { "line": [ { "card": "Meta", "menu": [ { "line": [ { "card": "X", "rules": [ ' +
+    '{ "name": { "equals": "No such item" } } ] } ] } ] } ] }, { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }',
+    'test', Error);
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      Check((Level.Lines[0].Cards[0].Kind = vkMenu) and Level.Lines[0].Cards[0].Sometimes,
+        'a card with a menu showing nothing: in the preview shown, striped');
+    finally
+      Level.Free;
+    end;
+    P.AtRightClick := True;
+    Level := P.TopLevel;
+    try
+      Check(Pos('M:Meta', Describe(Level)) = 0, '... left out at a right-click');
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 procedure TestRules;
 begin
   Expect(Shows('[ ' + Rest + ' ]'), AllRest, 'the remaining card alone: Windows'' menu as cards');
@@ -522,6 +560,7 @@ begin
   TestCurrent;
   TestRules;
   TestEmptySubmenu;
+  TestEmptyMenuCard;
   TestSeen;
   if Failures = 0 then
     Writeln('OK')

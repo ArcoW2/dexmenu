@@ -298,6 +298,7 @@ begin
   FindEmpty(FTop);
   FPlacement := TPlacement.Create(FLayout, FKind, FTop);
   FPlacement.Empty := FEmpty;
+  FPlacement.AtRightClick := True;
 
   L := TLevelWindow.Create;
   L.Session := Self;
@@ -675,6 +676,7 @@ begin
   FindEmpty(NewTop);
   NewPlacement := TPlacement.Create(FLayout, FKind, NewTop);
   NewPlacement.Empty := FEmpty;
+  NewPlacement.AtRightClick := True;
   OldViews := TObjectList<TViewLevel>.Create;
   try
     for I := 0 to FLevels.Count - 1 do

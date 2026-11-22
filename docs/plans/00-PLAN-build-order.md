@@ -292,6 +292,8 @@ None.
   if hovered), so the item chosen is still there when its id goes back; Dexmenu does not open it a second time when
   the user opens it. Tested: built, unit tests pass; the suite case (Send to's Desktop target taken to the top by a
   rule with a path) needs bin's DLL registered and has not run yet.
+- A card with a menu that shows nothing (its cards found nothing in this right-click) is left out at a right-click;
+  the preview shows it, striped (plan 02 3.8). Tested: unit tests.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

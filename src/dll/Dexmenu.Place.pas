@@ -39,6 +39,7 @@ type
     Card: TCard;        // the layout's card: that placed the item (vkItem), with the menu (vkMenu)
     Rule: TRule;        // vkItem: the rule that found it; nil for the remaining card's items
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
+    EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     function Title: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
@@ -79,6 +80,9 @@ type
     // Windows submenus found empty even when opened (Dexmenu.Menu, a right-click only; not owned, may be nil): their
     // items are not shown. The preview has none, so it shows them.
     Empty: TDictionary<HMENU, Boolean>;
+    // A right-click (Dexmenu.Menu): a card with a menu that shows nothing is left out; else (the preview) it shows,
+    // striped.
+    AtRightClick: Boolean;
     function Hides(Node: TNode): Boolean;
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes);
     destructor Destroy; override;
@@ -161,7 +165,7 @@ end;
 
 function TViewCard.Sometimes: Boolean;
 begin
-  Result := (Kind = vkItem) and Node.Sometimes;
+  Result := ((Kind = vkItem) and Node.Sometimes) or ((Kind = vkMenu) and EmptyMenu);
 end;
 
 function TViewCard.CardId: string;
@@ -444,6 +448,8 @@ var
   N: TNode;
   F: TFound;
   List: TList<TFound>;
+  Inner: TViewLevel;
+  Nothing: Boolean;
 begin
   Result := TViewLevel.Create;
   for Line in Lines do
@@ -464,9 +470,18 @@ begin
         V := nil;
         if Card.Menu <> nil then
         begin
+          Inner := PlaceLines(P, Card.Menu);   // what its menu would show: nothing, and it is not worth a card
+          try
+            Nothing := Inner.CardCount = 0;
+          finally
+            Inner.Free;
+          end;
+          if Nothing and P.AtRightClick then
+            Continue;
           V := TViewCard.Create;
           V.Kind := vkMenu;
           V.Card := Card;
+          V.EmptyMenu := Nothing;
         end
         else if P.FFound.TryGetValue(Card, List) and (List.Count = 1) and not P.Hides(List[0].Node) then
         begin
