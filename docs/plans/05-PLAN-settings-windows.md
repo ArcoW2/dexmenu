@@ -78,7 +78,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   kept: `"kinds": [ { "kind": "dialog", "layout": "Dialog" }, { "kind": "file", "layout": "First" }, ...,
   { "kind": "default", "layout": "Default" } ]`. A kind without a layout set is skipped (the next that fits
   decides); one set to `none` decides: Windows' own menu. `default` fits every right-click and is always last. The
-  starting order: dialog, file, folder, several, background, desktop, drive, default. The handler tells a dialog by the window that shows the menu: its top window is a file dialog
+  starting order: dialog, file, folder, several, background, desktop, drive, default.
+- The handler tells a dialog by the window that shows the menu: its top window is a file dialog
   (class `#32770` holding a shell view): [not yet checked] that this holds for every program's dialog.
 - The desktop's empty part (`desktop`): the handler is registered for it too (`DesktopBackground`, by
   `Registration.cs` and `register.ps1`, removed with the others); the handler tells it from a folder's empty part
