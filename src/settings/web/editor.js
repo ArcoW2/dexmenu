@@ -788,6 +788,23 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
   apply();
 })();
 
+// While dragging (a card, a divider, a rule, "+ Card"), the pointer near a pane's top or bottom edge scrolls that pane,
+// faster the nearer the edge: the browser only scrolls the page itself, and the cards list grows long. Caught before
+// the cards' own handlers (capture), which stop the event.
+(() => {
+  const edge = 48, fastest = 24;   // CSS pixels: the zone at each edge; the most it scrolls per event (dragover repeats)
+  for (const id of ["rulesPane", "cardsPane", "cardPane"]) {
+    const pane = $(id);
+    pane.addEventListener("dragover", e => {
+      const r = pane.getBoundingClientRect();
+      const sticky = id === "cardsPane" ? pane.querySelector(".cards-main > h2").getBoundingClientRect().height : 0;
+      const top = r.top + sticky, bottom = r.bottom;
+      if (e.clientY < top + edge) pane.scrollTop -= Math.ceil(fastest * (top + edge - e.clientY) / edge);
+      else if (e.clientY > bottom - edge) pane.scrollTop += Math.ceil(fastest * (e.clientY - (bottom - edge)) / edge);
+    }, true);
+  }
+})();
+
 // ---- the preview pane ------------------------------------------------------------------------------------------------
 
 // Where the preview's area is (CSS pixels within the page): the app places the preview window there (it lies over the

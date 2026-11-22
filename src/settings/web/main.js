@@ -77,6 +77,16 @@ function renderKinds() {
   });
 }
 
+// While a kind is dragged, the pointer near the list's top or bottom edge scrolls it, faster the nearer the edge.
+(() => {
+  const edge = 32, fastest = 16, list = $("kinds");
+  list.addEventListener("dragover", e => {
+    const r = list.getBoundingClientRect();
+    if (e.clientY < r.top + edge) list.scrollTop -= Math.ceil(fastest * (r.top + edge - e.clientY) / edge);
+    else if (e.clientY > r.bottom - edge) list.scrollTop += Math.ceil(fastest * (e.clientY - (r.bottom - edge)) / edge);
+  }, true);
+})();
+
 // ---- Layouts ---------------------------------------------------------------------------------------------------------
 
 function renderLayouts() {
