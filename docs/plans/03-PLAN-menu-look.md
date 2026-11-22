@@ -106,8 +106,11 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   base can change a few palette colours (or only the base colour) and recolour every element using them. This takes
   the place of LexPen's CSS variables.
 - **A colour in an element:** an object naming a palette colour and its intensity against the base colour:
-  `{ "color": "surface", "intensity": 80 }` is surface moved a little towards the base colour: 100 the palette
-  colour itself, 0 the base colour, the values between a mix of the two (80: four parts surface, one part base).
+  `{ "color": "surface", "intensity": 80 }` is surface moved a little towards the base colour. The intensity runs
+  from 0 to 200 along one line through the base colour and the palette colour: 0 the base colour, 100 the palette
+  colour itself, the values between a mix of the two (80: four parts surface, one part base), and above 100 the
+  colour shifted further away from the base colour by the same steps (200: the palette colour plus its difference
+  from the base colour). Each channel is kept within its range (0 - 255).
   `intensity` left out: 100. Short for 100: the palette name alone, `"surface"`. Wherever a colour goes: a
   background, a gradient's stops, a tint, the foreground, the border, the mark.
 - **Spelling, as LexPen and Foldex:** `color` in the JSON names (`color`, `basecolor`), "colour" in the text.
@@ -277,7 +280,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - Dividers: without a label, with a label left, middle and right; own height, background and label colour.
 - A menu without a background: the gaps and corners see-through, a card asking for alpha drawn opaque and reported;
   with a background, a transparent card showing it.
-- Colours: a palette colour at intensity 100, 0 (the base colour) and between (the mix); left out (100); a palette
+- Colours: a palette colour at intensity 100, 0 (the base colour), between (the mix) and above 100 up to 200 (shifted
+  away from the base colour, each channel kept within 0 - 255); outside 0 - 200 reported; left out (100); a palette
   name alone; an unknown palette name reported, the base's value used.
 - Themes: a theme on a base with only palette changes recolours every element using them; one changing only the
   base colour moves every colour below intensity 100; an unknown property or a
@@ -288,4 +292,3 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 1. How two colours mix for an intensity: per channel in sRGB (simple; a mix of two far colours can look muddy) or
    in a perceptual space such as OKLab (even steps, more work)? And alpha: mixed as well?
-2. Can an intensity go above 100 (further away from the base colour than the palette colour), or below 0?
