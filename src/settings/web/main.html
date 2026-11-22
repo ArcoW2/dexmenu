@@ -42,12 +42,14 @@
           <option value="enabled">enabled items only</option>
           <option value="disabled">disabled items only</option>
         </select></label>
-        <table id="widths" title="A level grows from its minimum with its lines, up to its maximum (pixels at 100%)">
-          <tr><th></th><th>min</th><th>max</th></tr>
+        <div class="widthsLabel">Menu width, in pixels at 100% scaling: each menu grows with its items from its
+          minimum up to its maximum
+        <table id="widths">
+          <tr><th></th><th>minimum</th><th>maximum</th></tr>
           <tr><td>The menu</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
           <tr><td>A submenu</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
           <tr><td>Deeper</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
-        </table>
+        </table></div>
       </div>
       <h3>Which layout each right-click gets <span class="hint">(tried from the top: the first that fits and is set decides, Not set passes to the next; drag to reorder)</span></h3>
       <ol id="kinds" class="list"></ol>

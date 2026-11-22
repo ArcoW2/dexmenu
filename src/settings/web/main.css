@@ -44,7 +44,8 @@ h3 { font-size: 13px; margin: 12px 0 6px; }
 .settings { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
 .settings input[type=text] { width: 4em; text-align: center; }
 .settings .hint { flex-basis: 100%; }
-#widths { border-collapse: collapse; }
+.settings .widthsLabel { flex-basis: 100%; margin-top: 4px; }
+#widths { border-collapse: collapse; margin-top: 4px; }
 #widths th { font-weight: normal; color: var(--dim); font-size: 12px; text-align: left; padding: 0 4px; }
 #widths td { padding: 1px 4px; }
 #widths input { width: 5em; }
