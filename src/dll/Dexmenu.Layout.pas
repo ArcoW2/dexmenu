@@ -47,6 +47,8 @@ type
   TMenuSettings = record
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
+    WindowsMenu: Boolean;     // "Windows' menu" at the end of every menu (plan 02 3.11)
+    EditMenu: Boolean;        // "Edit menu..." at the end of every menu (plan 02 3.6)
   end;
 
   TCard = class
@@ -493,6 +495,8 @@ var
 begin
   Result.Submenus := smNext;
   Result.OnClickOnly := False;
+  Result.WindowsMenu := True;
+  Result.EditMenu := True;
   if not ReadTextFile(DataFolder + '\settings.json', Text) then
     Exit;
   Settings := ParseWithComments(Text, Error);
@@ -508,6 +512,10 @@ begin
       Result.Submenus := smNext;
     if TJSONObject(Menu).GetValue('onClickOnly') is TJSONBool then
       Result.OnClickOnly := TJSONBool(TJSONObject(Menu).GetValue('onClickOnly')).AsBoolean;
+    if TJSONObject(Menu).GetValue('windowsMenu') is TJSONBool then
+      Result.WindowsMenu := TJSONBool(TJSONObject(Menu).GetValue('windowsMenu')).AsBoolean;
+    if TJSONObject(Menu).GetValue('editMenu') is TJSONBool then
+      Result.EditMenu := TJSONBool(TJSONObject(Menu).GetValue('editMenu')).AsBoolean;
   finally
     Settings.Free;
   end;

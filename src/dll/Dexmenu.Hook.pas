@@ -21,7 +21,7 @@ implementation
 
 uses
   System.SysUtils, System.StrUtils, System.SyncObjs, System.Generics.Collections, DDetours, Dexmenu.Log,
-  Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen;
+  Winapi.ShellAPI, Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen, Dexmenu.Place;
 
 const
   GET_MODULE_HANDLE_EX_FLAG_PIN = $00000001;
@@ -170,6 +170,20 @@ begin
   Result := FindView(Root);
 end;
 
+// "Edit menu..." (plan 02 3.6): the settings app next to this DLL, on the layout in use (its editor, which starts on
+// the last right-click, just written: this one); the main window for the built-in base layout.
+procedure StartEditor(const LayoutSource: string);
+var
+  Exe, Args: string;
+begin
+  Exe := ExtractFilePath(GetModuleName(HInstance)) + 'DexmenuSettings.exe';
+  Args := '';
+  if SameText(ExtractFileExt(LayoutSource), '.json') and FileExists(LayoutSource) then
+    Args := '--edit "' + ChangeFileExt(ExtractFileName(LayoutSource), '') + '"';
+  if ShellExecute(0, 'open', PChar(Exe), PChar(Args), nil, SW_SHOWNORMAL) <= 32 then
+    Log('Edit menu: ' + Exe + ' did not start');
+end;
+
 function ShowOwn(Menu: HMENU; Flags: UINT; X, Y: Integer; Owner: HWND; Params: PTPMParams; out Shown: Boolean): BOOL;
 var
   Layout: ILayout;
@@ -177,13 +191,22 @@ var
   Session: TMenuSession;
   Kind, Where, LayoutKind: string;
   ToWindows: Boolean;
+  Command: TCommand;
 begin
+  Command := ccNone;
   Result := False;
   Shown := False;
   if not TakeNoted(Menu, Kind, Where) or not Enabled or (ActiveSession <> nil) then
   begin
     if Tracing then
       Log(Format('show %s (%d items): not noted, passed through', [Hex(Menu), GetMenuItemCount(Menu)]));
+    Exit;
+  end;
+  // Shift held while right-clicking: Windows' own menu (plan 02 3.11; in Explorer that is its extended menu)
+  if GetKeyState(VK_SHIFT) < 0 then
+  begin
+    if Tracing then
+      Log(Format('show %s: Shift held: Windows'' menu', [Hex(Menu)]));
     Exit;
   end;
   LayoutKind := Kind;   // the layout is chosen by the kind, in a dialog its dialog kind (plan 05 3.2)
@@ -208,11 +231,18 @@ begin
   try
     Shown := True;
     Result := Session.Run(X, Y, Params);
+    Command := Session.Command;
   finally
     Session.Free;
   end;
   if Where <> '' then
     WriteLastRightClick(Where);   // the settings app's preview starts on it
+  case Command of
+    ccWindowsMenu:
+      Shown := False;   // the hook shows Windows' own menu now, at the same place
+    ccEditMenu:
+      StartEditor(Layout.Source);
+  end;
   if Tracing then
     Log(Format('show %s closed, returned %d', [Hex(Menu), Integer(Result)]));
 end;

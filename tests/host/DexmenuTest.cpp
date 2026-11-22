@@ -573,7 +573,8 @@ int wmain(int argc, wchar_t** argv)
             expected.push_back(c);
         }
         std::vector<Card> got;
-        if (!shown.empty()) for (const auto& c : shown.front().cards) if (c.kind != L"separator") got.push_back(c);
+        // Dexmenu's own items at the end ("Windows' menu", "Edit menu...") are not Windows' items
+        if (!shown.empty()) for (const auto& c : shown.front().cards) if (c.kind != L"separator" && c.kind != L"command") got.push_back(c);
         bool same = got.size() == expected.size();
         for (size_t i = 0; same && i < got.size(); i++)
             same = got[i].id == expected[i].id && got[i].text == expected[i].text &&

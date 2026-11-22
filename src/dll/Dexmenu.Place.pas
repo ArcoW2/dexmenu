@@ -27,7 +27,9 @@ uses
 
 type
   // vkNote: a note card (Card), no button; vkBack: "<<" at the top of a submenu that replaced its menu (plan 02 3.7)
-  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack);
+  // vkCommand: Dexmenu's own item at the end of the menu ("Windows' menu", "Edit menu...", plan 02 3.6, 3.11)
+  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand);
+  TCommand = (ccNone, ccWindowsMenu, ccEditMenu);
 
   TFound = record
     Node: TNode;
@@ -43,7 +45,8 @@ type
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
-    BackTitle: string;  // vkBack: "<<" and what it goes back from
+    BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand: its text
+    Command: TCommand;  // vkCommand: which
     function Title: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
@@ -106,6 +109,8 @@ function ShownHint(V: TViewCard; const Regular: string): string;
 function SubmenuModeOf(V: TViewCard; const Settings: TMenuSettings): TSubmenuMode;
 // "<<" at the top of a level that replaced its menu: back to the menu it replaced.
 procedure AddBackLine(Level: TViewLevel; Opener: TViewCard);
+// Dexmenu's own items at the end of the top level, as the global settings say: "Windows' menu", "Edit menu...".
+procedure AddCommandLines(Level: TViewLevel; const Settings: TMenuSettings);
 
 implementation
 
@@ -137,6 +142,32 @@ begin
   Level.Lines.Insert(0, Line);
 end;
 
+procedure AddCommandLines(Level: TViewLevel; const Settings: TMenuSettings);
+
+  procedure Add(Kind: TViewKind; Command: TCommand; const Text: string);
+  var
+    Line: TViewLine;
+    V: TViewCard;
+  begin
+    V := TViewCard.Create;
+    V.Kind := Kind;
+    V.Command := Command;
+    V.BackTitle := Text;
+    Line := TViewLine.Create;
+    Line.Cards.Add(V);
+    Level.Lines.Add(Line);
+  end;
+
+begin
+  if not Settings.WindowsMenu and not Settings.EditMenu then
+    Exit;
+  Add(vkSeparator, ccNone, '');
+  if Settings.WindowsMenu then
+    Add(vkCommand, ccWindowsMenu, 'Windows'' menu');
+  if Settings.EditMenu then
+    Add(vkCommand, ccEditMenu, 'Edit menu...');
+end;
+
 function KeyOf(Node: TNode): string;
 begin
   Result := IntToHex(NativeUInt(Node.Menu), 1) + ':' + IntToStr(Node.Id);
@@ -160,7 +191,7 @@ begin
           end;
       end;
     vkNote: Result := Card.NoteText;
-    vkBack: Result := BackTitle;
+    vkBack, vkCommand: Result := BackTitle;
     vkMenu:
       if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
@@ -175,7 +206,7 @@ function TViewCard.Enabled: Boolean;
 begin
   case Kind of
     vkItem: Result := Node.Enabled;
-    vkMenu, vkBack: Result := True;
+    vkMenu, vkBack, vkCommand: Result := True;
   else
     Result := False;
   end;

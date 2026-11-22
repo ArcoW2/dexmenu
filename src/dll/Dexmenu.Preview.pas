@@ -152,6 +152,7 @@ begin
   Placement := TPlacement.Create(Layout, Kind, Top);
   L := TPreviewLevel.Create;
   L.View := Placement.TopLevel;
+  AddCommandLines(L.View, Settings);
   L.Geometry := Measure(L.View);
   L.X := Margin;
   L.Y := Margin;
@@ -344,6 +345,7 @@ begin
           vkMenu: Kind := 'menu';
           vkNote: Kind := 'note';
           vkBack: Kind := 'back';
+          vkCommand: Kind := 'command';
         else
           Kind := 'separator';
         end;

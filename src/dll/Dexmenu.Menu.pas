@@ -64,6 +64,7 @@ type
     FRefreshPosted: Boolean;
     FHoverTimerLevel: Integer;
     FSettings: TMenuSettings;   // the global settings (settings.json "menu"), read when the menu shows
+    FCommand: TCommand;         // Dexmenu's own item chosen ("Windows' menu", "Edit menu..."); ccNone else
     function OpensOnHover(V: TViewCard): Boolean;
     procedure HoverTip(L: TLevelWindow; Box: Integer);
     procedure ShowTip(L: TLevelWindow);
@@ -92,6 +93,8 @@ type
     procedure Changed(Menu: HMENU);
     function Owns(Menu: HMENU): Boolean;
     property Original: HMENU read FOriginal;
+    // Dexmenu's own item chosen, when one was (the menu then returned no choice)
+    property Command: TCommand read FCommand;
   end;
 
 threadvar
@@ -320,6 +323,7 @@ begin
   L.Index := 0;
   L.Selected := -1;
   L.View := FPlacement.TopLevel;
+  AddCommandLines(L.View, FSettings);
   FLevels.Add(L);
   L.Wnd := MakeWindow(0, True);
   SetWindowLongPtr(L.Wnd, GWLP_USERDATA, LONG_PTR(L));
@@ -413,6 +417,13 @@ end;
 
 procedure TMenuSession.Choose(V: TViewCard);
 begin
+  if (V <> nil) and (V.Kind = vkCommand) then
+  begin
+    FCommand := V.Command;   // done by the show call once this menu is closed (Dexmenu.Hook)
+    FChosen := 0;
+    FDone := True;
+    Exit;
+  end;
   if (V = nil) or (V.Kind <> vkItem) or not V.Enabled or V.HasSubmenu then
     Exit;
   FChosen := V.Node.Id;
@@ -780,7 +791,10 @@ begin
         SelectedId := L.Geometry.Boxes[L.Selected].Card.Node.Id;
       OldViews.Add(L.View);
       if I = 0 then
-        L.View := NewPlacement.TopLevel
+      begin
+        L.View := NewPlacement.TopLevel;
+        AddCommandLines(L.View, FSettings);
+      end
       else
       begin
         // the opener in the new level above, by its id or its layout card
@@ -878,6 +892,7 @@ begin
           vkMenu: Kind := 'menu';
           vkNote: Kind := 'note';
           vkBack: Kind := 'back';
+          vkCommand: Kind := 'command';
         else
           Kind := 'separator';
         end;

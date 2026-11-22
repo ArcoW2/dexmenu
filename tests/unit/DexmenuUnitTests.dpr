@@ -466,6 +466,17 @@ begin
     Check(SubmenuModeOf(V, Settings) = smUnder, 'a card without its own: the global setting');
     C.SubmenuMode := smReplace;
     Check(SubmenuModeOf(V, Settings) = smReplace, 'a card''s own "submenus" overrules it');
+    Settings.WindowsMenu := True;
+    Settings.EditMenu := True;
+    AddCommandLines(Level, Settings);
+    Check((Level.Lines.Count = 3) and (Level.Lines[0].Cards[0].Kind = vkSeparator) and
+      (Level.Lines[1].Cards[0].Command = ccWindowsMenu) and (Level.Lines[2].Cards[0].Command = ccEditMenu),
+      'Dexmenu''s own items at the end: a line, "Windows'' menu", "Edit menu..."');
+    Level.Lines.Clear;
+    Settings.WindowsMenu := False;
+    Settings.EditMenu := False;
+    AddCommandLines(Level, Settings);
+    Check(Level.Lines.Count = 0, 'both switched off: nothing added');
     AddBackLine(Level, V);
     Check((Level.Lines.Count = 1) and (Level.Lines[0].Cards[0].Kind = vkBack) and (Level.Lines[0].Cards[0].Title = '<<  Tools') and
       Level.Lines[0].Cards[0].Enabled, '"<<" at the top of a replacing level, naming what it goes back from');

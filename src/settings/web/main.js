@@ -136,9 +136,9 @@ $("rename").addEventListener("click", async () => {
   if (n && n !== selected) { post({ type: "rename", from: selected, to: n }); selected = n; }
 });
 $("delete").addEventListener("click", async () => { if (selected && await confirmDelete(selected)) post({ type: "delete", name: selected }); });
-const postMenu = () => post({ type: "setMenu", submenus: $("submenus").value, onClickOnly: $("onClickOnly").checked });
-$("submenus").addEventListener("change", postMenu);
-$("onClickOnly").addEventListener("change", postMenu);
+$("submenus").addEventListener("change", () => post({ type: "setMenu", name: "submenus", value: $("submenus").value }));
+for (const id of ["onClickOnly", "windowsMenu", "editMenu"])
+  $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).checked }));
 $("register").addEventListener("click", () => post({ type: "register" }));
 $("unregister").addEventListener("click", () => post({ type: "unregister" }));
 $("restart").addEventListener("click", () => post({ type: "restart" }));
@@ -184,6 +184,8 @@ chrome.webview.addEventListener("message", e => {
     renderRegistration(m.registration);
     $("submenus").value = m.menu.submenus;
     $("onClickOnly").checked = m.menu.onClickOnly;
+    $("windowsMenu").checked = m.menu.windowsMenu;
+    $("editMenu").checked = m.menu.editMenu;
     $("onClickOnly").disabled = m.menu.submenus === "replace";   // in place of the menu: always on a click
     renderKinds();
     renderLayouts();
