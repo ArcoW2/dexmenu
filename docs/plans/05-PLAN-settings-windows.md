@@ -19,8 +19,8 @@ folder's empty part gets is hidden inside one layout file and hard to see.
 The app opens a main window with two panels. "General" holds the registration (a line saying whether Dexmenu is
 registered, and Register, Unregister and Restart Explorer buttons) and every kind of right-click, the desktop's empty
 part among them, each with the layout it uses. "Layouts" lists the layouts with New..., Edit, Copy, Rename and
-Delete. The panels stand next to each other in a wide window, above each other in a narrow one, and become tabs
-only in a window both narrow and short. Edit and New open an editor window for one layout, named in its title: its
+Delete. Each panel has a minimum size; the panels stand next to each other or above each other when both fit at
+that size, and become tabs when they do not. The window never gets smaller than one panel's minimum. Edit and New open an editor window for one layout, named in its title: its
 name at the top (changeable), Save, Save as... and Close, and below it today's panes and preview. A layout is one
 menu; which kinds use it is set in General, not inside the layout. "Make active" and "Give it its own" go.
 
@@ -38,7 +38,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Layout format | a layout is one menu (its lines); old files with a menu per kind converted | Open question 1 | 3.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
 | Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
-| Main window | the panels General and Layouts, side by side, stacked or as tabs by the window's size | Kinds setting | 3.3 |
+| Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
 | General panel | the registration line and buttons; each kind of right-click with its layout (or none) | Main window | 3.4 |
 | Layouts panel | the list; New..., Edit, Copy, Rename, Delete | Main window | 3.5 |
 | Editor window | one layout: name, Save, Save as..., Close; the panes and preview of today | Layouts panel | 3.6 |
@@ -73,15 +73,22 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 
 ### 3.3 The main window
 
-- Two panels, General and Layouts, placed by the window's size:
-  - wide: next to each other, General left;
-  - narrow: above each other, General on top, the window scrolling when they do not fit;
-  - narrow and short (the panels above each other would need scrolling to reach the second): tabs, one panel at a
-    time.
-  The sizes where it switches: [not yet calculated]; chosen when built, from what the panels need.
+- Two panels, General and Layouts. Each has a minimum width and height, set by Dexmenu: what its content needs, a
+  list or table at least three rows (General: the registration and three kinds; Layouts: its buttons and three
+  layouts). The sizes themselves: [not yet calculated]; measured from the panels when built.
+- Placed by what fits, in this order:
+  - next to each other (General left), when the window is at least both minimum widths wide and the higher of the
+    minimum heights high;
+  - else above each other (General on top), when it is at least the wider minimum width wide and both minimum
+    heights high;
+  - else tabs, one panel at a time.
+  Within a placement the panels share the room the window has (more than their minimum when there is).
+- The window's own minimum size (WinForms `MinimumSize`) is the larger of the panels' minimums, plus the window's
+  frame: a smaller window would cut a panel, so the window is not made smaller than that; when the screen is
+  smaller (a low resolution), [not yet checked] what then.
 - No preview here: the preview belongs to editing (3.6).
-- The panels are one page (CSS: side by side or stacked by the width; tabs only below a width and a height), so
-  resizing the window rearranges them at once, without a reload.
+- The panels are one page; the page measures the panels' minimums and tells the app (its `MinimumSize`), and on
+  every resize chooses the placement, so resizing the window rearranges them at once, without a reload.
 - A WebView2 page as today's editor (`web/main.html`), the same host code serving it.
 
 ### 3.4 The General panel
@@ -120,7 +127,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   read again when settings.json changes.
 - The settings app: its self-test extended with the main page's operations (the kinds written, rename following,
   copy, delete); the editor's self-test as now. The three arrangements of the panels seen by hand (a wide, a narrow
-  and a narrow short window).
+  and a narrow short window), and the window refusing to get smaller than a panel's minimum.
 - The suite: a right-click on a file and on a folder's empty part with two different layouts in `kinds`, each
   showing its own menu; the conversion of an old file (Open question 1); registration adds and removes the
   desktop's handler key; the desktop's empty part right-clicked in the test host gives the kind `desktop`.
