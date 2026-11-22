@@ -3,7 +3,7 @@
 Status: partly executed; see Status.
 
 - 2026-11-21: draft.
-- 2026-11-22: partly executed: theme files; the shipped themes.
+- 2026-11-22: partly executed: theme files; the shipped themes; gradients.
 
 Plan 02 (`02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -36,6 +36,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 
 | Part | What | Reference |
 |---|---|---|
+| Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
@@ -45,7 +46,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 |---|---|---|---|
 | Engine | Direct2D and DirectWrite in the DLL: brushes, rounded rectangles, text, images, stripes; drawing into a window or an image | plan 01 Delphi DLL | 3.1 |
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
-| Menu window | popup, corners, shadow, border, background colour / gradient / image, placement, scrolling | Engine | 3.4 |
+| Menu window | popup, corners, shadow, border, background image, placement, scrolling | Engine | 3.4 |
 | Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
 | Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
 | Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
@@ -322,3 +323,11 @@ None.
   `active` (a pressed card's background) and, for the light ones, `hover`.
 - A card's own background is drawn only where a theme gives one; the built-in light and dark give none.
 - Tested: each read without problems and with its cards' background; `dark-forest` seen in the editor's preview.
+
+### 6.3 Gradients
+
+- A background is a colour (any colour form, 3.2) or `{ "gradient": [ colours ], "angle": degrees }`: the colours
+  spread evenly along a line through the box's middle at the angle (0 left to right, 90 top to bottom, the default),
+  long enough to reach the corners. Drawn for the menu, a card and a hovered card; images (3.4) are still to come.
+- Tested: a gradient's colours resolved through the palette and its angle; a colour background; none given. By
+  hand: a menu from blue to purple in the editor's preview.

@@ -31,6 +31,10 @@ type
     destructor Destroy; override;
     // A property's colour: Element.State.Prop, else Element.normal.Prop, else Default.
     function Color(const Element, State, Prop: string; const Default: TRGBA): TRGBA;
+    // A background (plan 03 3.4): its colours, one for a colour, two or more for a gradient ("gradient": [ colours ],
+    // spread evenly, "angle" in degrees, 0 left to right, 90 top to bottom, the default); False when the theme gives
+    // none.
+    function Background(const Element, State: string; out Colors: TArray<TRGBA>; out Angle: Single): Boolean;
     // A property's number (a radius, a width): as Color, a number.
     function Number(const Element, State, Prop: string; Default: Single): Single;
   end;
@@ -299,6 +303,30 @@ function TTheme.Color(const Element, State, Prop: string; const Default: TRGBA):
 begin
   if not Resolve(Value(Element, State, Prop), Result) then
     Result := Default;
+end;
+
+function TTheme.Background(const Element, State: string; out Colors: TArray<TRGBA>; out Angle: Single): Boolean;
+var
+  V, Stop: TJSONValue;
+  C: TRGBA;
+begin
+  Colors := nil;
+  Angle := 90;
+  V := Value(Element, State, 'background');
+  if (V is TJSONObject) and (TJSONObject(V).GetValue('gradient') is TJSONArray) then
+  begin
+    for Stop in TJSONArray(TJSONObject(V).GetValue('gradient')) do
+      if Resolve(Stop, C) then
+        Colors := Colors + [C];
+    if TJSONObject(V).GetValue('angle') is TJSONNumber then
+      Angle := TJSONNumber(TJSONObject(V).GetValue('angle')).AsDouble;
+    if Length(Colors) = 1 then
+      Colors := Colors + [Colors[0]];
+    Exit(Length(Colors) >= 2);
+  end;
+  Result := Resolve(V, C);
+  if Result then
+    Colors := [C];
 end;
 
 function TTheme.Number(const Element, State, Prop: string; Default: Single): Single;

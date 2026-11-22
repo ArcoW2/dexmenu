@@ -396,6 +396,49 @@ begin
   Result := D2D1ColorF(C.R, C.G, C.B, C.A);
 end;
 
+// A theme's background for an element and state over a rounded box (plan 03 3.4): a colour, or a linear gradient at
+// its angle across the box; False (nothing drawn) when the theme gives none.
+function FillBackground(T: ID2D1RenderTarget; Theme: TTheme; const Element, State: string; const R: TD2D1RectF;
+  Radius: Single): Boolean;
+var
+  Colors: TArray<TRGBA>;
+  Angle, CX, CY, DX, DY, Half: Single;
+  Stops: TArray<TD2D1GradientStop>;
+  I: Integer;
+  Collection: ID2D1GradientStopCollection;
+  Gradient: ID2D1LinearGradientBrush;
+  Solid: ID2D1SolidColorBrush;
+  Box: TD2D1RoundedRect;
+begin
+  Result := Theme.Background(Element, State, Colors, Angle);
+  if not Result then
+    Exit;
+  Box := D2D1RoundedRect(R, Radius, Radius);
+  if Length(Colors) = 1 then
+  begin
+    if Colors[0].A <= 0 then
+      Exit(False);
+    T.CreateSolidColorBrush(ToD2D(Colors[0]), nil, Solid);
+    T.FillRoundedRectangle(Box, Solid);
+    Exit;
+  end;
+  SetLength(Stops, Length(Colors));
+  for I := 0 to High(Colors) do
+    Stops[I] := D2D1GradientStop(I / High(Colors), ToD2D(Colors[I]));
+  // the gradient's line through the box's middle at the angle, long enough to reach its corners
+  CX := (R.left + R.right) / 2;
+  CY := (R.top + R.bottom) / 2;
+  DX := Cos(DegToRad(Angle));
+  DY := Sin(DegToRad(Angle));
+  Half := (Abs(DX) * (R.right - R.left) + Abs(DY) * (R.bottom - R.top)) / 2;
+  if Failed(T.CreateGradientStopCollection(@Stops[0], Length(Stops), D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP,
+    Collection)) or Failed(T.CreateLinearGradientBrush(D2D1LinearGradientBrushProperties(
+    D2D1PointF(CX - DX * Half, CY - DY * Half), D2D1PointF(CX + DX * Half, CY + DY * Half)), nil, Collection,
+    Gradient)) then
+    Exit(False);
+  T.FillRoundedRectangle(Box, Gradient);
+end;
+
 // Diagonal stripes over a box: an item not always there (the preview only).
 procedure DrawStripes(T: ID2D1RenderTarget; const R: TD2D1RectF; Brush: ID2D1SolidColorBrush);
 const
@@ -441,8 +484,7 @@ end;
 procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer; ScrollY, VisibleHeight: Single;
   const Look: TLook; const Marked: string; Editing: Boolean);
 var
-  Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe, CardBg: ID2D1SolidColorBrush;
-  CardBgColor: TRGBA;
+  Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
   Theme: TTheme;
   MenuRadius, CardRadius: Single;
   I: Integer;
@@ -470,14 +512,12 @@ begin
   T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0))), nil, LabelBrush);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'focused', 'border', RGBA($2F, $6F, $D6))), nil, Accent);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'unavailable', 'background', RGBA(0, 0, 0, 0.09))), nil, Stripe);
-  // a card's own background, where the theme gives one (none in the built-in light and dark)
-  CardBgColor := Theme.Color('card', 'normal', 'background', RGBA(0, 0, 0, 0));
-  T.CreateSolidColorBrush(ToD2D(CardBgColor), nil, CardBg);
   MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius);
   CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius);
   T.Clear(D2D1ColorF(0, 0, 0, 0));
   R := D2D1RectF(0.5, 0.5, G.Width - 0.5, VisibleHeight - 0.5);
-  T.FillRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Bg);
+  if not FillBackground(T, Theme, 'menu', 'normal', R, MenuRadius) then
+    T.FillRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Bg);
   T.DrawRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Border, 1);
   T.PushAxisAlignedClip(D2D1RectF(1, OuterPad, G.Width - 1, VisibleHeight - OuterPad), D2D1_ANTIALIAS_MODE_ALIASED);
   for I := 0 to High(G.Boxes) do
@@ -505,9 +545,9 @@ begin
         DrawDividerText(T, V.Divider, R, Y, Sep, LabelBrush);
       Continue;
     end;
-    if (V.Kind in [vkItem, vkMenu, vkCommand]) and (CardBgColor.A > 0) then
-      T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
-        CardRadius, CardRadius), CardBg);
+    if V.Kind in [vkItem, vkMenu, vkCommand] then
+      FillBackground(T, Theme, 'card', 'normal', D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
+        CardRadius);
     if Editing and V.Sometimes then
       DrawStripes(T, D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1), Stripe);
     // the items of the card selected in the settings app's editor (the preview only)
@@ -515,8 +555,10 @@ begin
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
         CardRadius, CardRadius), Accent, 1.5);
     if (I = Selected) and V.Enabled then
-      T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
-        CardRadius, CardRadius), Hover);
+      if not FillBackground(T, Theme, 'card', 'hover', D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
+        CardRadius) then
+        T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
+          CardRadius, CardRadius), Hover);
     if V.Enabled then
       Brush := Text
     else

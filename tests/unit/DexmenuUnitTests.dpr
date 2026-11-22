@@ -761,6 +761,8 @@ var
   T: TTheme;
   Error, Data: string;
   Lookup: TFunc<string, string>;
+  Stops: TArray<TRGBA>;
+  Angle: Single;
 
   function Near(const A: TRGBA; R, G, B: Integer; Alpha: Single = 1): Boolean;
   begin
@@ -790,6 +792,15 @@ begin
       else
         Result := '';
     end;
+  T := ThemeFromText('{ "palette": { "basecolor": "#000000", "a": "#ff0000" }, "menu": { "normal": { "background": ' +
+    '{ "gradient": [ "a", { "color": "a", "intensity": 0 }, "#0000ff" ], "angle": 0 } } } }', Lookup, Error);
+  try
+    Check(T.Background('menu', 'normal', Stops, Angle) and (Length(Stops) = 3) and Near(Stops[0], 255, 0, 0) and
+      Near(Stops[1], 0, 0, 0) and Near(Stops[2], 0, 0, 255) and (Angle = 0), 'a gradient: its colours resolved, its angle');
+    Check(not T.Background('card', 'normal', Stops, Angle), 'no background given: none');
+  finally
+    T.Free;
+  end;
   T := ThemeFromText('// on dark' + #10 + '{ "name": "Red", "base": "dark", "palette": { "text": "#ff0000" }, ' +
     '"card": { "normal": { "background": { "color": "text", "intensity": 150, "opacity": 40 } }, ' +
     '"disabled": { "foreground": "nosuch" } } }', Lookup, Error);
@@ -806,6 +817,8 @@ begin
       Check(Near(T.Color('card', 'disabled', 'foreground', RGBA(1, 2, 3)), 1, 2, 3) and (Pos('nosuch', T.Problems) > 0),
         'an unknown palette name: the default used, the problem noted');
       Check(T.Number('card', 'hover', 'radius', 0) = 4, 'a number from normal');
+      Check(T.Background('card', 'normal', Stops, Angle) and (Length(Stops) = 1) and Near(Stops[0], 255, 128, 128, 0.4),
+        'a colour background: one colour');
     end;
   finally
     T.Free;
