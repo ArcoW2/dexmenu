@@ -32,6 +32,7 @@ is set in the editor.
 |---|---|---|---|
 | Command card | a card that runs a command or a task when chosen | Open questions | 3.1 |
 | Editor | the command set in the card's panel | Command card | 3.2 |
+| Own items as cards | "Windows' menu" and "Edit menu..." as command cards in the layout | Command card | 3.1 |
 | Tests | 3.3 | -- | 3.3 |
 
 ## 3. Details
@@ -43,6 +44,9 @@ is set in the editor.
 - What it may use of the right-click: the selected paths, the folder, the kind (the handler knows them, as for the
   last right-click, plan 02).
 - Shown only where it makes sense: Open question 4.
+- Dexmenu's own items at the end of every menu, "Windows' menu" and "Edit menu..." (plan 02 3.6, 3.11), become
+  command cards running Dexmenu's own commands: placed, moved and left out in a layout as any card, instead of the
+  two on / off settings in the main window.
 
 ### 3.2 The editor
 
