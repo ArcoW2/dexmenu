@@ -110,7 +110,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   from 0 to 200: 0 the base colour, 100 the palette colour itself, the values between a mix of the two (80: four
   parts surface, one part base); above 100 the palette colour mixed with the base colour inverted (each channel 255
   minus the base's), so it moves away from the base: 200 is that inverse. On black, red at 150 is rose and 200 is
-  white; on white, 200 is black.
+  white; on white, 200 is black. The mix is per channel in sRGB: each of red, green and blue as stored,
+  `a + (b - a) x t`.
   `intensity` left out: 100. Short for 100: the palette name alone, `"surface"`.
 - **Translucency is separate:** the intensity mixes the colour only, never its alpha. How see-through a colour is,
   is its `opacity`, 0 (invisible) to 100 (solid): `{ "color": "accent", "intensity": 30, "opacity": 40 }`. Given,
@@ -293,5 +294,4 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 ## 4. Open questions
 
-1. How two colours mix for an intensity: per channel in sRGB (simple; a mix of two far colours can look muddy) or
-   in a perceptual space such as OKLab (even steps, more work)? Both shown side by side on the samples page.
+None.
