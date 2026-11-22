@@ -107,10 +107,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   the place of LexPen's CSS variables.
 - **A colour in an element:** an object naming a palette colour and its intensity against the base colour:
   `{ "color": "surface", "intensity": 80 }` is surface moved a little towards the base colour. The intensity runs
-  from 0 to 200 along one line through the base colour and the palette colour: 0 the base colour, 100 the palette
-  colour itself, the values between a mix of the two (80: four parts surface, one part base), and above 100 the
-  colour shifted further away from the base colour by the same steps (200: the palette colour plus its difference
-  from the base colour). Each channel is kept within its range (0 - 255).
+  from 0 to 200: 0 the base colour, 100 the palette colour itself, the values between a mix of the two (80: four
+  parts surface, one part base); above 100 the palette colour mixed with the base colour inverted (each channel 255
+  minus the base's), so it moves away from the base: 200 is that inverse. On black, red at 150 is rose and 200 is
+  white; on white, 200 is black.
   `intensity` left out: 100. Short for 100: the palette name alone, `"surface"`. Wherever a colour goes: a
   background, a gradient's stops, a tint, the foreground, the border, the mark.
 - **Spelling, as LexPen and Foldex:** `color` in the JSON names (`color`, `basecolor`), "colour" in the text.
@@ -280,8 +280,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - Dividers: without a label, with a label left, middle and right; own height, background and label colour.
 - A menu without a background: the gaps and corners see-through, a card asking for alpha drawn opaque and reported;
   with a background, a transparent card showing it.
-- Colours: a palette colour at intensity 100, 0 (the base colour), between (the mix) and above 100 up to 200 (shifted
-  away from the base colour, each channel kept within 0 - 255); outside 0 - 200 reported; left out (100); a palette
+- Colours: a palette colour at intensity 100, 0 (the base colour), between (the mix) and above 100 up to 200 (mixed
+  with the inverted base colour: white at 200 on black, black on white); outside 0 - 200 reported; left out (100); a palette
   name alone; an unknown palette name reported, the base's value used.
 - Themes: a theme on a base with only palette changes recolours every element using them; one changing only the
   base colour moves every colour below intensity 100; an unknown property or a
