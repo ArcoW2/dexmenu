@@ -60,8 +60,8 @@ function ReadSeenText(const Kind: string): string;
 begin
   Result := '';
   try
-    if FileExists(SeenFolder + '' + Kind + '.json') then
-      Result := TFile.ReadAllText(SeenFolder + '' + Kind + '.json', TEncoding.UTF8);
+    if FileExists(SeenFolder + '\' + Kind + '.json') then
+      Result := TFile.ReadAllText(SeenFolder + '\' + Kind + '.json', TEncoding.UTF8);
   except
     on E: Exception do
       Log('seen items not read: ' + E.Message);
