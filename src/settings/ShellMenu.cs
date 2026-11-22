@@ -91,6 +91,7 @@ static class ShellMenu
             Check(desktop.BindToObject(pidl, IntPtr.Zero, ref sf, out var obj));
             shellFolder = (IShellFolder)obj;
             var cm = typeof(IContextMenu).GUID;
+            if (ViewBackground(shellFolder) is { } fromView) return fromView;
             Check(shellFolder.CreateViewObject(owner, ref cm, out var view));
             return (IContextMenu)view;
         }
@@ -99,6 +100,25 @@ static class ShellMenu
             if (shellFolder is not null) Marshal.ReleaseComObject(shellFolder);
             Marshal.ReleaseComObject(desktop);
         }
+    }
+
+    // The folder view's own menu of its empty part (View, Sort by, Group by, Refresh, Paste, ... with the folder's and
+    // the extensions' items), as Explorer shows it: a folder view (DefView) made for the folder; null when none.
+    static IContextMenu? ViewBackground(IShellFolder folder)
+    {
+        var create = new SFV_CREATE { cbSize = (uint)Marshal.SizeOf<SFV_CREATE>(),
+            pshf = Marshal.GetComInterfaceForObject(folder, typeof(IShellFolder)) };
+        try
+        {
+            if (SHCreateShellFolderView(ref create, out var view) < 0 || view is null) return null;
+            try
+            {
+                var cm = typeof(IContextMenu).GUID;
+                return view.GetItemObject(SVGIO_BACKGROUND, ref cm, out var obj) >= 0 ? obj as IContextMenu : null;
+            }
+            finally { Marshal.ReleaseComObject(view); }
+        }
+        finally { Marshal.Release(create.pshf); }
     }
 
     // Every submenu opened once, deepest last, as Windows' menu does when it shows them.
@@ -122,6 +142,36 @@ static class ShellMenu
     static void Check(int hr)
     {
         if (hr < 0) Marshal.ThrowExceptionForHR(hr);
+    }
+
+    const uint SVGIO_BACKGROUND = 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct SFV_CREATE
+    {
+        public uint cbSize;
+        public IntPtr pshf, psvOuter, psfvcb;
+    }
+
+    [DllImport("shell32.dll")]
+    static extern int SHCreateShellFolderView(ref SFV_CREATE create, out IShellView view);
+
+    [ComImport, Guid("000214E3-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IShellView
+    {
+        [PreserveSig] int GetWindow(out IntPtr wnd);
+        [PreserveSig] int ContextSensitiveHelp(bool enterMode);
+        [PreserveSig] int TranslateAccelerator(IntPtr msg);
+        [PreserveSig] int EnableModeless(bool enable);
+        [PreserveSig] int UIActivate(uint state);
+        [PreserveSig] int Refresh();
+        [PreserveSig] int CreateViewWindow(IntPtr previous, IntPtr folderSettings, IntPtr browser, IntPtr rect, out IntPtr wnd);
+        [PreserveSig] int DestroyViewWindow();
+        [PreserveSig] int GetCurrentInfo(IntPtr folderSettings);
+        [PreserveSig] int AddPropertySheetPages(uint reserved, IntPtr add, IntPtr lParam);
+        [PreserveSig] int SaveViewState();
+        [PreserveSig] int SelectItem(IntPtr pidl, uint flags);
+        [PreserveSig] int GetItemObject(uint item, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out object obj);
     }
 
     const uint CMF_NORMAL = 0, CMF_CANRENAME = 0x10, WM_INITMENUPOPUP = 0x0117;

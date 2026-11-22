@@ -296,6 +296,7 @@ WithLeft '' {
 }
 $live = LiveMenu @('background', $Work)
 if ($null -eq $live -or @(Names $live.items).Count -eq 0) { $problems += 'a folder''s empty part: no menu' }
+elseif (@($live.items | Where-Object submenu).Count -lt 2) { $problems += 'a folder''s empty part: no View / Sort by submenus (the folder view''s own items)' }
 $runs = @()
 Report 'the preview''s live menu: Windows'' real menu of a right-click in a folder' $runs $problems ''
 

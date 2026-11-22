@@ -98,8 +98,20 @@ function withDragged(e, place) {
   if (place(id)) {
     if (isNew) select(id, -1);
     changed();
+    if (isNew) focusNew(id);
   } else if (isNew) M.deleteCard(linesOf(), id);
 }
+
+// A card just added gets the focus: selected, scrolled into view, its name ready to be typed over. After the frame, as
+// the renders of the change come first and each makes the panel's fields anew.
+function focusNew(id) {
+  requestAnimationFrame(() => {
+    document.querySelector(`#cards .card[data-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
+    const name = $("card").querySelector("input[type=text]");
+    if (name) { name.focus(); name.select(); }
+  });
+}
+function addAndFocus(card) { select(card.id, -1); changed(); focusNew(card.id); }
 
 function renderLines(lines, parentId) {
   const box = el("div", "lines");
@@ -187,11 +199,10 @@ function cardActions(card) {
     b.addEventListener("click", e => { e.stopPropagation(); fn(); });
     into.append(b);
   };
-  action(adds, "+ beside", "A new card beside this one", () => { select(M.addCard(layout, linesOf(), null, card.id).id, -1); changed(); }, true);
+  action(adds, "+ beside", "A new card beside this one", () => addAndFocus(M.addCard(layout, linesOf(), null, card.id)), true);
   if (card.menu) action(adds, "+ in menu", "A new card at the end of its menu", () => {
     collapsed.delete(card.id);
-    select(M.addCard(layout, linesOf(), card.id).id, -1);
-    changed();
+    addAndFocus(M.addCard(layout, linesOf(), card.id));
   }, true);
   if (!card.menu && !M.isRemaining(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
     M.makeMenu(layout, linesOf(), card.id);
@@ -534,7 +545,7 @@ $("saveAs").addEventListener("click", async () => {
 });
 $("activate").addEventListener("click", () => post({ type: "activate", name: $("layouts").value }));
 withIcon($("addTop"), "+ Card");
-$("addTop").addEventListener("click", () => { if (layout) { select(M.addCard(layout, linesOf(), null).id, -1); changed(); } });
+$("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(layout, linesOf(), null)); });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("collapseAll").addEventListener("click", () => {
   if (!layout) return;

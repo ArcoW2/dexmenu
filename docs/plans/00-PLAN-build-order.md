@@ -278,6 +278,10 @@ None.
   right-click" above the preview goes back to it. Tested: a unit test (the text written); the app started on a
   `last.json` written for the test: the preview shows that file's live menu; a suite case (a right-click writes it),
   which needs bin's DLL registered, as the suite does.
+- The folder's empty part in the live preview from a folder view made for the folder (`SHCreateShellFolderView`,
+  its background menu), so View, Sort by, Group by, Refresh and Paste are there as in Explorer. Tested: `--live
+  background` on a folder gave them; the suite's live case asks for its submenus. A card just added gets the focus:
+  selected, scrolled into view, its name selected in its panel.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

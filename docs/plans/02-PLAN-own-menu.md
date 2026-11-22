@@ -305,8 +305,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   its drive). With a folder the settings app asks Windows for the real menu of that right-click there, as Explorer
   does, every submenu opened once, so a Git folder shows TortoiseGit's items, an SVN folder TortoiseSVN's, a folder
   without source control neither; the seen items' other items show too, striped. Without a folder: the seen items.
-  The folder's empty part shows the shell's own items and the extensions', not Explorer's view items (View, Sort
-  by, Refresh, Paste), which the folder view adds itself: [not yet checked] whether they can be had.
+  The folder's empty part is asked from a folder view made for the folder, as Explorer's own view gives it: its
+  View, Sort by, Group by, Refresh, Paste and Customise this folder with the extensions' items.
 - In the settings app the DLL sets no hook: it only draws. Dexmenu's handler runs there too while the real menu is
   built (maybe the registered copy of the DLL, not the app's own); the app marks its process (`DEXMENU_EDITOR`), so
   it notes nothing; Explorer started again from the app does not get the mark. The DLL is 64-bit, so the settings app runs 64-bit.
