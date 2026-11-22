@@ -99,6 +99,9 @@ type
     function TopLevel: TViewLevel;
     function MenuLevel(Card: TCard): TViewLevel;
     function SubmenuLevel(Node: TNode): TViewLevel;
+    // The stored use counts (Usage) per layout card, by its id: the sum over the items it got, each with the items in
+    // its submenu; the remaining card's over the remaining items. Cards without counts left out. The caller frees it.
+    function CardCounts: TDictionary<string, Integer>;
   end;
 
 function KeyOf(Node: TNode): string;
@@ -741,6 +744,68 @@ begin
   finally
     Keys.Free;
     Found.Free;
+  end;
+end;
+
+function TPlacement.CardCounts: TDictionary<string, Integer>;
+var
+  Pair: TPair<TCard, TList<TFound>>;
+  F: TFound;
+  N: TNode;
+  Sum: Integer;
+  Rest: TCard;
+
+  // an item's count with the counts of the items in its submenu
+  function Total(Node: TNode): Integer;
+  var
+    Key: string;
+    P: TPair<string, Integer>;
+  begin
+    Result := 0;
+    Key := UsageKey(Node);
+    for P in Usage do
+      if (P.Key = Key) or P.Key.StartsWith(Key + ' > ') then
+        Inc(Result, P.Value);
+  end;
+
+  function FindRest(Lines: TLines): TCard;
+  var
+    Line: TLine;
+    Card: TCard;
+  begin
+    Result := nil;
+    if Lines <> nil then
+      for Line in Lines do
+        for Card in Line.Cards do
+        begin
+          if Card.IsRemaining then
+            Exit(Card);
+          Result := FindRest(Card.Menu);
+          if Result <> nil then
+            Exit;
+        end;
+  end;
+
+begin
+  Result := TDictionary<string, Integer>.Create;
+  if (Usage = nil) or (Usage.Count = 0) then
+    Exit;
+  for Pair in FFound do
+  begin
+    Sum := 0;
+    for F in Pair.Value do
+      Inc(Sum, Total(F.Node));
+    if Sum > 0 then
+      Result.AddOrSetValue(Pair.Key.Id, Sum);
+  end;
+  Rest := FindRest(Layout.Lines(Kind));
+  if Rest <> nil then
+  begin
+    Sum := 0;
+    for N in Remaining do
+      Inc(Sum, Total(N));
+    if Sum > 0 then
+      Result.AddOrSetValue(Rest.Id, Sum);
   end;
 end;
 

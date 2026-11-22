@@ -22,6 +22,7 @@ let selectedId = null;
 let selectedRule = -1;   // index on the selected card
 let hoverId = null;
 const collapsed = new Set();   // cards with a menu shown folded (this session only)
+let counts = {};   // the stored use counts per card id of what the preview shows (the app, DexmenuPreviewCounts)
 let dirty = false;
 let lastSent = "";
 let loadedText = "";
@@ -656,7 +657,7 @@ function render() {
 // the pane resized, a card's text wrapping differently).
 function placeToggles() {
   const gutter = $("cardsGutter");
-  for (const t of gutter.querySelectorAll(".fold, .rest-mark")) t.remove();
+  for (const t of gutter.querySelectorAll(".fold, .rest-mark, .use-count")) t.remove();
   const top = gutter.getBoundingClientRect().top;
   // the remaining card: a coloured line beside it
   const rest = $("cards").querySelector(".card.remaining");
@@ -675,6 +676,25 @@ function placeToggles() {
     t.addEventListener("click", () => { folded ? collapsed.delete(id) : collapsed.add(id); render(); });
     gutter.append(t);
   }
+  // the use counts (plan 02 3.9): how often the items a card got in the preview were chosen; a card with a menu the
+  // sum of what is in it; under its fold toggle when it has one
+  for (const box of $("cards").querySelectorAll(".card[data-id]")) {
+    const n = useCount(box.dataset.id);
+    if (!n) continue;
+    const c = el("div", "use-count", n >= 10000 ? Math.round(n / 1000) + "k" : String(n));
+    c.title = `Chosen ${n} times in this kind of right-click`;
+    c.style.top = (box.getBoundingClientRect().top - top + (box.dataset.fold ? 22 : 5)) + "px";
+    gutter.append(c);
+  }
+}
+
+// A card's use count: its own (counts, by card id), or for a card with a menu the sum of the cards in it.
+function useCount(id) {
+  const at = M.find(linesOf(), id);
+  if (!at) return 0;
+  const sum = card => (counts[card.id] || 0) +
+    (card.menu ? card.menu.reduce((t, entry) => t + (entry.line ? entry.line.reduce((u, c) => u + sum(c), 0) : 0), 0) : 0);
+  return sum(at.card);
 }
 new ResizeObserver(() => { if (layout) placeToggles(); }).observe($("cards"));
 
@@ -949,5 +969,6 @@ chrome.webview.addEventListener("message", e => {
     if (m.event === 2) select(m.cardId, m.rule);
     else if (hoverId !== m.cardId) { hoverId = m.cardId; render(); }
   }
+  else if (m.type === "counts") { counts = m.counts || {}; placeToggles(); }
   else if (m.type === "saved") { dirty = false; $("dirty").hidden = true; }
 });

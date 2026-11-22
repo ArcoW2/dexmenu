@@ -11,6 +11,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: the global settings (marks, widths per level, a rule's default states).
 - 2026-11-22: partly executed: use counts and the most used row.
 - 2026-11-22: partly executed: the text size (Ctrl+scroll).
+- 2026-11-22: partly executed: the use counts in the editor.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -53,7 +54,7 @@ the preview is the result.
 | Edit menu | "Edit menu..." at the end of every menu (on or off in the main window): the menu closes, the last right-click is written, the settings app starts on the layout in use (its editor, the preview on this right-click) | 3.6 |
 | Windows' menu | Shift held while right-clicking shows Windows' own menu (in Explorer its extended menu); "Windows' menu" at the end of every menu (on or off) closes Dexmenu's and shows Windows' at the same place; a layout that cannot be read: Windows' menu | 3.11 |
 | Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, "Windows' menu" and "Edit menu..." at the end, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
-| Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider | 3.9 |
+| Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider; in the editor every card's count in the cards view's gutter (a card with a menu: the sum of what is in it); none on the preview | 3.9 |
 | Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
@@ -63,7 +64,6 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | -- | 3.8 |
-| Counts while editing | the use count on every item in the preview and in the editor's items list | -- | 3.9 |
 | Default layouts | the suggested layouts shipped, A the default | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
@@ -322,7 +322,7 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   to run it.
 - In the preview, an item that is not always there (seen, but hidden for some selections, or removed late by
   Explorer) and a card that would be empty are shown as unavailable: diagonal stripes, so the layout can be made for
-  them too. The use count of every item can be shown on it (3.9).
+  them too. No use counts on the preview: they would change how it lays out (3.9).
 - What the preview is a right-click of: chosen above it, the kind of right-click and a base folder with the item(s)
   in it (a file or a folder picked from the folder's, several checked, nothing more for the folder's empty part or
   its drive). With a folder the settings app asks Windows for the real menu of that right-click there, as Explorer
@@ -345,8 +345,10 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 - An item may show both in the most used row and at its own place: the row is a shortcut.
 - Items inside a submenu count too (their key is their path and text, `7-Zip > Add to archive...`); the submenus
   that fill only when opened are opened early when the row may need them.
-- While editing: the count shown on every item in the preview and in the editor's item list, so the user sees what
-  matters most and places it.
+- While editing: every card's count in the gutter beside it in the cards view, so the user sees what matters most
+  and places it: the stored counts of the items the card gets in the preview, each with the items in its submenu; the
+  remaining card's of the remaining items; a card with a menu the sum of the cards in it. Not on the preview itself:
+  a mark there would change how it lays out, and the preview is to show the menu as it is.
 
 ### 3.10 Suggested layouts
 

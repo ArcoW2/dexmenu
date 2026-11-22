@@ -47,6 +47,18 @@ static class Native
         return DexmenuPreviewSet(wnd, layout, seen, kind, error, error.Capacity) ? null : error.ToString();
     }
 
+    [DllImport(Dll, CharSet = CharSet.Unicode)]
+    static extern int DexmenuPreviewCounts(IntPtr wnd, StringBuilder? buffer, int chars);
+
+    /// <summary>The stored use counts per card of what the preview shows, as JSON { "card id": count }.</summary>
+    public static string PreviewCounts(IntPtr wnd)
+    {
+        var chars = DexmenuPreviewCounts(wnd, null, 0);
+        var buffer = new StringBuilder(chars);
+        DexmenuPreviewCounts(wnd, buffer, chars);
+        return buffer.ToString();
+    }
+
     /// <summary>The built-in base layout (only the remaining card): the layout when the user has none.</summary>
     public static string BaseLayout()
     {

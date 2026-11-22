@@ -482,6 +482,7 @@ var
   Top: TNodes;
   P: TPlacement;
   Level: TViewLevel;
+  Counts: TDictionary<string, Integer>;
 begin
   Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-usage');
   if TDirectory.Exists(Data) then
@@ -529,6 +530,20 @@ begin
       Level.Free;
     end;
     Check(HasMostUsed(Layout, 'default') and UsageGoesDeeper(U), 'a most used row in the layout; a count inside a submenu');
+    P.Free;
+    P := nil;
+    Layout := ParseLayout('{ "default": [ { "line": [ { "id": "x", "card": "X", "rules": [ { "name": { "equals": "Cut" } } ] }, ' +
+      '{ "id": "z", "card": "Z", "rules": [ { "name": { "equals": "7-Zip" } } ] } ] }, ' +
+      '{ "line": [ { "id": "r", "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+    P := TPlacement.Create(Layout, 'default', Top);
+    P.Usage := U;
+    Counts := P.CardCounts;
+    try
+      Check((Counts.Count = 3) and (Counts['x'] = 1) and (Counts['z'] = 2) and (Counts['r'] = 13),
+        'the counts per card: its items, with what is in their submenus; the remaining card the rest');
+    finally
+      Counts.Free;
+    end;
   finally
     P.Free;
     Top.Free;

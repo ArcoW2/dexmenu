@@ -22,6 +22,9 @@ function DexmenuPreviewSet(Wnd: HWND; Layout, Seen, Kind: PWideChar; Error: PWid
   stdcall;
 // The built-in base layout's text into Buffer; the number of characters it needs (with the closing #0).
 function DexmenuBaseLayout(Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+// The preview's use counts per layout card (TPlacement.CardCounts) as JSON { "<card id>": <count> } into Buffer; the
+// number of characters it needs (with the closing #0).
+function DexmenuPreviewCounts(Wnd: HWND; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 
 type
   // Event 1: the mouse over an item, 2: an item clicked; CardId and Rule: the layout's card that placed it and the
@@ -597,6 +600,39 @@ begin
   end;
   if (Error <> nil) and (ErrorChars > 0) then
     StrPLCopy(Error, Problem, ErrorChars - 1);
+end;
+
+function DexmenuPreviewCounts(Wnd: HWND; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+var
+  P: TPreview;
+  Counts: TDictionary<string, Integer>;
+  Pair: TPair<string, Integer>;
+  Json: TJSONObject;
+  Text: string;
+begin
+  Text := '{}';
+  try
+    P := PreviewOf(Wnd);
+    if (P <> nil) and (P.Placement <> nil) then
+    begin
+      Counts := P.Placement.CardCounts;
+      Json := TJSONObject.Create;
+      try
+        for Pair in Counts do
+          Json.AddPair(Pair.Key, TJSONNumber.Create(Pair.Value));
+        Text := Json.ToJSON;
+      finally
+        Json.Free;
+        Counts.Free;
+      end;
+    end;
+  except
+    on E: Exception do
+      Log('preview counts: ' + E.Message);
+  end;
+  Result := Length(Text) + 1;
+  if (Buffer <> nil) and (Chars > 0) then
+    StrPLCopy(Buffer, Text, Chars - 1);
 end;
 
 function DexmenuBaseLayout(Buffer: PWideChar; Chars: Integer): Integer; stdcall;

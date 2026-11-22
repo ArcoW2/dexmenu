@@ -250,6 +250,7 @@ sealed class EditorForm : Form, IThemed
             : Native.SetPreview(preview, editedText ?? text, SeenText(), kind);
         if (!pageReady) return;
         PostPreviewBar();
+        PostCounts();
         if (editedText is not null)
         {
             Post(new { type = "preview", error });
@@ -259,6 +260,13 @@ sealed class EditorForm : Form, IThemed
     }
 
     void Post(object message) => web.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message));
+
+    // The stored use counts per card of what the preview shows (plan 02 3.9), for the cards view's gutter.
+    void PostCounts()
+    {
+        if (preview == IntPtr.Zero) return;
+        Post(new { type = "counts", counts = System.Text.Json.Nodes.JsonNode.Parse(Native.PreviewCounts(preview)) });
+    }
 
     void Placed(int previewEvent, string cardId, int rule) =>
         Post(new { type = "placed", @event = previewEvent, cardId, rule });
@@ -279,6 +287,7 @@ sealed class EditorForm : Form, IThemed
                 // so the file on disk is still followed
                 if (!m.TryGetProperty("quiet", out _)) editedText = Str("layout");
                 Post(new { type = "preview", error = Native.SetPreview(preview, Str("layout"), SeenText(), kind) });
+                PostCounts();
                 break;
             case "save":
                 Save(Str("name"), Str("layout"));

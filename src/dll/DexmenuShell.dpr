@@ -31,6 +31,7 @@ exports
   DexmenuBaseLayout,
   DexmenuPreviewSetCallback,
   DexmenuPreviewMark,
+  DexmenuPreviewCounts,
   DexmenuSeenOfMenu,
   DexmenuSetTheme;
 

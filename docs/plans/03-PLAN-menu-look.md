@@ -49,7 +49,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Other elements | icon row, search box, most used row, `<<` | Card | 3.8 |
 | Submenu panels | next, under, replace: where they appear and how they look | Card; plan 02 Submenus | 3.9 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window; Card | 3.4 |
-| Preview marks | striped unavailable items, use counts, new | Card; plan 02 Preview | 3.10 |
+| Preview marks | striped unavailable items, new | Card; plan 02 Preview | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -89,8 +89,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   the DLL's folder, the user's own in `%APPDATA%\Dexmenu\themes`; a file of the user's with the same name wins.
 - **What it holds:** per element, per state, a set of properties:
   - Elements: `menu` (the window), `line`, `card`, `item` (a card alone on a line), `divider`, `row` (an icon row
-    and its icons), `search`, `panel` (a submenu panel), `back` (the `<<` line), `scrollbar`, `badge` (counts,
-    new).
+    and its icons), `search`, `panel` (a submenu panel), `back` (the `<<` line), `scrollbar`, `badge` (new).
   - States: `normal`, `hover`, `pressed`, `focused` (the keyboard's), `disabled`, `checked`, `default` (Windows'
     default item, bold there), `unavailable` (the preview's stripes). A state lists only what differs from `normal`.
   - Properties (what the user sets per theme: the line around a card, the roundness of its corners, its background,
@@ -212,7 +211,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 ### 3.8 The other elements
 
 - **Icon row:** square cells of an icon each, the title as a tooltip; the same states as a card.
-- **Most used row:** as an icon row, or as small cards with titles; the use count as a badge in the preview only.
+- **Most used row:** as an icon row, or as small cards with titles. No use counts on it, in the menu or the preview
+  (plan 02 3.9: they are shown in the editor's cards view).
 - **Divider:** between two lines of cards. Without a label: a thin line. With a label: the text aligned `left`,
   `middle` or `right`, the line on the free side(s). Its own `height` (the space it takes) and `background` (colour,
   gradient or image, 3.4) where the layout gives them; the label's colour and font from the theme's `divider`, or
@@ -241,7 +241,6 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - **Unavailable:** diagonal stripes over an item that is not always there, or a card that would be empty (plan 02
   3.8), in the theme's `unavailable` colours.
-- **Use counts:** a small badge with the count on each item (plan 02 3.9), when the settings app asks for it.
 - **New:** a badge on items seen for the first time.
 - **Useless:** a red outline around a card that can never show anything (no rules, or an invalid rule; plan 02 3.5),
   in the editor and the preview only; the theme's `invalid` colour. Distinct from the stripes: a striped card is
