@@ -50,6 +50,8 @@ type
     FSeen: TJSONArray;    // every item seen while shown, also those Windows' menu lost (Dexmenu.Seen)
     FEmpty: TDictionary<HMENU, Boolean>;     // Windows submenus empty even when opened: their items not shown
     FChecked: TDictionary<HMENU, Boolean>;   // submenus looked at for that
+    FEarly: TList<HMENU>;    // submenus opened before the user opened them (FindEmpty): open until the menu closes
+    FDeep: Boolean;          // the layout's rules look inside submenus (RulesLookDeeper)
     FPlacement: TPlacement;
     FLevels: TObjectList<TLevelWindow>;
     FDone: Boolean;
@@ -166,6 +168,7 @@ begin
   FLevels := TObjectList<TLevelWindow>.Create;
   FEmpty := TDictionary<HMENU, Boolean>.Create;
   FChecked := TDictionary<HMENU, Boolean>.Create;
+  FEarly := TList<HMENU>.Create;
 end;
 
 destructor TMenuSession.Destroy;
@@ -176,6 +179,7 @@ begin
   FSeen.Free;
   FEmpty.Free;
   FChecked.Free;
+  FEarly.Free;
   inherited;
 end;
 
@@ -279,6 +283,7 @@ function TMenuSession.Run(X, Y: Integer; Params: PTPMParams): BOOL;
 var
   Msg: TMsg;
   L: TLevelWindow;
+  I: Integer;
   Quit: Boolean;
   QuitCode: WPARAM;
 begin
@@ -289,6 +294,7 @@ begin
     SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(FOriginal), MakeLParam(0, 0));
   end;
   FTop := ReadLevel(FOriginal, '');
+  FDeep := RulesLookDeeper(FLayout, FKind);
   FindEmpty(FTop);
   FPlacement := TPlacement.Create(FLayout, FKind, FTop);
   FPlacement.Empty := FEmpty;
@@ -329,6 +335,9 @@ begin
   end;
 
   FLevels.Clear;   // the windows gone
+  if Notify then
+    for I := FEarly.Count - 1 downto 0 do   // the submenus opened early close with the menu
+      SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(FEarly[I]), 0);
   KeepSeen;
   WriteSeen(FKind, FSeen);   // for the settings app's preview (Dexmenu.Seen)
   if Notify then
@@ -357,7 +366,8 @@ begin
   for I := FLevels.Count - 1 downto Max(Index, 1) do
   begin
     L := FLevels[I];
-    if Notify and (L.Opener <> nil) and (L.Opener.Kind = vkItem) then
+    // one opened early stays open until the menu closes (Run)
+    if Notify and (L.Opener <> nil) and (L.Opener.Kind = vkItem) and not FEarly.Contains(L.Opener.Node.SubMenu) then
       SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(L.Opener.Node.SubMenu), 0);
     FLevels.Delete(I);
   end;
@@ -404,7 +414,7 @@ begin
     L.View := FPlacement.MenuLevel(V.Card)
   else
   begin
-    if Notify then
+    if Notify and not FEarly.Contains(V.Node.SubMenu) then   // one opened early is open already
     begin
       // the submenu's position in its menu, as Windows' menu sends it
       Index := 0;
@@ -578,14 +588,14 @@ begin
   PostMessage(FLevels[0].Wnd, WM_DEXMENU_REFRESH, 0, 0);
 end;
 
-// The Windows submenus of these items that hold nothing even when opened (an extension's submenu it fills with
-// nothing here, such as Bash's on a DLL): their items are not shown. A submenu with no items yet is opened once, as
-// Windows' menu does on hover (WM_INITMENUPOPUP, then WM_UNINITMENUPOPUP), and read; one with items is never
-// opened early. Each submenu is looked at once per right-click.
+// The Windows submenus of these items that an extension fills only when opened (no items yet) are opened now, as
+// Windows' menu does on hover (WM_INITMENUPOPUP), and stay open until the menu closes; one with items is never opened
+// early. One that holds nothing even then (Bash's on a DLL): its item is not shown. When the layout's rules look
+// inside submenus (FDeep), the levels below are opened too, before the rules run, so a rule with a path or scope
+// anywhere finds what the extension puts there (Send to's targets). Each submenu is looked at once per right-click.
 procedure TMenuSession.FindEmpty(Nodes: TNodes);
 var
   N, C: TNode;
-  Items: TNodes;
   Index: Integer;
   HasItem: Boolean;
 begin
@@ -596,29 +606,35 @@ begin
     if (N.SubMenu = 0) or N.IsSeparator or FChecked.ContainsKey(N.SubMenu) then
       Continue;
     FChecked.Add(N.SubMenu, True);
-    if GetMenuItemCount(N.SubMenu) > 0 then
-      Continue;
-    Index := 0;
-    while (Index < GetMenuItemCount(N.Menu)) and (GetSubMenu(N.Menu, Index) <> N.SubMenu) do
-      Inc(Index);
-    if Notify then
-      SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(N.SubMenu), MakeLParam(Index, 0));
-    Items := ReadLevel(N.SubMenu, '');
-    try
+    if GetMenuItemCount(N.SubMenu) = 0 then
+    begin
+      Index := 0;
+      while (Index < GetMenuItemCount(N.Menu)) and (GetSubMenu(N.Menu, Index) <> N.SubMenu) do
+        Inc(Index);
+      if Notify then
+      begin
+        SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(N.SubMenu), MakeLParam(Index, 0));
+        FEarly.Add(N.SubMenu);
+      end;
+      ReadChildren(N);
       HasItem := False;
-      for C in Items do
+      for C in N.Children do
         if not C.IsSeparator and ((C.Name <> '') or (C.SubMenu <> 0)) then
           HasItem := True;
-    finally
-      Items.Free;
+      if not HasItem then
+      begin
+        FEmpty.AddOrSetValue(N.SubMenu, True);
+        if Tracing then
+          Log(Format('submenu %s of "%s" empty: not shown', [Hex(N.SubMenu), N.Name]));
+      end
+      else if Tracing then
+        Log(Format('submenu %s of "%s" opened early: %d items', [Hex(N.SubMenu), N.Name, N.Children.Count]));
     end;
-    if Notify then
-      SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(N.SubMenu), 0);
-    if not HasItem then
+    if FDeep then
     begin
-      FEmpty.AddOrSetValue(N.SubMenu, True);
-      if Tracing then
-        Log(Format('submenu %s of "%s" empty: not shown', [Hex(N.SubMenu), N.Name]));
+      if N.Children = nil then
+        ReadChildren(N);
+      FindEmpty(N.Children);
     end;
   end;
 end;

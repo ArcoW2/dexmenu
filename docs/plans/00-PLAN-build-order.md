@@ -286,6 +286,12 @@ None.
   not shown; a submenu with no items yet is opened once (`WM_INITMENUPOPUP`, then `WM_UNINITMENUPOPUP`, as Windows'
   menu does on hover) and read; one with items is never opened early. The preview still shows such items. Tested: a
   unit test (the placement leaves the item out with the list, shows it without); at a right-click: not yet.
+- Rules into submenus an extension fills only when opened: when a layout has a rule with scope anywhere or a path,
+  a right-click opens every submenu without items yet, deeper levels too, before the rules run, so such a rule finds
+  what the extension puts there (Send to's targets). A submenu opened early stays open until the menu closes (as
+  if hovered), so the item chosen is still there when its id goes back; Dexmenu does not open it a second time when
+  the user opens it. Tested: built, unit tests pass; the suite case (Send to's Desktop target taken to the top by a
+  rule with a path) needs bin's DLL registered and has not run yet.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

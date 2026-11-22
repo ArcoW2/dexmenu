@@ -271,6 +271,20 @@ finally {
 }
 Report 'the seen items merged: items of only some right-clicks shown striped in the preview' $runs $problems ''
 
+# A rule with a path into a submenu an extension fills only when opened (Send to): Dexmenu opens it before the rules
+# run, so its "Desktop" target is found and shown at the top.
+$env:DEXMENU_LAYOUT_FILE = Join-Path $root 'tests\layout-sendto.json'
+WithLeft '' {
+    $script:runs = @((Run @("$Work.txt") $true @('--any-layout')) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, a rule into Send to' -PassThru)
+}
+$env:DEXMENU_LAYOUT_FILE = $baseLayout
+$top = @(MenuCards $runs[0].Out)
+$problems = @()
+if (-not ($top | Where-Object { $_.Kind -eq 'item' -and $_.Text -like '*Desktop*' })) {
+    $problems += "Send to's Desktop target not at the top: [$(($top | Select-Object -First 4 | ForEach-Object Text) -join '; ')]"
+}
+Report 'a rule into a submenu filled when opened (Send to) finds its items' $runs $problems ''
+
 # The preview's live menu (ShellMenu, DexmenuSettings.exe --live): Windows' real menu of a right-click in a base folder,
 # its submenus filled; a file in the work folder has LexPen's items and 7-Zip's filled submenu; the empty part of a
 # folder has a menu too.

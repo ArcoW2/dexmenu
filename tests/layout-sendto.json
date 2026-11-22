@@ -1,0 +1,6 @@
+// A layout for the tests (tests/run-tests.ps1): a rule with a path takes Send to's "Desktop" target to the top. Send
+// to fills its submenu only when it opens, so Dexmenu opens it before the rules run (Dexmenu.Menu FindEmpty).
+{ "default": [
+  { "line": [ { "id": "c1", "card": "Desktop", "rules": [ { "name": { "contains": "Desktop" }, "path": { "equals": "Send to" }, "priority": 1 } ] } ] },
+  { "line": [ { "id": "c2", "card": "Rest", "rules": [ "remaining" ] } ] }
+] }

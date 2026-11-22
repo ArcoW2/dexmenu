@@ -88,6 +88,9 @@ type
   end;
 
 function KeyOf(Node: TNode): string;
+// Whether a kind's layout has a rule that looks inside Windows submenus (scope anywhere, or a path): then a
+// right-click opens the submenus an extension fills only when opened, before the rules run (Dexmenu.Menu).
+function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
 
 implementation
 
@@ -293,6 +296,23 @@ begin
       if Card.Menu <> nil then
         CollectRules(Card.Menu, Rules);
     end;
+end;
+
+function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
+var
+  Rules: TList<TRule>;
+  R: TRule;
+begin
+  Result := False;
+  Rules := TList<TRule>.Create;
+  try
+    CollectRules(Layout.Lines(Kind), Rules);
+    for R in Rules do
+      if R.Spec.Scope <> scTop then
+        Exit(True);
+  finally
+    Rules.Free;
+  end;
 end;
 
 // Every submenu's items read (as far as Windows' menu has them before it opens), for rules that look deeper.
