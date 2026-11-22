@@ -102,14 +102,15 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
     `gap` (between cards on a line and
     between lines), `font` (family, size, weight), `iconSize`, `opacity`.
 - **A palette makes the colours:** named colours at the top of the theme (`accent`, `text`, `surface`, ...) and a
-  `basecolour`, the theme's generic base colour. The elements use the palette's colours by name, so a theme on a
+  `basecolor`, the theme's generic base colour. The elements use the palette's colours by name, so a theme on a
   base can change a few palette colours (or only the base colour) and recolour every element using them. This takes
   the place of LexPen's CSS variables.
 - **A colour in an element:** an object naming a palette colour and its intensity against the base colour:
-  `{ "colour": "surface", "intensity": 80 }` is surface moved a little towards the base colour: 100 the palette
+  `{ "color": "surface", "intensity": 80 }` is surface moved a little towards the base colour: 100 the palette
   colour itself, 0 the base colour, the values between a mix of the two (80: four parts surface, one part base).
   `intensity` left out: 100. Short for 100: the palette name alone, `"surface"`. Wherever a colour goes: a
   background, a gradient's stops, a tint, the foreground, the border, the mark.
+- **Spelling, as LexPen and Foldex:** `color` in the JSON names (`color`, `basecolor`), "colour" in the text.
 - **Colours in the palette:** `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgba(r, g, b, a)` as in LexPen's themes; in an
   element a literal colour is allowed too, for the rare one the palette does not hold.
 - **Following Windows:** `accent` can be `system` (Windows' accent colour); light or dark per Windows' mode, as the
@@ -119,12 +120,12 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   ```json
   // Dark ocean: on Dark, bluer.
   { "name": "Dark ocean", "base": "dark",
-    "palette": { "basecolour": "#161c27", "surface": "#1d2533", "text": "#d8e0ee", "accent": "#6aa8ff" },
-    "menu": { "normal": { "background": { "gradient": [ "basecolour", { "colour": "surface", "intensity": 60 } ],
+    "palette": { "basecolor": "#161c27", "surface": "#1d2533", "text": "#d8e0ee", "accent": "#6aa8ff" },
+    "menu": { "normal": { "background": { "gradient": [ "basecolor", { "color": "surface", "intensity": 60 } ],
                                           "angle": 90 } } },
-    "card": { "normal": { "radius": 6, "background": { "colour": "surface", "intensity": 80 },
+    "card": { "normal": { "radius": 6, "background": { "color": "surface", "intensity": 80 },
                           "foreground": "text" },
-              "hover": { "background": { "colour": "accent", "intensity": 30 } } }
+              "hover": { "background": { "color": "accent", "intensity": 30 } } }
   }
   ```
 
@@ -147,7 +148,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 ### 3.4 The menu window and backgrounds
 
 - **A background** (for the menu, a panel, a card): one of
-  - `colour`: one colour (a palette colour with its intensity, 3.2), with alpha;
+  - `color`: one colour (a palette colour with its intensity, 3.2), with alpha;
   - `gradient`: two or more colours, an angle (linear) or a centre (radial): the shade;
   - `image`: a file, with `fit`, `opacity`, and an optional `tint` colour over it so text stays readable. `fit`:
     `stretch` (to the whole area), `fit` (whole image inside, its proportions kept), `center` (its own size, in the
