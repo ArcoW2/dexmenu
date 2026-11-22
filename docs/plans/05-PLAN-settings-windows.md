@@ -39,7 +39,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
 | Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
 | Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
-| General panel | the registration line and buttons; each kind of right-click with its layout (or none) | Main window | 3.4 |
+| General panel | the registration line and buttons (Restart Explorer lit after a change); each kind of right-click with its layout (or none) | Main window | 3.4 |
 | Layouts panel | the list; New..., Edit, Copy, Rename, Delete | Main window | 3.5 |
 | Editor window | one layout: name, Save, Save as..., Close; the panes and preview of today | Layouts panel | 3.6 |
 | Tests | 3.7 | -- | 3.7 |
@@ -101,6 +101,9 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - At its top, the registration: a line ("Dexmenu is registered for you: <the DLL's path>", "not registered", or
   "another DLL is registered: <path>") and the buttons Register, Unregister and Restart Explorer. Restart Explorer
   is its own button (today a checkbox with Register), since a registration takes effect in Explorer only after it.
+- After Register or Unregister, Restart Explorer gets the focus and is lit (drawn as the main button, in the accent
+  colour), with the line saying the change takes effect in Explorer after a restart. It stays lit until Explorer has
+  restarted (from this button, or Explorer started again otherwise, which the app sees by Explorer's process).
 - Below it, one row per kind of right-click (3.2), each with a choice of the layouts (and none, Open question 2).
 - A change is written to settings.json at once (no Save here); the DLL reads it at the next right-click.
 - Beside each row, Edit opens that layout's editor (3.6).
