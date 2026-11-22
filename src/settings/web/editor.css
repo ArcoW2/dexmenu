@@ -31,9 +31,11 @@ html, body { height: 100%; }
 body { display: flex; flex-direction: column; }
 #panes { flex: 1; min-height: 0; display: flex; }
 #panes > .pane { border-bottom: none; overflow: auto; min-width: 160px; box-sizing: border-box; }
+#cardsPane { min-width: 260px; }
+#cardPane { min-width: 200px; }
 #rulesPane { flex: 1 1 0; }
 #cardsPane { flex: 1.3 1 0; }
-#cardPane { flex: 1.3 1 0; }
+#cardPane { flex: 1.3 1 0; }   /* takes the rest: never given a fixed width */
 /* between the panes: dragged, the pane left of it gets that width (kept for the next start) */
 .splitter { flex: 0 0 5px; cursor: col-resize; background: var(--line); border-left: 2px solid var(--bg); border-right: 2px solid var(--bg); }
 .splitter:hover, .splitter.dragging { background: var(--accent); }

@@ -37,7 +37,7 @@ sealed class EditorForm : Form, IThemed
     readonly Label liveError = new() { AutoSize = true, ForeColor = Color.Firebrick, Padding = new Padding(0, 6, 0, 0) };
     string? folder;          // the base folder; null: the seen items
     string? liveSeen;        // Windows' real menu there, as seen items' text (merged with the seen file)
-    readonly SplitContainer split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
+    readonly SplitContainer split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterWidth = 6 };
     readonly System.Windows.Forms.Timer settle = new() { Interval = 150 };
     readonly List<FileSystemWatcher> watchers = [];
     readonly Native.PreviewCallback callback;   // kept: the DLL holds it
@@ -53,7 +53,6 @@ sealed class EditorForm : Form, IThemed
     {
         Width = 1500;
         Height = 820;
-        MinimumSize = new Size(900, 520);
         StartPosition = FormStartPosition.CenterScreen;
         selftest = selftestFile;
         currentFile = layoutFile;
@@ -87,6 +86,10 @@ sealed class EditorForm : Form, IThemed
     public void ApplyTheme()
     {
         Themes.Apply(this, web);
+        // the splitter before the preview: in the line colour, so it shows on either theme (it is drawn in the
+        // SplitContainer's own colour; the panes keep the window's)
+        split.BackColor = Themes.Dark ? Color.FromArgb(0x3A, 0x3A, 0x3A) : Color.FromArgb(0xD0, 0xD0, 0xD0);
+        split.Panel1.BackColor = split.Panel2.BackColor = BackColor;
         previewBar.BackColor = BackColor;
         previewBar.ForeColor = ForeColor;
         if (preview != IntPtr.Zero) Native.MoveWindow(preview, 0, 0, previewPanel.ClientSize.Width, previewPanel.ClientSize.Height, true);
@@ -115,7 +118,14 @@ sealed class EditorForm : Form, IThemed
 
     async Task Start()
     {
-        split.SplitterDistance = Width * 70 / 100;   // the page's three panes, then the preview
+        // Each half a minimum (plan 05 3.6): the page holds its three panes at their minimum (rules 160, cards 260, the
+        // card's panel 200 CSS pixels, the splitters and the scrollbar), the preview a narrow menu; the window not
+        // smaller than both.
+        var scale = DeviceDpi / 96.0;
+        split.Panel1MinSize = (int)Math.Ceiling(660 * scale);
+        split.Panel2MinSize = (int)Math.Ceiling(300 * scale);
+        MinimumSize = SizeFromClientSize(new Size(split.Panel1MinSize + split.Panel2MinSize + split.SplitterWidth, (int)(520 * scale)));
+        split.SplitterDistance = Math.Max(split.Panel1MinSize, Width * 70 / 100);   // the page's three panes, then the preview
         if (selftest is null)
         {
             preview = Native.DexmenuPreviewCreate(previewPanel.Handle);

@@ -678,38 +678,57 @@ $("collapseAll").addEventListener("click", () => {
 });
 $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); });
 
-// The splitters between the panes: dragging one gives the pane on its left a fixed width; the last pane takes the rest.
-// The widths are kept in this page's storage (a convenience: without it the panes start at their default widths).
+// The splitters between the panes: a splitter changes only the pane on its left (and so the room of the card's panel
+// on the right, which takes the rest). The rules pane and the cards pane keep the width they were dragged to (kept in
+// this page's storage, a convenience). Each pane has a minimum; a drag stops there. When the window is too narrow for
+// the kept widths, both left panes shrink in proportion for now; the kept widths stay for a wider window.
 (() => {
   const key = "dexmenu.paneWidths";
-  // a dragged width is the pane's wish; it shrinks when the window is too narrow for all, so no pane runs off
-  const fix = (pane, w) => { pane.style.flex = "0 1 " + Math.round(w) + "px"; };
-  try {
-    const saved = JSON.parse(localStorage.getItem(key) || "{}");
-    for (const [id, w] of Object.entries(saved)) if ($(id) && w > 0) fix($(id), w);
-  } catch (e) { /* no storage: default widths */ }
+  const min = { rulesPane: 160, cardsPane: 260, cardPane: 200 };
+  let wish = {};
+  try { wish = JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) { /* no storage: default widths */ }
+  const left = ["rulesPane", "cardsPane"];
+  const room = () => $("panes").clientWidth - min.cardPane -
+    [...document.querySelectorAll("#panes > .splitter")].reduce((n, s) => n + s.getBoundingClientRect().width, 0);
+  const set = (id, w) => { $(id).style.flex = w ? "0 0 " + Math.round(w) + "px" : ""; };
+
+  function apply() {
+    const w = {};
+    for (const id of left) w[id] = wish[id] > 0 ? Math.max(min[id], wish[id]) : null;
+    const total = (w.rulesPane || $("rulesPane").getBoundingClientRect().width) + (w.cardsPane || $("cardsPane").getBoundingClientRect().width);
+    const r = room();
+    if (total > r && (w.rulesPane || w.cardsPane))
+      for (const id of left) if (w[id]) w[id] = Math.max(min[id], w[id] * r / total);
+    for (const id of left) set(id, w[id]);
+  }
+
   for (const splitter of document.querySelectorAll("#panes > .splitter")) {
     const pane = splitter.previousElementSibling;
+    const other = left.find(id => id !== pane.id);
     splitter.addEventListener("pointerdown", e => {
       e.preventDefault();
       splitter.setPointerCapture(e.pointerId);
       splitter.classList.add("dragging");
-      const startX = e.clientX, startW = pane.getBoundingClientRect().width;
-      const move = ev => fix(pane, Math.max(160, Math.min(startW + ev.clientX - startX, window.innerWidth - 320)));
+      // both left panes as they are now; during the drag only this one changes
+      for (const id of left) { wish[id] = $(id).getBoundingClientRect().width; set(id, wish[id]); }
+      const startX = e.clientX, startW = wish[pane.id];
+      const move = ev => {
+        const most = room() - wish[other];   // the card's panel keeps its minimum
+        wish[pane.id] = Math.max(min[pane.id], Math.min(startW + ev.clientX - startX, most));
+        set(pane.id, wish[pane.id]);
+      };
       const up = () => {
         splitter.classList.remove("dragging");
         splitter.removeEventListener("pointermove", move);
         splitter.removeEventListener("pointerup", up);
-        try {
-          const saved = JSON.parse(localStorage.getItem(key) || "{}");
-          saved[pane.id] = pane.getBoundingClientRect().width;
-          localStorage.setItem(key, JSON.stringify(saved));
-        } catch (e) { /* not kept */ }
+        try { localStorage.setItem(key, JSON.stringify(wish)); } catch (e) { /* not kept */ }
       };
       splitter.addEventListener("pointermove", move);
       splitter.addEventListener("pointerup", up);
     });
   }
+  window.addEventListener("resize", apply);
+  apply();
 })();
 document.addEventListener("keydown", async e => {
   const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
