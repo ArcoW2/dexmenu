@@ -51,11 +51,12 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .gutter-col { flex: 0 0 18px; position: relative; border-right: 1px solid var(--line); }
 .gutter-top { display: flex; flex-direction: column; gap: 2px; margin-top: 7px; align-items: center; }
 .cards-main { flex: 1; min-width: 0; }
-/* the heading row (+ Card, + Divider) and the gutter's collapse / expand all stay at the top while the cards scroll;
-   the pane's own top padding is covered too (top: -6px) */
-#cardsPane .cards-main > h2, #cardsPane .gutter-top { position: sticky; top: -6px; z-index: 2; background: var(--bg); }
-#cardsPane .cards-main > h2 { margin: 0; padding: 6px 0; }
-#cardsPane .gutter-top { margin-top: 0; padding: 7px 0 6px; }
+/* the heading row (+ Card, + Divider) and the gutter's collapse / expand all stay at the top while the cards scroll,
+   where they start: the pane has no top padding, the row its own */
+#cardsPane { padding-top: 0; }
+#cardsPane .cards-main > h2, #cardsPane .gutter-top { position: sticky; top: 0; z-index: 2; background: var(--bg); }
+#cardsPane .cards-main > h2 { margin: 0; padding: 12px 0 6px; }
+#cardsPane .gutter-top { margin-top: 0; padding: 13px 0 6px; }
 .toggle { padding: 0; width: 15px; height: 15px; line-height: 12px; font-size: 12px; font-weight: 700; border-radius: 3px; }
 .toggle.fold { position: absolute; left: 1px; }
 .card-icon { width: 14px; height: 10px; vertical-align: -1px; }
