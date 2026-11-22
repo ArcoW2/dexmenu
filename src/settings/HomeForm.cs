@@ -22,8 +22,9 @@ sealed class HomeForm : Form, IThemed
     public HomeForm()
     {
         Text = "Dexmenu";
-        Width = 980;
-        Height = 640;
+        // opens as tabs: narrower than both panels side by side, lower than both above each other (main.css minimums)
+        Width = 720;
+        Height = 720;
         StartPosition = FormStartPosition.CenterScreen;
         Controls.Add(web);
         settle.Tick += (_, _) => { settle.Stop(); PostState(); };
