@@ -411,7 +411,14 @@ function ruleEditor(card, rule, index) {
   box.append(head, where, opts);
   const problem = M.ruleProblem(rule);
   if (problem) box.append(el("div", "problem", problem));
-  box.addEventListener("click", () => { if (selectedRule !== index) { selectedRule = index; render(); } });
+  // selecting the rule only moves the highlights: a full render here would replace the checkbox or field this same
+  // click is meant for (the first click was lost)
+  box.addEventListener("click", () => {
+    if (selectedRule === index) return;
+    selectedRule = index;
+    for (const r of $("card").querySelectorAll(".rule")) r.classList.toggle("selected", r === box);
+    renderRules();
+  });
   return box;
 }
 
