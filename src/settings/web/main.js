@@ -186,7 +186,7 @@ function measureMinimums() {
 function arrange() {
   document.body.className = "tabs";
   for (const p of document.querySelectorAll(".panel")) p.classList.toggle("shown", p.id === shownTab);
-  for (const b of document.querySelectorAll("#tabs button")) b.classList.toggle("on", b.dataset.panel === shownTab);
+  for (const b of document.querySelectorAll("#tabs button[data-panel]")) b.classList.toggle("on", b.dataset.panel === shownTab);
 }
 
 // The window's minimum: one panel at its minimum, as a tab (the largest of both), with the margins and
@@ -199,7 +199,7 @@ function minimumSize() {
   };
 }
 
-for (const b of document.querySelectorAll("#tabs button"))
+for (const b of document.querySelectorAll("#tabs button[data-panel]"))   // the tabs, not the light / dark button
   b.addEventListener("click", () => { shownTab = b.dataset.panel; arrange(); });
 // Measured again whenever the page changes (a state fills the lists and the registration line); the window's minimum
 // sent when it changed.

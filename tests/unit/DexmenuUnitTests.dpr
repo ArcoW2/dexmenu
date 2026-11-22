@@ -337,6 +337,7 @@ end;
 
 const
   Rest = '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] }';
+  RestMenu = '{ "line": [ { "card": "R", "menu": [ { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] } ] }';
   AllRest = 'I:Open / I:Open with / - / I:Edit in LexPen / I:View in LexPen / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties';
 
 function Card(const Name, Rules: string; const Extra: string = ''): string;
@@ -611,6 +612,19 @@ begin
   Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "Open" } }') + ', { "divider": "Rest" }, ' + Rest + ' ]'),
     'I:Open / D:Rest / I:Open with / - / I:Edit in LexPen / I:View in LexPen / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties',
     'a divider before the remaining items; no Windows separator right after it');
+  // (the remaining card first, in a menu, so the helper adds none at the end)
+  Expect(Shows('[ { "divider": true }, ' + RestMenu + ', ' + Card('X', '{ "name": { "equals": "Cut" } }') + ', { "divider": true }, { "divider": true }, ' +
+    Card('Y', '{ "name": { "equals": "Copy" } }') + ', { "divider": true } ]'), 'M:R / I:Cut / D: / I:Copy',
+    'a divider without text: not first, not last, not right after another');
+  Expect(Shows('[ { "divider": "A" }, { "divider": "B" }, ' + Card('X', '{ "name": { "equals": "Cut" } }') + ', { "divider": "C" }, ' +
+    '{ "divider": true }, ' + Card('Y', '{ "name": { "equals": "Copy" } }') + ' ]'), 'D:B / I:Cut / D:C / I:Copy',
+    'a divider with text followed at once by another with text: not shown; one without text after it: not shown');
+  Expect(Shows('[ ' + RestMenu + ', ' + Card('X', '{ "name": { "equals": "Cut" } }') + ', { "divider": true }, ' +
+    Card('Nothing', '{ "name": { "equals": "No such item" } }') + ' ]'), 'M:R / I:Cut',
+    'a divider left last because the card after it found nothing: not shown');
+  Expect(Shows('[ ' + RestMenu + ', ' + Card('X', '{ "name": { "equals": "Cut" } }') + ', { "divider": "Gone" }, ' +
+    Card('H', '{ "name": { "equals": "Copy" } }', ', "hidden": true') + ', { "divider": true } ]'), 'M:R / I:Cut / D:Gone',
+    'a hidden card is not shown, so it is no item after a divider (the plain divider after it goes as the last)');
 end;
 
 // The seen items merged (Dexmenu.Seen): names, '*' for "sometimes", a submenu's items in [ ], '-' a separator.

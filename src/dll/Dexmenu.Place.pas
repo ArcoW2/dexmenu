@@ -282,10 +282,11 @@ begin
 end;
 
 // No Windows separator at the start or the end of a level, never two separators in a row: a Windows separator next to
-// another separator or a layout's divider goes; the layout's dividers stay where the user put them.
+// another separator or a layout's divider goes. A layout's divider without text goes at the start or the end of a
+// level or right after another separator; one with text goes when another with text follows it at once.
 procedure CleanSeparators(Level: TViewLevel);
 var
-  I: Integer;
+  I, Before: Integer;
   function IsSep(I: Integer): Boolean;
   begin
     Result := (I >= 0) and (I < Level.Lines.Count) and (Level.Lines[I].Cards.Count = 1) and
@@ -295,15 +296,32 @@ var
   begin
     Result := IsSep(I) and (Level.Lines[I].Cards[0].Divider = nil);
   end;
+  function IsTexted(I: Integer): Boolean;
+  begin
+    Result := IsSep(I) and not IsWindows(I) and (Level.Lines[I].Cards[0].Divider.DividerText <> '');
+  end;
+  function IsPlain(I: Integer): Boolean;
+  begin
+    Result := IsSep(I) and not IsWindows(I) and (Level.Lines[I].Cards[0].Divider.DividerText = '');
+  end;
 begin
-  I := 0;
-  while I < Level.Lines.Count do
-    if IsWindows(I) and ((I = 0) or IsSep(I - 1) or (IsSep(I + 1) and not IsWindows(I + 1))) then
-      Level.Lines.Delete(I)
-    else
-      Inc(I);
-  while (Level.Lines.Count > 0) and IsWindows(Level.Lines.Count - 1) do
-    Level.Lines.Delete(Level.Lines.Count - 1);
+  repeat
+    Before := Level.Lines.Count;
+    I := 0;
+    while I < Level.Lines.Count do
+      if IsWindows(I) and ((I = 0) or IsSep(I - 1) or (IsSep(I + 1) and not IsWindows(I + 1))) then
+        Level.Lines.Delete(I)
+      else
+        Inc(I);
+    while (Level.Lines.Count > 0) and IsWindows(Level.Lines.Count - 1) do
+      Level.Lines.Delete(Level.Lines.Count - 1);
+    I := 0;
+    while I < Level.Lines.Count do
+      if (IsPlain(I) and ((I = 0) or (I = Level.Lines.Count - 1) or IsSep(I - 1))) or (IsTexted(I) and IsTexted(I + 1)) then
+        Level.Lines.Delete(I)
+      else
+        Inc(I);
+  until Level.Lines.Count = Before;
 end;
 
 function NewLine(Level: TViewLevel): TViewLine;
