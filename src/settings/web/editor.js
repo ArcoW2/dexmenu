@@ -26,6 +26,22 @@ let dirty = false;
 let lastSent = "";
 let loadedText = "";
 
+// A small card, the icon of the buttons that add one (drawn here: a symbol font such as Wingdings is not sure to be
+// there).
+function cardIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 14 10");
+  svg.setAttribute("class", "card-icon");
+  svg.setAttribute("aria-hidden", "true");
+  const add = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); svg.append(e); };
+  add("rect", { x: "0.75", y: "0.75", width: "12.5", height: "8.5", rx: "2", fill: "none", stroke: "currentColor", "stroke-width": "1.5" });
+  add("line", { x1: "3.5", y1: "4", x2: "10.5", y2: "4", stroke: "currentColor", "stroke-width": "1.3" });
+  add("line", { x1: "3.5", y1: "6.5", x2: "8", y2: "6.5", stroke: "currentColor", "stroke-width": "1.3" });
+  return svg;
+}
+const withIcon = (button, label) => { button.replaceChildren(cardIcon(), document.createTextNode(" " + label)); return button; };
+
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -109,23 +125,23 @@ function renderCard(card) {
   const box = el("div", classes.join(" "));
   box.draggable = true;
   box.dataset.id = card.id;
-  // left, a gutter with the fold toggle of a card with a menu; right, the card
-  const gutter = el("div", "gutter");
+  // a card with a menu folds; its toggle is in the pane's gutter (placeToggles)
   const folded = !!card.menu && collapsed.has(card.id);
-  if (card.menu) {
-    const t = el("button", "toggle", folded ? "+" : "-");
-    t.title = folded ? "Expand" : "Collapse";
-    t.addEventListener("click", e => { e.stopPropagation(); folded ? collapsed.delete(card.id) : collapsed.add(card.id); render(); });
-    gutter.append(t);
-  }
-  const body = el("div", "body");
+  if (card.menu) box.dataset.fold = folded ? "folded" : "open";
   const title = el("div", "title", card.card);
-  title.append(...ruleBadges(card), el("span", "grow"), cardActions(card));
+  title.append(...ruleBadges(card));
   const cardsIn = card.menu ? [...M.cards(card.menu)].length : 0;
-  body.append(title, el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
-  if (card.menu && !folded) body.append(renderLines(card.menu, card.id));
-  box.append(gutter, body);
+  box.append(cardActions(card), title,
+    el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
+  if (card.menu && !folded) box.append(renderLines(card.menu, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
+  // its actions show for the innermost card under the mouse only (CSS :hover would show the outer cards' too)
+  box.addEventListener("mouseover", e => {
+    e.stopPropagation();
+    for (const h of document.querySelectorAll(".card.hot")) if (h !== box) h.classList.remove("hot");
+    box.classList.add("hot");
+  });
+  box.addEventListener("mouseleave", () => box.classList.remove("hot"));
   box.addEventListener("dragstart", e => { e.stopPropagation(); e.dataTransfer.setData("text/card", card.id); });
   const zones = ["over", "over-before", "over-after", "over-above", "over-below"];
   box.addEventListener("dragover", e => {
@@ -159,24 +175,29 @@ function renderCard(card) {
 
 // A card's own actions, shown on hover: a card beside it, a card in its menu, make it a card with a menu, delete.
 function cardActions(card) {
-  const box = el("span", "card-actions");
-  const action = (label, tip, fn) => {
+  // over the card's top right on hover (the card keeps its size): the two that add a card above each other, then the rest
+  const box = el("div", "card-actions");
+  const adds = el("div", "adds"), rest = el("div", "rest");
+  box.append(adds, rest);
+  const action = (into, label, tip, fn, icon = false) => {
     const b = el("button", "", label);
+    if (icon) withIcon(b, label);
     b.title = tip;
+    b.draggable = false;
     b.addEventListener("click", e => { e.stopPropagation(); fn(); });
-    box.append(b);
+    into.append(b);
   };
-  action("+ beside", "A new card beside this one", () => { select(M.addCard(layout, linesOf(), null, card.id).id, -1); changed(); });
-  if (card.menu) action("+ in menu", "A new card at the end of its menu", () => {
+  action(adds, "+ beside", "A new card beside this one", () => { select(M.addCard(layout, linesOf(), null, card.id).id, -1); changed(); }, true);
+  if (card.menu) action(adds, "+ in menu", "A new card at the end of its menu", () => {
     collapsed.delete(card.id);
     select(M.addCard(layout, linesOf(), card.id).id, -1);
     changed();
-  });
-  if (!card.menu && !M.isRemaining(card)) action("menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
+  }, true);
+  if (!card.menu && !M.isRemaining(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
     M.makeMenu(layout, linesOf(), card.id);
     changed();
   });
-  if (!M.isRemaining(card)) action("x", "Delete this card", () => {
+  if (!M.isRemaining(card)) action(rest, "x", "Delete this card", () => {
     if (M.deleteCard(linesOf(), card.id)) { if (selectedId === card.id) selectedId = null; changed(); }
   });
   return box;
@@ -419,9 +440,36 @@ function render() {
   if (!layout) return;
   $("ownKind").hidden = Array.isArray(layout[kind]) || kind === "default";
   $("cards").replaceChildren(renderLines(linesOf(), null));
+  placeToggles();
   renderCardPane();
   renderRules();
 }
+
+// The fold toggles in the gutter, each level with its card's title; placed again whenever the cards move (a render,
+// the pane resized, a card's text wrapping differently).
+function placeToggles() {
+  const gutter = $("cardsGutter");
+  for (const t of gutter.querySelectorAll(".fold, .rest-mark")) t.remove();
+  const top = gutter.getBoundingClientRect().top;
+  // the remaining card: a coloured line beside it
+  const rest = $("cards").querySelector(".card.remaining");
+  if (rest) {
+    const r = rest.getBoundingClientRect(), mark = el("div", "rest-mark");
+    mark.title = "The remaining card";
+    mark.style.top = (r.top - top) + "px";
+    mark.style.height = r.height + "px";
+    gutter.append(mark);
+  }
+  for (const box of $("cards").querySelectorAll(".card[data-fold]")) {
+    const id = box.dataset.id, folded = box.dataset.fold === "folded";
+    const t = el("button", "toggle fold", folded ? "+" : "-");
+    t.title = (folded ? "Expand " : "Collapse ") + (M.find(linesOf(), id)?.card.card || "");
+    t.style.top = (box.getBoundingClientRect().top - top + 5) + "px";
+    t.addEventListener("click", () => { folded ? collapsed.delete(id) : collapsed.add(id); render(); });
+    gutter.append(t);
+  }
+}
+new ResizeObserver(() => { if (layout) placeToggles(); }).observe($("cards"));
 
 function load(state) {
   kind = state.kind;   // chosen above the preview (the app)
@@ -485,6 +533,7 @@ $("saveAs").addEventListener("click", async () => {
   if (name) post({ type: "save", name, layout: JSON.stringify(layout, null, 2) });
 });
 $("activate").addEventListener("click", () => post({ type: "activate", name: $("layouts").value }));
+withIcon($("addTop"), "+ Card");
 $("addTop").addEventListener("click", () => { if (layout) { select(M.addCard(layout, linesOf(), null).id, -1); changed(); } });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("collapseAll").addEventListener("click", () => {
