@@ -38,6 +38,8 @@ type
     destructor Destroy; override;
   end;
 
+  TNoteAlign = (naLeft, naText, naCenter, naRight);   // a note's text: left, with the items' text, center, right
+
   TCard = class
   public
     Id: string;            // "id", or made up (c1, c2, ...) when the layout has none
@@ -58,6 +60,7 @@ type
     // several lines
     IsNote: Boolean;
     NoteText: string;
+    NoteAlign: TNoteAlign;   // "align": left (default), text (with the items' text), center, right
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -213,6 +216,13 @@ begin
     Card := TCard.Create;
     Card.IsNote := True;
     Card.NoteText := Obj.GetValue('note').Value;
+    if Obj.GetValue('align') is TJSONString then
+      if Obj.GetValue('align').Value = 'text' then
+        Card.NoteAlign := naText
+      else if Obj.GetValue('align').Value = 'center' then
+        Card.NoteAlign := naCenter
+      else if Obj.GetValue('align').Value = 'right' then
+        Card.NoteAlign := naRight;
     Card.Parent := Parent;
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then

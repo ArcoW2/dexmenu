@@ -56,6 +56,9 @@ end;
 procedure TestLayouts;
 const
   Remaining = '{ "card": "Rest", "rules": [ "remaining" ] }';
+var
+  NoteLayout: ILayout;
+  NoteError: string;
 begin
   Check(Valid(BaseLayout), 'the built-in base layout is valid');
   Check(Valid('{ "default": [ { "line": [ ' + Remaining + ' ] } ] }'), 'one remaining card at the root');
@@ -80,6 +83,11 @@ begin
     'a newer format than the DLL knows: not used, the reason says so');
   Check(Valid('{ "default": [ { "line": [ ' + Remaining + ' ] } ], "folder": [ { "line": [ { "card": "Broken" } ] } ] }'),
     'the older form: read by its default menu, its other kinds'' sections ignored');
+  NoteLayout := ParseLayout('{ "format": 1, "lines": [ { "line": [ { "note": "a", "align": "text" }, { "note": "b", "align": "right" }, ' +
+    '{ "note": "c" } ] }, { "line": [ ' + Remaining + ' ] } ] }', 'test', NoteError);
+  Check((NoteLayout <> nil) and (NoteLayout.Lines('')[0].Cards[0].NoteAlign = naText) and
+    (NoteLayout.Lines('')[0].Cards[1].NoteAlign = naRight) and (NoteLayout.Lines('')[0].Cards[2].NoteAlign = naLeft),
+    'a note''s alignment read: text, right; left when not given');
 end;
 
 procedure TestCurrent;

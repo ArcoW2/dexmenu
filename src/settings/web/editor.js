@@ -207,7 +207,8 @@ function renderCard(card) {
   if (card.menu) box.dataset.fold = folded ? "folded" : "open";
   const title = el("div", "title");
   // its own element, so a long name wraps inside the card; a note shows its text (its first lines)
-  title.append(M.isNote(card) ? el("span", "name note-text", card.note || "(empty)") : el("span", "name", card.card));
+  title.append(M.isNote(card) ? el("span", "name note-text align-" + (card.align || "left"), card.note || "(empty)")
+    : el("span", "name", card.card));
   title.append(...ruleBadges(card));
   const cardsIn = card.menu ? [...M.cards(card.menu)].length : 0;
   box.append(cardActions(card), title,
@@ -475,7 +476,18 @@ function renderCardPane() {
     area.addEventListener("change", () => { card.note = area.value; changed(); });
     const row = el("label", "field");
     row.append(el("span", "", "Text"), area);
-    $("card").replaceChildren(row, el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
+    // where its text goes: the card's left edge, in line with the items' text, the middle, the right
+    const place = el("select");
+    for (const [v, label] of [["left", "left"], ["text", "aligned with the menu's text"], ["center", "centered"], ["right", "right"]]) {
+      const o = el("option", "", label);
+      o.value = v;
+      place.append(o);
+    }
+    place.value = card.align || "left";
+    place.addEventListener("change", () => { if (place.value === "left") delete card.align; else card.align = place.value; changed(); });
+    const placeRow = el("label", "field");
+    placeRow.append(el("span", "", "Text placed"), place);
+    $("card").replaceChildren(row, placeRow, el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
     return;
   }
   $("cardHeading").textContent = M.isRemaining(card) ? "The remaining card" : card.menu ? "A card with a menu" : "A card with rules";

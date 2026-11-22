@@ -44,7 +44,7 @@ the preview is the result.
 | Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the priority list, several found at the card's place, `also`, `consume`, `skipDuplicates`, hidden cards, the remaining card; submenus filled only when opened opened first for rules that look inside | 3.3; plan 00 6.5 |
 | Layout editing | the cards view and the rules view (priority list, draggable); dragging cards and dividers (onto a card, beside, above or below), the remaining card; preview and editor tied; comments, hints | 3.5; plan 00 6.5; plan 05 6.3 |
 | Layouts | saved under a name, JSON with comments, one menu per layout; which kinds use which layout: plan 05 | 3.4; 3.5; plan 05 |
-| Note card | `{ "note": "<text>" }`: no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
+| Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
 ### Not yet built
@@ -127,7 +127,9 @@ in the layout is where its items show.
 - **Note card:** `{ "note": "<text>" }` (or `"note": ""` for an empty space): a card that is no button. It finds
   nothing and runs nothing: hover does not light it, a click and the keys pass it by (the arrows skip it), and it
   has no rules or menu. Its text, when it has one, may hold several lines (a memo) and wraps to the card's width;
-  the card is as high as its text, or one line's height when empty. It stands in a line like any card (beside
+  the card is as high as its text, or one line's height when empty. Its text is placed by `"align"`: `left` (the
+  card's edge; the default), `text` (in line with the items' text, past the room for a check mark or an icon),
+  `center` or `right`. It stands in a line like any card (beside
   other cards too) and is never in the priority list. Its look (text colour, background) comes with the themes
   (plan 03); until then the dim text colour. In the editor: "+ Note" beside "+ Card" and "+ Divider", dragged or
   clicked, its text edited in the panel as a text box. Used for the warning of a layout the DLL cannot use (plan 05

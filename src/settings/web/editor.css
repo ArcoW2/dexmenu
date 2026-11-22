@@ -98,7 +98,10 @@ h2 button { white-space: nowrap; }
 .card.over-below { box-shadow: 0 3px 0 var(--accent); }
 .card.useless { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
 .card.remaining { border-style: dashed; }
-.card .note-text { font-weight: normal; font-style: italic; white-space: pre-line; color: var(--dim); }
+.card .note-text { font-weight: normal; font-style: italic; white-space: pre-line; color: var(--dim); flex: 1; }
+.card .note-text.align-text { padding-left: 24px; }
+.card .note-text.align-center { text-align: center; }
+.card .note-text.align-right { text-align: right; }
 .rest-mark { position: absolute; right: 2px; width: 4px; border-radius: 2px; background: var(--rest); }
 .card.hidden { opacity: .55; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px), var(--card); }
 .card .title { font-weight: 600; display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; min-width: 0; }

@@ -166,17 +166,40 @@ end;
 const
   NotePad = 8;   // a note's text from its card's edges (DIP)
 
+// Where a note's text starts within its card: aligned with the items' text, or at the card's edge.
+function NoteLeft(V: TViewCard): Single;
+begin
+  if V.Card.NoteAlign = naText then
+    Result := TextLeft
+  else
+    Result := NotePad;
+end;
+
+// A note's text laid out in its box (width), aligned as the layout says; nil when it has no text.
+function NoteLayout(V: TViewCard; Width: Single): IDWriteTextLayout;
+const
+  Align: array[TNoteAlign] of DWRITE_TEXT_ALIGNMENT = (DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_LEADING,
+    DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_TRAILING);
+var
+  Text: string;
+begin
+  Result := nil;
+  Text := V.Title;
+  if (Text = '') or Failed(DWrite.CreateTextLayout(PWideChar(Text), Length(Text), NoteFormat,
+    Max(1, Width - NoteLeft(V) - NotePad), 10000, Result)) then
+    Exit(nil);
+  Result.SetTextAlignment(Align[V.Card.NoteAlign]);
+end;
+
 // A note's height at a card width: its wrapped text, or one line's height when it has none.
-function NoteHeight(const Text: string; Width: Single): Single;
+function NoteHeight(V: TViewCard; Width: Single): Single;
 var
   Layout: IDWriteTextLayout;
   M: TDWriteTextMetrics;
 begin
   Result := ItemHeight;
-  if (Text = '') or Failed(DWrite.CreateTextLayout(PWideChar(Text), Length(Text), NoteFormat, Max(1, Width - 2 * NotePad), 10000,
-    Layout)) then
-    Exit;
-  if Succeeded(Layout.GetMetrics(M)) then
+  Layout := NoteLayout(V, Width);
+  if (Layout <> nil) and Succeeded(Layout.GetMetrics(M)) then
     Result := Max(ItemHeight, M.height + 2 * NotePad);
 end;
 
@@ -210,7 +233,7 @@ begin
       if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
         Need := Need + TextWidth(V.Divider.DividerText, NormalFormat) + 48
       else if V.Kind = vkNote then
-        Need := Need + NoteWidth(V.Title)
+        Need := Need + NoteWidth(V.Title) + NoteLeft(V) - NotePad
       else if V.Kind <> vkSeparator then
       begin
         if V.IsDefault then
@@ -241,7 +264,7 @@ begin
     CardW := (W - 2 * OuterPad) / N;
     for I := 0 to N - 1 do   // a line as high as its highest card (a note may wrap to several lines)
       if Line.Cards[I].Kind = vkNote then
-        H := Max(H, NoteHeight(Line.Cards[I].Title, CardW));
+        H := Max(H, NoteHeight(Line.Cards[I], CardW));
     X := OuterPad;
     for I := 0 to N - 1 do
     begin
@@ -323,6 +346,7 @@ var
   R: TD2D1RectF;
   V: TViewCard;
   Title: string;
+  NoteText: IDWriteTextLayout;
   Fmt: IDWriteTextFormat;
   Brush: ID2D1SolidColorBrush;
   Y: Single;
@@ -364,11 +388,10 @@ begin
       Continue;
     if V.Kind = vkNote then
     begin
-      // a note: its text in the dim colour, no button (no hover, no mark)
-      Title := V.Title;
-      if Title <> '' then
-        T.DrawText(PWideChar(Title), Length(Title), NoteFormat, D2D1RectF(R.left + NotePad, R.top + NotePad,
-          R.right - NotePad, R.bottom - NotePad), Dim, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      // a note: its text in the dim colour, aligned as the layout says; no button (no hover, no mark)
+      NoteText := NoteLayout(V, R.right - R.left);
+      if NoteText <> nil then
+        T.DrawTextLayout(D2D1PointF(R.left + NoteLeft(V), R.top + NotePad), NoteText, Dim, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       Continue;
     end;
     if V.Kind = vkSeparator then
