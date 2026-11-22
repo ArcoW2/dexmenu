@@ -5,6 +5,7 @@ Status: partly executed; see Status.
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: the item tree and the window's first form (plan 00 steps 2 and 3).
 - 2026-11-21: partly executed: the preview's first form (plan 00 step 4).
+- 2026-11-22: partly executed: the rules, layout editing, layouts and the preview (plan 00 step 5 and after; plan 05).
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -39,26 +40,25 @@ the preview is the result.
 | Part | What | Reference |
 |---|---|---|
 | Item tree | Windows' menu read into a tree (names, paths, ids, states), a submenu read when opened, read again on a change while shown | 3.2; plan 00 6.3 |
-| Window, first form | Dexmenu's own window: plain cards one per line, keys, mouse, submenus, closing, the id handed back; the remaining card only; one built-in look | 3.6; 3.7; plan 00 6.3 |
-| Preview, first form | the DLL draws the menu in the settings app from the seen items and the layout, live, redrawn on a change | 3.8; plan 00 6.4 |
+| Window | Dexmenu's own window: lines of cards (side by side), dividers, keys, mouse, submenus next to their card, closing, the id handed back; one built-in look; empty submenus and empty cards with a menu left out | 3.6; 3.7; plan 00 6.3, 6.5 |
+| Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the priority list, several found at the card's place, `also`, `consume`, `skipDuplicates`, hidden cards, the remaining card; submenus filled only when opened opened first for rules that look inside | 3.3; plan 00 6.5 |
+| Layout editing | the cards view and the rules view (priority list, draggable); dragging cards and dividers (onto a card, beside, above or below), the remaining card; preview and editor tied; comments, hints | 3.5; plan 00 6.5; plan 05 6.3 |
+| Layouts | saved under a name, JSON with comments, one menu per layout; which kinds use which layout: plan 05 | 3.4; 3.5; plan 05 |
+| Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the rules' priority list, several found, the remaining card | Item tree | 3.3 |
-| Layout editing | the cards view and the rules view (priority list, draggable); dragging cards: onto a card makes a menu (its rules kept in a first card), moving, the remaining card; preview and editor tied (an item shows the card and rule that placed it) | Rules; plan 01 Settings app | 3.5 |
-| Settings and layouts | global settings; layouts per kind of right-click, saved under a name; JSON with comments | Rules | 3.4; 3.5 |
-| Window | Dexmenu's own window, drawn by the Delphi DLL: lines of cards, keys, mouse, closing, the id handed back | Settings and layouts | 3.6; 3.7; 3.8 |
-| Submenus | next to, half under, or in place of the menu; on hover or on click; filled when opened (Send to) | Window | 3.7 |
-| Edit menu | "Edit menu..." in the menu: the settings app's layout editor opened on this menu as it is | Window; plan 01 Settings app | 3.6 |
-| Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | Window | 3.8 |
-| Preview | the same window drawn by the DLL inside the settings app, from the seen items and the layout being edited | Window; plan 01 Settings app | 3.8 |
-| Use counts | every choice counted per item; the most used row; counts shown while editing | Window | 3.9 |
-| Default layouts | the suggested layouts shipped, A the default | Settings and layouts | 3.10 |
-| Note card | a card that is no button: an empty space with an optional text of several lines | Window | 3.3 |
-| Safety | fallback to Windows' own menu; a key for Windows' menu | Window | 3.11 |
-| Tests | 3.12 | -- | 3.12 |
+| Note card | a card that is no button: an empty space with an optional text of several lines | -- | 3.3 |
+| Global settings | the settings for every layout (submenus on hover or on click, the most used row's size, ...) | -- | 3.4 |
+| Submenus | half under, or in place of the menu (with `<<`); on click only | Global settings | 3.7 |
+| Edit menu | "Edit menu..." in the menu: the settings app's layout editor opened on this menu as it is | -- | 3.6 |
+| Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | -- | 3.8 |
+| Use counts | every choice counted per item; the most used row; counts shown while editing | -- | 3.9 |
+| Default layouts | the suggested layouts shipped, A the default | -- | 3.10 |
+| Safety | a key for Windows' own menu (the fallback on a broken layout is built) | -- | 3.11 |
+| Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 ## 3. Details
 
