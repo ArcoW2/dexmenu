@@ -139,6 +139,7 @@ $("delete").addEventListener("click", async () => { if (selected && await confir
 $("submenus").addEventListener("change", () => post({ type: "setMenu", name: "submenus", value: $("submenus").value }));
 for (const id of ["onClickOnly", "windowsMenu", "editMenu"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).checked }));
+$("textSize").addEventListener("change", () => post({ type: "setMenu", name: "textSize", value: (+$("textSize").value || 100) / 100 }));
 $("mostUsed").addEventListener("change", () => post({ type: "setMenu", name: "mostUsed", value: Math.round(+$("mostUsed").value || 3) }));
 for (const id of ["submenuMark", "actionMark", "states"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).value }));
@@ -227,6 +228,7 @@ chrome.webview.addEventListener("message", e => {
     for (const id of ["submenuMark", "actionMark"]) if (document.activeElement !== $(id)) $(id).value = m.menu[id];
     $("states").value = m.menu.states;
     if (document.activeElement !== $("mostUsed")) $("mostUsed").value = m.menu.mostUsed;
+    if (document.activeElement !== $("textSize")) $("textSize").value = Math.round(m.menu.textSize * 100);
     const rows = [...$("widths").querySelectorAll("tr")].slice(1);
     rows.forEach((tr, i) => {
       const w = m.menu.widths[Math.min(i, m.menu.widths.length - 1)] || { min: 200, max: 480 };

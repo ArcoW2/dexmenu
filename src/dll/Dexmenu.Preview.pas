@@ -138,6 +138,8 @@ begin
   if Dpi = 0 then
     Dpi := 96;
   Result := Dpi / 96;
+  if Settings.TextSize > 0 then
+    Result := Result * Settings.TextSize;   // the menu's text size (Ctrl+scroll in the menu), as a right-click shows it
 end;
 
 procedure TPreview.Rebuild;

@@ -85,6 +85,9 @@ static class DataFolder
             ["editMenu"] = m?["editMenu"]?.GetValue<bool>() != false,
             ["mostUsed"] = m?["mostUsed"] is System.Text.Json.Nodes.JsonValue n && n.TryGetValue<int>(out var count)
                 ? Math.Clamp(count, 1, 10) : 3,
+            // the menu's size (1 as drawn; Ctrl+scroll in the menu sets it too)
+            ["textSize"] = m?["textSize"] is System.Text.Json.Nodes.JsonValue t && t.TryGetValue<double>(out var size)
+                ? Math.Clamp(Math.Round(size, 1), 0.6, 2.5) : 1.0,
             ["submenuMark"] = m?["submenuMark"]?.GetValue<string>() ?? "",
             ["actionMark"] = m?["actionMark"]?.GetValue<string>() ?? "",
             ["states"] = m?["states"]?.GetValue<string>() is "enabled" or "disabled" ? m!["states"]!.GetValue<string>() : "both",

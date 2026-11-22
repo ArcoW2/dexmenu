@@ -235,6 +235,8 @@ begin
     Result := Session.Run(X, Y, Params);
     Command := Session.Command;
     ChosenKey := Session.ChosenKey;
+    if Session.TextSizeChanged then
+      SaveTextSize(Session.TextSize);   // Ctrl+scroll: kept for every next menu
   finally
     Session.Free;
   end;

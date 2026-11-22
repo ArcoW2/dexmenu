@@ -14,8 +14,9 @@ only left out by the general divider rules (plan 02 3.5), which do not know whic
 
 ## 2. The solution, in brief
 
-A group: a part of the layout holding lines of cards, notes, dividers and other groups, with a divider as its header.
-It looks just like its content and the divider would without the group. Each group says when it is shown: always,
+A group: a group card in the layout, holding cards, notes, dividers and other group cards, with a divider as its
+header; in the top level and in a card's menu. It looks just like its content and the divider would without the
+group. In the editor it is a card that holds cards, and cards and groups are dragged into it as into any place. Each group says when it is shown: always,
 only when it shows any item, or only when it shows an item that can be chosen. When it is not shown, its header and
 everything in it are left out.
 
@@ -30,17 +31,18 @@ everything in it are left out.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Group | a group in the layout format: its header divider, its content, when it shows; placed as its content, or left out whole | Open question 1 | 3.1; 3.2 |
-| Editor | groups made, filled and moved in the cards view; when it shows set in its panel | Group; Open question 2 | 3.3 |
-| Preview | a group that is not shown, as the menu shows it | Group; Open question 3 | 3.4 |
+| Group | a group card in the layout format: its header divider, its content, when it shows; placed as its content, or left out whole | -- | 3.1; 3.2 |
+| Editor | the group card in the cards view: "+ Group", cards and groups dragged into and out of it; its panel | Group | 3.3 |
+| Preview | a group that is not shown, as the menu shows it | Group; Open question 1 | 3.4 |
 | Tests | 3.5 | Group | 3.5 |
 
 ## 3. Details
 
 ### 3.1 The group
 
-- In a layout's lines, an entry of its own beside lines, dividers and notes: its header (a divider: its text and
-  alignment, or none) and its own content: lines of cards, notes, dividers, and groups in it (nested, to any depth).
+- A group card: an entry in a layout's lines beside lines, dividers and notes, in the top level and in a card's menu
+  (a submenu level) alike. It has its header (a divider: its text and alignment) and its own content: lines of
+  cards, notes, dividers, and group cards in it (nested, to any depth).
 - Placed as if its content stood there, with its header above it.
 - For now it looks the same as its content and divider without a group; a look of its own may follow (plan 03).
 - The general divider rules (plan 02 3.5) still apply to what remains, inside the group and around it.
@@ -60,12 +62,16 @@ in then counts what that group shows.
 
 ### 3.3 The editor
 
-- To be set: Open question 2.
+- A group is a card in the cards view, as a card with a menu is: a card that holds cards, drawn with its content
+  inside it (collapsible as a card with a menu).
+- "+ Group" beside "+ Card", "+ Divider", "+ Note".
+- Dragging is the same as for any card: a card, or a group card, is dragged into a group, out of it, and between
+  groups, onto the same drop places as elsewhere.
 - Its panel: the header (text, alignment) and when it shows.
 
 ### 3.4 The preview
 
-- To be set: Open question 3.
+- To be set: Open question 1.
 
 ### 3.5 Tests
 
@@ -76,10 +82,7 @@ in then counts what that group shows.
 
 ## 4. Open questions
 
-1. Can a group stand inside a card's menu (a submenu level), as well as in the top level?
-2. In the editor: how is a group made and shown (a frame around its content, "+ Group", selecting cards and grouping
-   them), and how are cards dragged into and out of it?
-3. In the preview: is a group that is not shown left out, as at a right-click, or striped as the preview does with
+1. In the preview: is a group that is not shown left out, as at a right-click, or striped as the preview does with
    cards that show nothing?
-4. Does the header have to have a text, or can it be a plain divider?
-5. Which setting does a new group get: always, only with any item, or only with executable items?
+2. Does the header have to have a text, or can it be a plain divider?
+3. Which setting does a new group get: always, only with any item, or only with executable items?

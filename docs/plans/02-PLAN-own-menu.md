@@ -10,6 +10,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: "Edit menu..." and Windows' menu (Shift, the item).
 - 2026-11-22: partly executed: the global settings (marks, widths per level, a rule's default states).
 - 2026-11-22: partly executed: use counts and the most used row.
+- 2026-11-22: partly executed: the text size (Ctrl+scroll).
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -53,6 +54,7 @@ the preview is the result.
 | Windows' menu | Shift held while right-clicking shows Windows' own menu (in Explorer its extended menu); "Windows' menu" at the end of every menu (on or off) closes Dexmenu's and shows Windows' at the same place; a layout that cannot be read: Windows' menu | 3.11 |
 | Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, "Windows' menu" and "Edit menu..." at the end, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
 | Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider | 3.9 |
+| Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -62,7 +64,6 @@ the preview is the result.
 |---|---|---|---|
 | Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | -- | 3.8 |
 | Counts while editing | the use count on every item in the preview and in the editor's items list | -- | 3.9 |
-| Text size | Ctrl+scroll in the open menu makes its text (and so its cards) larger or smaller; kept in the global settings for every next menu | -- | 3.4 |
 | Default layouts | the suggested layouts shipped, A the default | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 

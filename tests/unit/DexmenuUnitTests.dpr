@@ -185,6 +185,12 @@ begin
   with MenuSettings do
     Check((SubmenuMark = '>') and (ActionMark = '-') and (States = [stEnabled]) and (Length(Widths) = 2) and
       (Widths[0].MinW = 240) and (Widths[1].MaxW = 360), 'marks, a rule''s default states and the widths per level read');
+  Check(MenuSettings.TextSize = 1, 'no text size: 1');
+  SaveTextSize(1.34);
+  Check((Abs(MenuSettings.TextSize - 1.3) < 0.001) and (MenuSettings.SubmenuMark = '>') and (MenuSettings.States = [stEnabled]),
+    'the text size saved (to a tenth), the other settings kept');
+  SaveTextSize(9);
+  Check(Abs(MenuSettings.TextSize - MaxTextSize) < 0.001, 'the text size within its bounds');
   L := CurrentLayout('file', ToWindows, Error);
   TFile.WriteAllText(TPath.Combine(Layouts, 'Rules.json'), '{ "format": 1, "lines": [ { "line": [ { "card": "A", "rules": [ ' +
     '{ "name": { "equals": "x" } } ] } ] }, { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }');

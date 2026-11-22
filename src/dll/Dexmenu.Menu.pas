@@ -56,6 +56,8 @@ type
     FHints: TDictionary<string, string>;   // the items' own hints, from the seen items (Dexmenu.Seen.HintsOf)
     FUsage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage), for the most used row
     FChosenKey: string;                    // the chosen item's use count key; '' when none was chosen
+    FTextSize: Single;                     // the menu's size (Ctrl+scroll; settings.json menu.textSize)
+    FTextSizeChanged: Boolean;             // Ctrl+scroll changed it: kept once the menu closed (Dexmenu.Hook)
     FTip: TTip;
     FTipLevel: TLevelWindow; // the level and box a hint waits for (TipTimer) or shows for
     FTipBox: Integer;
@@ -80,6 +82,8 @@ type
     procedure Open(LevelIndex, Box: Integer; SelectFirst: Boolean);
     procedure MoveSelection(L: TLevelWindow; Delta: Integer);
     procedure KeyDown(Key: WPARAM);
+    // Ctrl+scroll: the menu larger (Delta > 0) or smaller; its submenus closed, the menu drawn again where it is
+    procedure ChangeTextSize(Delta: Integer);
     procedure CharKey(Ch: Char);
     procedure Refresh;
     procedure KeepSeen;
@@ -99,6 +103,8 @@ type
     property Command: TCommand read FCommand;
     // The chosen item's use count key (Dexmenu.Usage.UsageKey); '' when no item was chosen
     property ChosenKey: string read FChosenKey;
+    property TextSize: Single read FTextSize;
+    property TextSizeChanged: Boolean read FTextSizeChanged;
   end;
 
 threadvar
@@ -291,7 +297,7 @@ begin
   Dpi := GetDpiForWindow(L.Wnd);
   if Dpi = 0 then
     Dpi := 96;
-  L.Scale := Dpi / 96;
+  L.Scale := Dpi / 96 * FTextSize;
   L.Geometry := Measure(L.View);
   if FFlags and TPM_CENTERALIGN <> 0 then
     X := X - Ceil(L.Geometry.Width * L.Scale) div 2;
@@ -316,6 +322,7 @@ begin
   end;
   FTop := ReadLevel(FOriginal, '');
   FSettings := MenuSettings;
+  FTextSize := FSettings.TextSize;
   SetMenuLook(FSettings);
   FHints := HintsOf(ReadSeenText(FKind));
   FUsage := ReadUsage(FKind);
@@ -389,6 +396,31 @@ begin
     PostMessage(FOwner, WM_COMMAND, FChosen, 0);
     Result := True;
   end;
+end;
+
+procedure TMenuSession.ChangeTextSize(Delta: Integer);
+var
+  Size: Single;
+  L: TLevelWindow;
+  Dpi: UINT;
+begin
+  if Delta = 0 then
+    Exit;
+  Size := ClampTextSize(FTextSize + Sign(Delta) * 0.1);
+  if Size = FTextSize then
+    Exit;
+  FTextSize := Size;
+  FTextSizeChanged := True;
+  HideTip;
+  CloseFrom(1);
+  L := FLevels[0];
+  Dpi := GetDpiForWindow(L.Wnd);
+  if Dpi = 0 then
+    Dpi := 96;
+  L.Scale := Dpi / 96 * FTextSize;
+  FitOnScreen(L, L.Pos.X, L.Pos.Y, False, False, L.Pos.X);
+  L.ScrollY := Min(L.ScrollY, Max(0, L.Geometry.Height - L.VisibleHeight));
+  L.Redraw;
 end;
 
 procedure TMenuSession.CloseFrom(Index: Integer);
@@ -512,7 +544,7 @@ begin
   Dpi := GetDpiForWindow(L.Wnd);
   if Dpi = 0 then
     Dpi := 96;
-  L.Scale := Dpi / 96;
+  L.Scale := Dpi / 96 * FTextSize;
   L.Geometry := Measure(L.View, L.Index);
   FitOnScreen(L, X, Y, False, False, Parent.Pos.X + Round(R.left * Parent.Scale) + 2);
   if L.Replaces then
@@ -1008,6 +1040,9 @@ begin
         end;
       end;
     WM_MOUSEWHEEL:
+      if WP and MK_CONTROL <> 0 then
+        S.ChangeTextSize(SmallInt(WP shr 16))
+      else
       begin
         L.ScrollY := Max(0, Min(L.Geometry.Height - L.VisibleHeight,
           L.ScrollY - SmallInt(WP shr 16) / WHEEL_DELTA * ItemHeight * 3));

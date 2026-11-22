@@ -55,6 +55,7 @@ type
     Widths: TArray<TLevelWidth>;   // per level: the top, a first submenu, ...; the last for every deeper one
     States: TStates;          // the states a rule takes when it does not say
     MostUsed: Integer;        // how many items the most used row shows (plan 02 3.9)
+    TextSize: Single;         // the menu's size, 1 as drawn; Ctrl+scroll in the menu changes it (plan 02 3.4)
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
     WindowsMenu: Boolean;     // "Windows' menu" at the end of every menu (plan 02 3.11)
@@ -125,10 +126,16 @@ function CurrentLayout(const Kind: string; out ToWindows: Boolean; out Error: st
 // The global settings (settings.json "menu": { "submenus": "next" | "under" | "replace", "onClickOnly": true });
 // next and on hover when not set.
 function MenuSettings: TMenuSettings;
+// A text size within its bounds (MinTextSize - MaxTextSize), to a tenth.
+function ClampTextSize(Size: Double): Single;
+// The text size kept in settings.json ("menu": { "textSize" }), the other settings left as they are.
+procedure SaveTextSize(Size: Single);
 // The file CurrentLayout reads for a kind, or '' for the built-in base layout or Windows' menu (ToWindows).
 function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
 
 const
+  MinTextSize = 0.6;   // the menu's text size (TMenuSettings.TextSize) from 60% to 250%
+  MaxTextSize = 2.5;
   FormatVersion = 1;   // the layout files' form this DLL writes and reads; older forms are read too
   BaseLayout = '// the base layout: Windows'' menu as cards'#10 +
     '{ "format": 1, "lines": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }';
@@ -136,7 +143,7 @@ const
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, System.SyncObjs, System.Math, Dexmenu.Json, Dexmenu.Log;
+  Winapi.Windows, System.SysUtils, System.Classes, System.SyncObjs, System.Math, Dexmenu.Json, Dexmenu.Log;
 
 type
   TLayout = class(TInterfacedObject, ILayout)
@@ -506,6 +513,58 @@ var
   Cache: TObjectDictionary<string, TCached>;   // per layout file, read again when it changes
   Base: ILayout;
 
+function ClampTextSize(Size: Double): Single;
+begin
+  Result := Max(MinTextSize, Min(MaxTextSize, Round(Size * 10) / 10));
+end;
+
+procedure SaveTextSize(Size: Single);
+var
+  Path, Text, Error: string;
+  Settings: TJSONValue;
+  Menu: TJSONValue;
+  Lines: TStringList;
+begin
+  Path := DataFolder + '\settings.json';
+  Settings := nil;
+  try
+    if ReadTextFile(Path, Text) then
+      Settings := ParseWithComments(Text, Error);
+    if not (Settings is TJSONObject) then
+    begin
+      if FileExists(Path) then
+      begin
+        Log('text size not saved: settings.json cannot be read: ' + Error);
+        Exit;
+      end;
+      FreeAndNil(Settings);
+      Settings := TJSONObject.Create;
+    end;
+    Menu := TJSONObject(Settings).GetValue('menu');
+    if not (Menu is TJSONObject) then
+    begin
+      TJSONObject(Settings).RemovePair('menu').Free;
+      Menu := TJSONObject.Create;
+      TJSONObject(Settings).AddPair('menu', TJSONObject(Menu));
+    end;
+    TJSONObject(Menu).RemovePair('textSize').Free;
+    TJSONObject(Menu).AddPair('textSize', TJSONNumber.Create(ClampTextSize(Size)));
+    ForceDirectories(DataFolder);
+    Lines := TStringList.Create;
+    try
+      Lines.Text := Settings.Format(2);
+      Lines.SaveToFile(Path + '.tmp', TEncoding.UTF8);
+    finally
+      Lines.Free;
+    end;
+    MoveFileEx(PChar(Path + '.tmp'), PChar(Path), MOVEFILE_REPLACE_EXISTING);
+  except
+    on E: Exception do
+      Log('text size not saved: ' + E.Message);
+  end;
+  Settings.Free;
+end;
+
 function MenuSettings: TMenuSettings;
 var
   Text, Error: string;
@@ -520,6 +579,7 @@ begin
   Result.ActionMark := '';
   Result.Widths := nil;
   Result.MostUsed := 3;
+  Result.TextSize := 1;
   Result.States := [stEnabled, stDisabled];
   if not ReadTextFile(DataFolder + '\settings.json', Text) then
     Exit;
@@ -542,6 +602,8 @@ begin
       Result.EditMenu := TJSONBool(TJSONObject(Menu).GetValue('editMenu')).AsBoolean;
     if TJSONObject(Menu).GetValue('mostUsed') is TJSONNumber then
       Result.MostUsed := Max(1, Min(10, TJSONNumber(TJSONObject(Menu).GetValue('mostUsed')).AsInt));
+    if TJSONObject(Menu).GetValue('textSize') is TJSONNumber then
+      Result.TextSize := ClampTextSize(TJSONNumber(TJSONObject(Menu).GetValue('textSize')).AsDouble);
     if TJSONObject(Menu).GetValue('submenuMark') is TJSONString then
       Result.SubmenuMark := TJSONObject(Menu).GetValue('submenuMark').Value;
     if TJSONObject(Menu).GetValue('actionMark') is TJSONString then
