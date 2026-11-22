@@ -28,7 +28,8 @@ uses
 type
   // vkNote: a note card (Card), no button; vkBack: "<<" at the top of a submenu that replaced its menu (plan 02 3.7)
   // vkCommand: Dexmenu's own item at the end of the menu ("Windows' menu", "Edit menu...", plan 02 3.6, 3.11)
-  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand);
+  // vkSearch: the search's own line ("Search: ..."), a text, nothing to choose (plan 02 3.6)
+  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand, vkSearch);
   TCommand = (ccNone, ccWindowsMenu, ccEditMenu);
 
   TFound = record
@@ -45,7 +46,8 @@ type
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
-    BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand: its text
+    BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand, vkSearch: its text
+    ShownText: string;  // vkItem: a title in place of its own (a search hit: with its path); '' none
     Command: TCommand;  // vkCommand: which
     function Title: string;
     // The layout card's own icon ("icon") where it is this card's: a card with a menu, or the items a card places
@@ -107,6 +109,10 @@ type
     function TopLevel: TViewLevel;
     function MenuLevel(Card: TCard): TViewLevel;
     function SubmenuLevel(Node: TNode): TViewLevel;
+    // The search (plan 02 3.6): a line with the text, then every item of Windows' menu at any depth whose name holds
+    // the text (case ignored; a leading "/" makes the rest a regex), each on a line of its own, titled with its path;
+    // an item with a submenu, a hidden one and a duplicate left out.
+    function SearchLevel(const Text: string): TViewLevel;
     // The stored use counts (Usage) per layout card, by its id: the sum over the items it got, each with the items in
     // its submenu; the remaining card's over the remaining items. Cards without counts left out. The caller frees it.
     function CardCounts: TDictionary<string, Integer>;
@@ -129,7 +135,8 @@ procedure AddBackLine(Level: TViewLevel; Opener: TViewCard);
 implementation
 
 uses
-  System.SysUtils, System.Math, System.RegularExpressions, System.Generics.Defaults, Dexmenu.Rules, Dexmenu.Usage;
+  System.SysUtils, System.StrUtils, System.Math, System.RegularExpressions, System.Generics.Defaults, Dexmenu.Rules,
+  Dexmenu.Usage;
 
 function TPlacement.Hides(Node: TNode): Boolean;
 begin
@@ -233,6 +240,8 @@ begin
   case Kind of
     vkItem:
       begin
+        if ShownText <> '' then
+          Exit(ShownText);
         if (Card <> nil) and (Card.ShownTitle <> '') and not Card.IsRemaining and not Several then
           Exit(Card.ShownTitle);
         Result := Node.Name;
@@ -244,7 +253,7 @@ begin
           end;
       end;
     vkNote: Result := Card.NoteText;
-    vkBack, vkCommand: Result := BackTitle;
+    vkBack, vkCommand, vkSearch: Result := BackTitle;
     vkMenu:
       if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
@@ -860,6 +869,87 @@ begin
     if Sum > 0 then
       Result.AddOrSetValue(Rest.Id, Sum);
   end;
+end;
+
+function TPlacement.SearchLevel(const Text: string): TViewLevel;
+var
+  Keys: TDictionary<string, Boolean>;
+  Regex: TRegEx;
+  IsRegex, RegexOk: Boolean;
+  Hits: Integer;
+
+  procedure AddLine(Kind: TViewKind; const Title: string; Node: TNode);
+  var
+    Line: TViewLine;
+    V: TViewCard;
+  begin
+    V := TViewCard.Create;
+    V.Kind := Kind;
+    V.BackTitle := Title;
+    V.Node := Node;
+    Line := TViewLine.Create;
+    Line.Cards.Add(V);
+    Result.Lines.Add(Line);
+  end;
+
+  function Matches(const Name: string): Boolean;
+  begin
+    if IsRegex then
+    begin
+      Result := False;
+      if RegexOk then
+        try
+          Result := Regex.IsMatch(Name);   // compiled on first use: a regex still being typed fails here
+        except
+          RegexOk := False;
+        end;
+    end
+    else
+      Result := ContainsText(Name, Text);
+  end;
+
+  procedure Walk(Nodes: TNodes);
+  var
+    N: TNode;
+  begin
+    for N in Nodes do
+    begin
+      if N.IsSeparator or Hides(N) then
+        Continue;
+      if N.Children <> nil then
+        Walk(N.Children);
+      if (N.SubMenu <> 0) or (N.Name = '') or Keys.ContainsKey(UsageKey(N)) or not Matches(N.Name) then
+        Continue;
+      Keys.Add(UsageKey(N), True);
+      AddLine(vkItem, '', N);
+      if N.Path <> '' then
+        Result.Lines.Last.Cards[0].ShownText := N.Path + ' > ' + N.Name;
+      Inc(Hits);
+    end;
+  end;
+
+begin
+  Result := TViewLevel.Create;
+  AddLine(vkSearch, 'Search: ' + Text, nil);
+  IsRegex := Text.StartsWith('/');
+  RegexOk := False;
+  if IsRegex then
+    try
+      Regex := TRegEx.Create(Copy(Text, 2, MaxInt), [roIgnoreCase]);
+      RegexOk := Length(Text) > 1;
+    except
+      RegexOk := False;   // a regex still being typed: no hits until it is whole
+    end;
+  ReadAllChildren(Top);
+  Hits := 0;
+  Keys := TDictionary<string, Boolean>.Create;
+  try
+    Walk(Top);
+  finally
+    Keys.Free;
+  end;
+  if Hits = 0 then
+    AddLine(vkSearch, 'No item found', nil);
 end;
 
 function TPlacement.TopLevel: TViewLevel;

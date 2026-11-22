@@ -58,6 +58,7 @@ type
     FChosenKey: string;                    // the chosen item's use count key; '' when none was chosen
     FTextSize: Single;                     // the menu's size (Ctrl+scroll; settings.json menu.textSize)
     FTextSizeChanged: Boolean;             // Ctrl+scroll changed it: kept once the menu closed (Dexmenu.Hook)
+    FSearch: string;                       // what is typed into the search (plan 02 3.6); '' : no search
     FTip: TTip;
     FTipLevel: TLevelWindow; // the level and box a hint waits for (TipTimer) or shows for
     FTipBox: Integer;
@@ -85,6 +86,8 @@ type
     // Ctrl+scroll: the menu larger (Delta > 0) or smaller; its submenus closed, the menu drawn again where it is
     procedure ChangeTextSize(Delta: Integer);
     procedure CharKey(Ch: Char);
+    // The top level shows the search for FSearch, or its own lines again when FSearch is ''.
+    procedure ShowSearch;
     procedure Refresh;
     procedure KeepSeen;
     procedure FindEmpty(Nodes: TNodes);
@@ -105,6 +108,8 @@ type
     property ChosenKey: string read FChosenKey;
     property TextSize: Single read FTextSize;
     property TextSizeChanged: Boolean read FTextSizeChanged;
+    // Whether a search is being typed (a space then goes into it)
+    function IsSearching: Boolean;
   end;
 
 threadvar
@@ -600,6 +605,24 @@ begin
   V := nil;
   if (L.Selected >= 0) and (L.Selected <= High(L.Geometry.Boxes)) then
     V := L.Geometry.Boxes[L.Selected].Card;
+  // the search: Backspace takes a letter off, Esc ends it; a space is typed (WM_CHAR), not a choice
+  if FSearch <> '' then
+    case Key of
+      VK_BACK:
+        begin
+          Delete(FSearch, Length(FSearch), 1);
+          ShowSearch;
+          Exit;
+        end;
+      VK_ESCAPE:
+        begin
+          FSearch := '';
+          ShowSearch;
+          Exit;
+        end;
+      VK_SPACE:
+        Exit;
+    end;
   case Key of
     VK_DOWN, VK_UP:
       begin
@@ -665,12 +688,49 @@ begin
   end;
 end;
 
+function TMenuSession.IsSearching: Boolean;
+begin
+  Result := FSearch <> '';
+end;
+
+procedure TMenuSession.ShowSearch;
+var
+  L: TLevelWindow;
+  Old: TViewLevel;
+begin
+  CloseFrom(1);
+  HideTip;
+  L := FLevels[0];
+  Old := L.View;
+  if FSearch = '' then
+    L.View := FPlacement.TopLevel
+  else
+    L.View := FPlacement.SearchLevel(FSearch);
+  Old.Free;
+  L.Geometry := Measure(L.View, 0);
+  L.ScrollY := 0;
+  L.Selected := -1;
+  if FSearch <> '' then
+    MoveSelection(L, 1);   // the first hit: Enter runs it
+  FitOnScreen(L, L.Pos.X, L.Pos.Y, False, False, L.Pos.X);
+  L.Redraw;
+end;
+
 procedure TMenuSession.CharKey(Ch: Char);
 var
   L: TLevelWindow;
   I, First, Count, Start: Integer;
 begin
+  // typing into the search already begun
+  if FSearch <> '' then
+  begin
+    FSearch := FSearch + Ch;
+    ShowSearch;
+    Exit;
+  end;
   L := FLevels.Last;
+  if Ch = ' ' then
+    Exit;
   Ch := UpCase(Ch);
   Count := 0;
   First := -1;
@@ -683,7 +743,12 @@ begin
         First := I;
     end;
   if First < 0 then
+  begin
+    // no item of the open level has this access key: the letter starts the search (plan 02 3.6)
+    FSearch := Ch;
+    ShowSearch;
     Exit;
+  end;
   L.Selected := First;
   L.Redraw;
   if Count = 1 then
@@ -904,6 +969,8 @@ begin
     L.ScrollY := Min(L.ScrollY, Max(0, L.Geometry.Height - L.VisibleHeight));
     L.Redraw;
   end;
+  if FSearch <> '' then
+    ShowSearch;   // the search shown again on the new items
 end;
 
 procedure TMenuSession.Dump;
@@ -1050,7 +1117,7 @@ begin
     WM_KEYDOWN, WM_SYSKEYDOWN:
       S.KeyDown(WP);
     WM_CHAR:
-      if WP > 32 then
+      if (WP > 32) or ((WP = 32) and S.IsSearching) then
         S.CharKey(Char(WP));
     WM_ACTIVATE:
       if (WP and $FFFF = WA_INACTIVE) and not S.IsOurs(HWND(LP)) then

@@ -291,6 +291,7 @@ begin
         vkItem: Line := Line + 'I:' + V.Title;
         vkMenu: Line := Line + 'M:' + V.Title;
         vkCommand: Line := Line + 'C:' + V.Title;
+        vkSearch: Line := Line + 'S:' + V.Title;
       else
         Line := Line + '-';
       end;
@@ -711,6 +712,46 @@ begin
   end;
 end;
 
+// The search (plan 02 3.6): items at any depth whose name holds the text, titled with their path; a regex.
+procedure TestSearch;
+var
+  Layout: ILayout;
+  Error: string;
+  Menu: HMENU;
+  Top: TNodes;
+  P: TPlacement;
+
+  function Search(const Text: string): string;
+  var
+    Level: TViewLevel;
+  begin
+    Level := P.SearchLevel(Text);
+    try
+      Result := Describe(Level);
+    finally
+      Level.Free;
+    end;
+  end;
+
+begin
+  Layout := ParseLayout('{ "default": [ { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Expect(Search('add'), 'S:Search: add / I:7-Zip > Add to archive...', 'a submenu''s item found, titled with its path');
+    Expect(Search('C'), 'S:Search: C / I:7-Zip > Add to archive... / I:7-Zip > Extract here / I:7-Zip > CRC SHA > CRC-32 / ' +
+      'I:Cut / I:Copy', 'case ignored; items with a submenu (7-Zip, CRC SHA) left out');
+    Expect(Search('/^(cut|copy)$'), 'S:Search: /^(cut|copy)$ / I:Cut / I:Copy', 'a leading / : a regex');
+    Expect(Search('/('), 'S:Search: /( / S:No item found', 'a regex not yet whole: nothing found, no error');
+    Expect(Search('zzz'), 'S:Search: zzz / S:No item found', 'nothing found: said so');
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 procedure TestSubmenuModes;
 var
   C: TCard;
@@ -1064,6 +1105,7 @@ begin
   TestIcons;
   TestKeptIcons;
   TestAccessAndShortcut;
+  TestSearch;
   TestSubmenuModes;
   TestSeen;
   if Failures = 0 then

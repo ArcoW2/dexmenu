@@ -15,6 +15,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: icons (the layout's, the item's own bitmap).
 - 2026-11-22: partly executed: Dexmenu's own items as cards; the shipped layouts Default A, C and D.
 - 2026-11-22: partly executed: the items' icons in the preview.
+- 2026-11-22: partly executed: access keys and shortcuts; the search.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -64,6 +65,7 @@ the preview is the result.
 | Icons in the preview | the items' own bitmaps kept as PNG files in the seen folder's `icons` (by a hash of the item's path and text), by every right-click and by the settings app's real menu of a folder; the preview draws them; an icon this process kept with the same pixels is not encoded again | 3.8 |
 | Icon probe | opt-in (HKCU Software Dexmenu, ProbeIcons = 1): at a right-click every owner-drawn item without a bitmap drawn by its owner window into Dexmenu's memory on black and on white, the icon cut from its left part; the drawings written to %LOCALAPPDATA%\Dexmenu\probe, the icon kept for the preview, the result logged; not yet run in Explorer | 3.8 |
 | Access keys and shortcuts | the `&` letter underlined in an item's own title, its key picks the item; the shortcut after a tab in Windows' text shown dim at the right, the card wide enough for it | 3.6 |
+| Search | a letter that is no access key in the open level starts a search: the top level shows "Search: ..." and every item at any depth whose name holds the text (case ignored; a leading `/`: a regex), titled with its path, the first selected; Enter runs it, Backspace edits, Esc ends the search; kept when Explorer changes the menu | 3.6 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -72,8 +74,10 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Explorer's own icons | Explorer's owner-drawn items' icons read at a right-click and used in the menu and the preview | the probe's result | 3.8 |
-| Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | items as buttons in a card; the search box | 3.10 |
-| Search box in Default D | Default D's search box | the search box (3.6) | 3.10 |
+| Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | Items as buttons in a card; Search box in Default D | 3.10 |
+| Search box in Default D | a search box as a layout entry, shown before typing starts (Default D's) | -- | 3.6; 3.10 |
+| Search in the preview | typing in the settings app's preview searches as in the menu | -- | 3.6 |
+| Items as buttons in a card | a card showing its items as buttons inside it (Default B's cards per program) | -- | 3.3; 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 ## 3. Details
@@ -283,9 +287,13 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   title when the title is the item's own text; pressing it picks the item, or moves between items with the same
   letter); an item's shortcut (the text after a tab in Windows' text, "Ctrl+X") shown dim at the right of its card; Esc closes an open submenu,
   goes back from a `replace` submenu, or closes the menu.
-- **Typing searches:** any letter typed with the window open goes into the search box (shown when typing starts, if
-  the layout has none); it filters every item of every place, Windows' submenus included once filled, with the same
-  match kinds as the rules (contains by default, a leading `/` for a regex). Enter runs the first hit.
+- **Typing searches:** a letter that is an access key in the open level picks that item (above); any other letter
+  starts the search, and from then on every letter, space included, goes into it. The top level shows a line
+  "Search: <text>" and below it every item of Windows' menu, at any depth (submenus read as far as they are filled),
+  whose name holds the text (case ignored; a leading `/` makes the rest a regex, no hits while it is not yet whole),
+  one per line, titled with its path ("7-Zip > Add to archive..."); items with a submenu and duplicates left out;
+  "No item found" when none. The first hit is selected: Enter runs it. Backspace takes a letter off (the last one
+  gone: the menu as it was), Esc ends the search. A layout can also place a search box of its own (Default D).
 - **Disabled items:** shown greyed, or left out, per rule (3.3).
 - **Late changes:** an item that Explorer enables changes in place; a card Explorer removes goes at once and its
   line closes up. (In the preview such a card is striped instead, 3.8.)
