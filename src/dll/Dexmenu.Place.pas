@@ -120,8 +120,6 @@ function ShownHint(V: TViewCard; const Regular: string): string;
 function SubmenuModeOf(V: TViewCard; const Settings: TMenuSettings): TSubmenuMode;
 // "<<" at the top of a level that replaced its menu: back to the menu it replaced.
 procedure AddBackLine(Level: TViewLevel; Opener: TViewCard);
-// Dexmenu's own items at the end of the top level, as the global settings say: "Windows' menu", "Edit menu...".
-procedure AddCommandLines(Level: TViewLevel; const Settings: TMenuSettings);
 
 implementation
 
@@ -153,30 +151,14 @@ begin
   Level.Lines.Insert(0, Line);
 end;
 
-procedure AddCommandLines(Level: TViewLevel; const Settings: TMenuSettings);
-
-  procedure Add(Kind: TViewKind; Command: TCommand; const Text: string);
-  var
-    Line: TViewLine;
-    V: TViewCard;
-  begin
-    V := TViewCard.Create;
-    V.Kind := Kind;
-    V.Command := Command;
-    V.BackTitle := Text;
-    Line := TViewLine.Create;
-    Line.Cards.Add(V);
-    Level.Lines.Add(Line);
-  end;
-
+function CommandOf(const Own: string): TCommand;
 begin
-  if not Settings.WindowsMenu and not Settings.EditMenu then
-    Exit;
-  Add(vkSeparator, ccNone, '');
-  if Settings.WindowsMenu then
-    Add(vkCommand, ccWindowsMenu, 'Windows'' menu');
-  if Settings.EditMenu then
-    Add(vkCommand, ccEditMenu, 'Edit menu...');
+  if Own = 'windowsMenu' then
+    Result := ccWindowsMenu
+  else if Own = 'editMenu' then
+    Result := ccEditMenu
+  else
+    Result := ccNone;
 end;
 
 function KeyOf(Node: TNode): string;
@@ -191,7 +173,7 @@ begin
   Result := '';
   if Card = nil then
     Exit;
-  if (Kind = vkMenu) or ((Kind = vkItem) and not Card.IsRemaining) then
+  if (Kind in [vkMenu, vkCommand]) or ((Kind = vkItem) and not Card.IsRemaining) then
     Result := Card.Icon;
 end;
 
@@ -653,6 +635,14 @@ begin
         begin
           V := TViewCard.Create;
           V.Kind := vkNote;
+          V.Card := Card;
+        end
+        else if Card.Own <> '' then
+        begin
+          V := TViewCard.Create;   // Dexmenu's own item, where the layout puts it
+          V.Kind := vkCommand;
+          V.Command := CommandOf(Card.Own);
+          V.BackTitle := Card.Title;
           V.Card := Card;
         end
         else if Card.Menu <> nil then

@@ -63,9 +63,14 @@ static class LayoutFiles
     {
         var lines = new List<string>();
         void Check(bool ok, string what) => lines.Add((ok ? "PASS " : "FAIL ") + what);
-        DataFolder.EnsureKinds(baseLayout);
-        Check(Names().SequenceEqual(["Default"]) && KindsOf("Default").SequenceEqual(["default"]),
-            "first start: the Default layout, set for every other right-click");
+        ShippedLayouts.Ensure();
+        DataFolder.EnsureKinds();
+        Check(Names().SequenceEqual([ShippedLayouts.First]) && KindsOf(ShippedLayouts.First).SequenceEqual(["default"]),
+            "first start: the shipped layout Default A, set for every other right-click");
+        File.Delete(DataFolder.LayoutPath(ShippedLayouts.First));
+        ShippedLayouts.Ensure();
+        Check(!Names().Contains(ShippedLayouts.First), "a shipped layout the user deleted is not written again");
+        File.WriteAllText(DataFolder.LayoutPath("Default"), baseLayout);
         Check(Problem("Default") is not null && Problem("a/b") is not null && Problem("none") is not null && Problem("Mine") is null,
             "names: an existing one, a bad character and \"none\" refused");
         New("Mine", baseLayout);

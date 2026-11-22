@@ -58,8 +58,6 @@ type
     TextSize: Single;         // the menu's size, 1 as drawn; Ctrl+scroll in the menu changes it (plan 02 3.4)
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
-    WindowsMenu: Boolean;     // "Windows' menu" at the end of every menu (plan 02 3.11)
-    EditMenu: Boolean;        // "Edit menu..." at the end of every menu (plan 02 3.6)
   end;
 
   TCard = class
@@ -68,6 +66,7 @@ type
     Title: string;         // "card": its name in the editor, and its title when it holds several items
     ShownTitle: string;    // "title": its title also when it holds one item ('' : the item's own text)
     Icon: string;          // "icon": a glyph's code point in hex ("E8C8") or an icon in a file ("path,index"); '' none
+    Own: string;           // "own": Dexmenu's own item placed here, "windowsMenu" or "editMenu" (plan 02 3.6); '' none
     RenameFrom, RenameTo: string;   // "rename": { "regex": ..., "replace": ... } on the item's text
     Parent: TCard;         // the card with a menu it sits in; nil at the top
     Hidden: Boolean;       // "hidden": shows nothing; its rules still take their items, so they show nowhere
@@ -315,6 +314,16 @@ begin
       Card.RenameFrom := TJSONObject(Obj.GetValue('rename')).GetValue('regex').Value;
       if TJSONObject(Obj.GetValue('rename')).GetValue('replace') <> nil then
         Card.RenameTo := TJSONObject(Obj.GetValue('rename')).GetValue('replace').Value;
+    end;
+    if Obj.GetValue('own') is TJSONString then
+    begin
+      Card.Own := Obj.GetValue('own').Value;
+      if (Card.Own <> 'windowsMenu') and (Card.Own <> 'editMenu') then
+      begin
+        Error := Where + ' "' + Card.Title + '": "own" is "windowsMenu" or "editMenu"';
+        Exit;
+      end;
+      Exit(True);   // Dexmenu's own item: no rules, no menu
     end;
     Rules := Obj.GetValue('rules');
     Menu := Obj.GetValue('menu');
@@ -576,8 +585,6 @@ var
 begin
   Result.Submenus := smNext;
   Result.OnClickOnly := False;
-  Result.WindowsMenu := True;
-  Result.EditMenu := True;
   Result.SubmenuMark := '';
   Result.ActionMark := '';
   Result.Widths := nil;
@@ -599,10 +606,6 @@ begin
       Result.Submenus := smNext;
     if TJSONObject(Menu).GetValue('onClickOnly') is TJSONBool then
       Result.OnClickOnly := TJSONBool(TJSONObject(Menu).GetValue('onClickOnly')).AsBoolean;
-    if TJSONObject(Menu).GetValue('windowsMenu') is TJSONBool then
-      Result.WindowsMenu := TJSONBool(TJSONObject(Menu).GetValue('windowsMenu')).AsBoolean;
-    if TJSONObject(Menu).GetValue('editMenu') is TJSONBool then
-      Result.EditMenu := TJSONBool(TJSONObject(Menu).GetValue('editMenu')).AsBoolean;
     if TJSONObject(Menu).GetValue('mostUsed') is TJSONNumber then
       Result.MostUsed := Max(1, Min(10, TJSONNumber(TJSONObject(Menu).GetValue('mostUsed')).AsInt));
     if TJSONObject(Menu).GetValue('textSize') is TJSONNumber then

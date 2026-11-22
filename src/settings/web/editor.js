@@ -102,6 +102,7 @@ function ruleBadges(card) {
 
 function describeCard(card) {
   if (M.isNote(card)) return "a note: shown as text, no button";
+  if (M.isOwn(card)) return "Dexmenu's own item: " + (card.own === "windowsMenu" ? "shows Windows' menu" : "opens this editor");
   if (card.hidden && !M.isRemaining(card)) return "hidden: what it finds is left out of the menu";
   if (card.menu) return "a card with a menu";
   if (M.isRemaining(card)) return "the remaining card: every item no rule took, each a card of its own here";
@@ -244,7 +245,7 @@ function renderCard(card) {
     box.classList.remove(...zones);
     if (e.dataTransfer.types.includes("text/ruleref")) {   // a rule: onto the card, moved or (Shift) copied
       e.dataTransfer.dropEffect = e.shiftKey ? "copy" : "move";
-      if (!card.menu && !M.isRemaining(card) && !M.isNote(card)) box.classList.add("over");
+      if (!card.menu && !M.isRemaining(card) && !M.isNote(card) && !M.isOwn(card)) box.classList.add("over");
       return;
     }
     box.classList.add(zoneClass(dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"))));
@@ -287,7 +288,7 @@ function cardActions(card) {
     collapsed.delete(card.id);
     addAndFocus(M.addCard(layout, linesOf(), card.id));
   }, true);
-  if (!card.menu && !M.isRemaining(card) && !M.isNote(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
+  if (!card.menu && !M.isRemaining(card) && !M.isNote(card) && !M.isOwn(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
     M.makeMenu(layout, linesOf(), card.id);
     changed();
   });
@@ -501,6 +502,25 @@ function renderCardPane() {
     const placeRow = el("label", "field");
     placeRow.append(el("span", "", "Text placed"), place);
     $("card").replaceChildren(row, placeRow, el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
+    return;
+  }
+  if (M.isOwn(card)) {
+    // Dexmenu's own item: which one, its title and icon; no rules
+    $("cardHeading").textContent = "Dexmenu's own item";
+    const which = el("select");
+    for (const [v, label] of [["editMenu", "Edit menu...: this editor on the layout in use"], ["windowsMenu", "Windows' menu: shows Windows' own menu"]]) {
+      const o = el("option", "", label);
+      o.value = v;
+      which.append(o);
+    }
+    which.value = card.own;
+    which.addEventListener("change", () => { card.own = which.value; changed(); });
+    const row = el("label", "field");
+    row.append(el("span", "", "Item"), which);
+    $("card").replaceChildren(row,
+      textField("Title", card.card, v => { card.card = v || (card.own === "windowsMenu" ? "Windows' menu" : "Edit menu..."); changed(); }),
+      textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); }, "(the first letter) e.g. E70F"),
+      el("div", "hint", "Shown where it stands in the layout; a layout without it does not show it."));
     return;
   }
   $("cardHeading").textContent = M.isRemaining(card) ? "The remaining card" : card.menu ? "A card with a menu" : "A card with rules";
@@ -756,6 +776,7 @@ $("close").addEventListener("click", () => post({ type: "close" }));
 withIcon($("addTop"), "+ Card");
 $("addDivider").replaceChildren(dividerIcon(), document.createTextNode(" + Divider"));
 $("addNote").replaceChildren(noteIcon(), document.createTextNode(" + Note"));
+$("addOwn").addEventListener("click", () => { if (layout) addAndFocus(M.addOwn(layout, linesOf())); });
 $("addNote").addEventListener("click", () => { if (layout) addAndFocus(M.addNote(layout, linesOf())); });
 $("addNote").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "newnote"); e.dataTransfer.effectAllowed = "copy"; });
 $("addDivider").addEventListener("click", () => {

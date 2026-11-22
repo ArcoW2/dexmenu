@@ -341,7 +341,6 @@ begin
   L.Index := 0;
   L.Selected := -1;
   L.View := FPlacement.TopLevel;
-  AddCommandLines(L.View, FSettings);
   FLevels.Add(L);
   L.Wnd := MakeWindow(0, True);
   SetWindowLongPtr(L.Wnd, GWLP_USERDATA, LONG_PTR(L));
@@ -837,10 +836,7 @@ begin
         SelectedId := L.Geometry.Boxes[L.Selected].Card.Node.Id;
       OldViews.Add(L.View);
       if I = 0 then
-      begin
-        L.View := NewPlacement.TopLevel;
-        AddCommandLines(L.View, FSettings);
-      end
+        L.View := NewPlacement.TopLevel
       else
       begin
         // the opener in the new level above, by its id or its layout card

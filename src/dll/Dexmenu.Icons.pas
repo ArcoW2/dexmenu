@@ -28,7 +28,9 @@ uses
   System.Generics.Collections, System.SyncObjs, Winapi.ShellAPI, Dexmenu.Log;
 
 const
-  LastMenuConstant = 11;   // HBMMENU_POPUP_MINIMIZE: hbmpItem values up to it (and HBMMENU_CALLBACK, -1) are no bitmap
+  // HBMMENU_CALLBACK (-1) and HBMMENU_SYSTEM (1) to HBMMENU_POPUP_MINIMIZE (11) are no bitmap. Only these: a real
+  // bitmap's handle is sign-extended on 64-bit Windows, so it may be below zero too.
+  LastMenuConstant = 11;
 
 var
   Cache: TDictionary<string, TIconPixels>;
@@ -112,7 +114,7 @@ end;
 
 function BitmapPixels(Bitmap: HBITMAP; out Pixels: TIconPixels): Boolean;
 begin
-  Result := (NativeInt(Bitmap) > LastMenuConstant) and ReadBits(Bitmap, Pixels);
+  Result := ((NativeInt(Bitmap) < -1) or (NativeInt(Bitmap) > LastMenuConstant)) and ReadBits(Bitmap, Pixels);
   if Result then
     FixAlpha(Pixels);
 end;

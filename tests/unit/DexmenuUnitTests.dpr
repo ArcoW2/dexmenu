@@ -290,6 +290,7 @@ begin
         vkNote: Line := Line + 'N:' + V.Title;
         vkItem: Line := Line + 'I:' + V.Title;
         vkMenu: Line := Line + 'M:' + V.Title;
+        vkCommand: Line := Line + 'C:' + V.Title;
       else
         Line := Line + '-';
       end;
@@ -596,7 +597,7 @@ begin
       PByte(NativeUInt(Bits) + NativeUInt(I * 4 + 3))^ := 0;   // no alpha at all
     AnyShown := BitmapPixels(Bmp, P);
     Check(AnyShown and (P.Width = 4) and (P.Bits[3] = 255) and (P.Bits[0] = $80),
-      'a bitmap without alpha: opaque, its colours kept');
+      'a bitmap without alpha: opaque, its colours kept (its handle may be below zero: sign-extended)');
   finally
     DeleteObject(Bmp);
   end;
@@ -621,17 +622,6 @@ begin
     Check(SubmenuModeOf(V, Settings) = smUnder, 'a card without its own: the global setting');
     C.SubmenuMode := smReplace;
     Check(SubmenuModeOf(V, Settings) = smReplace, 'a card''s own "submenus" overrules it');
-    Settings.WindowsMenu := True;
-    Settings.EditMenu := True;
-    AddCommandLines(Level, Settings);
-    Check((Level.Lines.Count = 3) and (Level.Lines[0].Cards[0].Kind = vkSeparator) and
-      (Level.Lines[1].Cards[0].Command = ccWindowsMenu) and (Level.Lines[2].Cards[0].Command = ccEditMenu),
-      'Dexmenu''s own items at the end: a line, "Windows'' menu", "Edit menu..."');
-    Level.Lines.Clear;
-    Settings.WindowsMenu := False;
-    Settings.EditMenu := False;
-    AddCommandLines(Level, Settings);
-    Check(Level.Lines.Count = 0, 'both switched off: nothing added');
     AddBackLine(Level, V);
     Check((Level.Lines.Count = 1) and (Level.Lines[0].Cards[0].Kind = vkBack) and (Level.Lines[0].Cards[0].Title = '<<  Tools') and
       Level.Lines[0].Cards[0].Enabled, '"<<" at the top of a replacing level, naming what it goes back from');
@@ -741,6 +731,12 @@ begin
   Expect(Shows('[ { "line": [ { "card": "Rest", "hidden": true, "rules": [ "remaining" ] } ] } ]'), AllRest,
     'the remaining card cannot be hidden');
   // note cards (plan 02 3.3): placed where they stand, beside other cards too; no button
+  // Dexmenu's own items (plan 02 3.6, 3.11): cards where the layout puts them, nowhere else
+  Expect(Shows('[ { "line": [ { "note": "About" }, { "card": "Edit it...", "own": "editMenu" }, ' +
+    '{ "card": "Windows", "own": "windowsMenu" } ] } ]'), 'N:About | C:Edit it... | C:Windows',
+    'Dexmenu''s own items as cards, titled by the layout');
+  Expect(Shows('[ { "line": [ { "card": "X", "own": "nothing" } ] } ]'), 'LAYOUT: test "X": "own" is "windowsMenu" or "editMenu"',
+    'an unknown own item: the layout refused');
   Expect(Shows('[ { "line": [ { "note": "Pick one" } ] }, { "line": [ { "card": "X", "rules": [ { "name": { "equals": "Cut" } } ] }, ' +
     '{ "note": "" } ] } ]'), 'N:Pick one / I:Cut | N:', 'notes: a text on a line of its own, an empty one beside a card');
   // dividers from the layout: kept where they are (also first); a Windows separator next to one goes

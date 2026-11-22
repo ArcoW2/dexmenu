@@ -106,7 +106,7 @@ const LayoutModel = (() => {
 
   // A card that can never show anything (outlined red): a card with rules but none, or with an invalid rule.
   function useless(card) {
-    if (card.menu || isNote(card)) return false;
+    if (card.menu || isNote(card) || isOwn(card)) return false;
     const rules = card.rules || [];
     return rules.length === 0 || rules.some(r => ruleProblem(r) !== "");
   }
@@ -324,6 +324,14 @@ const LayoutModel = (() => {
     return true;
   }
 
+  // Dexmenu's own item as a card ({ id, card: its title, own: "editMenu" | "windowsMenu" }; plan 02 3.6, 3.11): no rules.
+  function isOwn(card) { return typeof card.own === "string"; }
+  function addOwn(layout, lines) {
+    const card = { id: newId(layout), card: "Edit menu...", own: "editMenu" };
+    lines.push({ line: [card] });
+    return card;
+  }
+
   function addNote(layout, lines) {
     const card = { id: newId(layout), note: "" };
     lines.push({ line: [card] });
@@ -428,7 +436,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, isNote, addNote, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
+  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addMostUsed, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

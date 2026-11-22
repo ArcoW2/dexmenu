@@ -164,7 +164,6 @@ begin
   Placement.MostUsedCount := Settings.MostUsed;
   L := TPreviewLevel.Create;
   L.View := Placement.TopLevel;
-  AddCommandLines(L.View, Settings);
   L.Geometry := Measure(L.View);
   L.X := Margin;
   L.Y := Margin;

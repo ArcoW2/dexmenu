@@ -68,7 +68,7 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
    where they start: the pane has no top padding, the row its own */
 #cardsPane { padding-top: 0; }
 #cardsPane .cards-main > h2, #cardsPane .gutter-top { position: sticky; top: 0; z-index: 2; background: var(--bg); }
-#cardsPane .cards-main > h2 { margin: 0; padding: 12px 0 6px; }
+#cardsPane .cards-main > h2 { margin: 0; padding: 12px 0 6px; flex-wrap: wrap; row-gap: 4px; }
 #cardsPane .gutter-top { margin-top: 0; padding: 13px 0 6px; }
 .toggle { padding: 0; width: 15px; height: 15px; line-height: 12px; font-size: 12px; font-weight: 700; border-radius: 3px; }
 .toggle.fold { position: absolute; left: 7px; }

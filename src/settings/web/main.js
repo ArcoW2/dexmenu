@@ -137,7 +137,7 @@ $("rename").addEventListener("click", async () => {
 });
 $("delete").addEventListener("click", async () => { if (selected && await confirmDelete(selected)) post({ type: "delete", name: selected }); });
 $("submenus").addEventListener("change", () => post({ type: "setMenu", name: "submenus", value: $("submenus").value }));
-for (const id of ["onClickOnly", "windowsMenu", "editMenu"])
+for (const id of ["onClickOnly"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).checked }));
 $("textSize").addEventListener("change", () => post({ type: "setMenu", name: "textSize", value: (+$("textSize").value || 100) / 100 }));
 $("mostUsed").addEventListener("change", () => post({ type: "setMenu", name: "mostUsed", value: Math.round(+$("mostUsed").value || 3) }));
@@ -223,8 +223,6 @@ chrome.webview.addEventListener("message", e => {
     renderRegistration(m.registration);
     $("submenus").value = m.menu.submenus;
     $("onClickOnly").checked = m.menu.onClickOnly;
-    $("windowsMenu").checked = m.menu.windowsMenu;
-    $("editMenu").checked = m.menu.editMenu;
     for (const id of ["submenuMark", "actionMark"]) if (document.activeElement !== $(id)) $(id).value = m.menu[id];
     $("states").value = m.menu.states;
     if (document.activeElement !== $("mostUsed")) $("mostUsed").value = m.menu.mostUsed;

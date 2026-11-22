@@ -129,7 +129,7 @@ sealed class HomeForm : Form, IThemed
                     // one setting: submenus (next, under, replace) or a true / false one
                     var name = Str("name");
                     if (name == "submenus") DataFolder.SetMenu(name, Str("value") is "under" or "replace" ? Str("value") : "next");
-                    else if (name is "onClickOnly" or "windowsMenu" or "editMenu")
+                    else if (name == "onClickOnly")
                         DataFolder.SetMenu(name, m.TryGetProperty("value", out var on) && on.ValueKind == JsonValueKind.True);
                     else if (name is "submenuMark" or "actionMark") DataFolder.SetMenu(name, Str("value"));
                     else if (name == "textSize" && m.TryGetProperty("value", out var t) && t.TryGetDouble(out var size))

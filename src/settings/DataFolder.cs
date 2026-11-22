@@ -81,8 +81,6 @@ static class DataFolder
         {
             ["submenus"] = m?["submenus"]?.GetValue<string>() is "under" or "replace" ? m!["submenus"]!.GetValue<string>() : "next",
             ["onClickOnly"] = m?["onClickOnly"]?.GetValue<bool>() == true,
-            ["windowsMenu"] = m?["windowsMenu"]?.GetValue<bool>() != false,
-            ["editMenu"] = m?["editMenu"]?.GetValue<bool>() != false,
             ["mostUsed"] = m?["mostUsed"] is System.Text.Json.Nodes.JsonValue n && n.TryGetValue<int>(out var count)
                 ? Math.Clamp(count, 1, 10) : 3,
             // the menu's size (1 as drawn; Ctrl+scroll in the menu sets it too)
@@ -128,19 +126,14 @@ static class DataFolder
     }
 
     /// <summary>First start (plan 05 3.1, 3.2): settings.json gets "kinds" when it has none: every kind in its starting
-    /// order, not set, and "every other" (default) set to the layout the older "layout" named, or to the Default layout
-    /// (only the remaining card), made when missing. The user's layouts are not touched.</summary>
-    public static void EnsureKinds(string baseLayout)
+    /// order, not set, and "every other" (default) set to the layout the older "layout" named, or to the first shipped
+    /// layout, "Default A" (plan 02 3.10; ShippedLayouts.Ensure writes it). The user's layouts are not touched.</summary>
+    public static void EnsureKinds()
     {
         var settings = ReadSettings();
         if (settings["kinds"] is System.Text.Json.Nodes.JsonArray) return;
         var named = settings["layout"]?.GetValue<string>();
-        var defaultLayout = named is { Length: > 0 } && File.Exists(LayoutPath(named)) ? named : "Default";
-        if (defaultLayout == "Default" && !File.Exists(LayoutPath("Default")))
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(LayoutPath("Default"))!);
-            File.WriteAllText(LayoutPath("Default"), baseLayout + Environment.NewLine);
-        }
+        var defaultLayout = named is { Length: > 0 } && File.Exists(LayoutPath(named)) ? named : ShippedLayouts.First;
         var kinds = new System.Text.Json.Nodes.JsonArray();
         foreach (var kind in KindOrder)
         {

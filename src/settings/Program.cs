@@ -17,10 +17,11 @@ static class Program
         // This process is the editor: Dexmenu's handler, run here when ShellMenu builds Windows' real menu (maybe from the
         // registered copy of the DLL, not the one next to this exe), notes nothing and sets no hook (Dexmenu.Hook).
         Environment.SetEnvironmentVariable("DEXMENU_EDITOR", "1");
-        // first start: the kinds setting and the Default layout (plan 05 3.1, 3.2); the user's layouts untouched
+        // the shipped layouts each written once (plan 02 3.10); first start: the kinds setting, every other kind on
+        // "Default A" (plan 05 3.1, 3.2); the user's layouts untouched
         if (!args.Contains("--live") && !args.Contains("--selftest") && Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is not { Length: > 0 })
-            try { DataFolder.EnsureKinds(Native.BaseLayout()); }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or DllNotFoundException) { }
+            try { ShippedLayouts.Ensure(); DataFolder.EnsureKinds(); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         if (args.Length >= 4 && args[0] == "--live")
         {
             using var owner = new Form();

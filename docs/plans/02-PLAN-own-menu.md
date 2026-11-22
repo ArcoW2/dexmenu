@@ -13,6 +13,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: the text size (Ctrl+scroll).
 - 2026-11-22: partly executed: the use counts in the editor.
 - 2026-11-22: partly executed: icons (the layout's, the item's own bitmap, the first letter).
+- 2026-11-22: partly executed: Dexmenu's own items as cards; the shipped layout Default A.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -52,12 +53,13 @@ the preview is the result.
 | Layout editing | the cards view and the rules view (priority list, draggable); dragging cards and dividers (onto a card, beside, above or below), the remaining card; preview and editor tied; comments, hints | 3.5; plan 00 6.5; plan 05 6.3 |
 | Layouts | saved under a name, JSON with comments, one menu per layout; which kinds use which layout: plan 05 | 3.4; 3.5; plan 05 |
 | Submenus | `next` (beside the card), `under` (from the card's middle, over the lines below), `replace` (in place of the menu, "<<" back, on a click only); on hover or only on a click; set for every menu (main window, settings.json `menu`) or per card (`submenus`); the same in the preview | 3.4; 3.7 |
-| Edit menu | "Edit menu..." at the end of every menu (on or off in the main window): the menu closes, the last right-click is written, the settings app starts on the layout in use (its editor, the preview on this right-click) | 3.6 |
-| Windows' menu | Shift held while right-clicking shows Windows' own menu (in Explorer its extended menu); "Windows' menu" at the end of every menu (on or off) closes Dexmenu's and shows Windows' at the same place; a layout that cannot be read: Windows' menu | 3.11 |
-| Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, "Windows' menu" and "Edit menu..." at the end, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
+| Edit menu | "Edit menu..." as a card a layout places (`"own": "editMenu"`; "+ Dexmenu" in the editor): the menu closes, the last right-click is written, the settings app starts on the layout in use (its editor, the preview on this right-click) | 3.6 |
+| Windows' menu | Shift held while right-clicking shows Windows' own menu (in Explorer its extended menu); "Windows' menu" as a card a layout places (`"own": "windowsMenu"`) closes Dexmenu's and shows Windows' at the same place; a layout that cannot be read: Windows' menu | 3.11 |
+| Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
 | Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider; in the editor every card's count in the cards view's gutter (a card with a menu: the sum of what is in it); none on the preview | 3.9 |
 | Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
 | Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else the title's first letter; set in the editor's card panel | 3.8 |
+| Default A | the shipped layout "Default A", written once into the layouts folder (settings.json `shipped`), every other kind on it at a first start | 3.10 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -67,7 +69,7 @@ the preview is the result.
 |---|---|---|---|
 | Icons in the preview | every right-click saves the icons of the items it shows (PNG files next to the seen items), the preview draws them | Icons | 3.8 |
 | Explorer's own icons | Explorer asked to draw its owner-drawn items into Dexmenu's memory, the icon cut out; first a probe in Explorer | Icons | 3.8 |
-| Default layouts | the suggested layouts shipped, A the default | -- | 3.10 |
+| Default layouts B - D | Default B, C and D shipped | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 ## 3. Details
@@ -283,8 +285,9 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   line closes up. (In the preview such a card is striped instead, 3.8.)
 - **No editing from the menu:** the menu does not pin, move, hide or rename items; removing an item while a menu is
   being used is too easily done by mistake. Changing the layout is the settings app's.
-- **Edit menu...:** an item at the end of the menu (on or off in the global settings) that closes the menu and opens
-  the settings app's layout editor on this menu as it was: this kind of right-click, the items it had (the DLL writes
+- **Edit menu...:** Dexmenu's own item, a card the layout places where it wants (`{ "card": "Edit menu...", "own":
+  "editMenu" }`; a layout without it does not show it) that closes the menu and opens the settings app's layout
+  editor on this menu as it was: this kind of right-click, the items it had (the DLL writes
   them to a file and starts the settings app with it), the layout in use. The user places what they just saw.
 - **Closing:** a click outside, the window losing focus, Esc on the top level, Alt: closed without a choice, as
   Windows' menu.
@@ -360,21 +363,24 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 
 ### 3.10 Suggested layouts
 
-Shipped as named layouts; A is active for a new user, who can pick another, change it and save it as their own (3.5).
+Shipped as named layouts, "Default A", "Default B", ...: each written into the layouts folder once (settings.json
+`shipped` remembers which), so one the user changed or deleted is left as it is. A new user's every other kind of
+right-click uses Default A; the user can pick another, change it and save it as their own (3.5). Their rules match
+Windows' texts, so they fit an English Windows until a rule on the verb is possible.
 
-- **A. Classic plus (default).** An icon row on top (Cut, Copy, Paste, Rename, Delete, Properties); the most used row;
-  Open and Open with; a divider "Programs"; one card per program with a submenu of its items (LexPen, 7-Zip,
-  TortoiseGit); a "More" card with a menu holding the remaining card, so the rest is in that submenu.
+- **A. Default A (the default).** Cut, Copy, Paste, Rename and Delete side by side, each with its icon; Properties
+  under them; a divider; Open and Open with on one line; a divider; the rest (the remaining card, not in a submenu);
+  a divider; the note "Dexmenu - default menu", "Edit menu..." and "Windows' menu" on one line.
 
   ```
-  [Cut] [Copy] [Paste] [Rename] [Delete] [Properties]
-  [most used 1] [most used 2] [most used 3]
-  Open
-  Open with            >
-  +-----------+ +-----------+ +-----------+
-  | LexPen  > | | 7-Zip   > | | Git     > |
-  +-----------+ +-----------+ +-----------+
-  More                 >
+  [Cut] [Copy] [Paste] [Rename] [Delete]
+  [Properties]
+  ----------------------------------------
+  [Open]              [Open with        >]
+  ----------------------------------------
+  (every other item, each a card)
+  ----------------------------------------
+  Dexmenu - default menu  [Edit menu...] [Windows' menu]
   ```
 
 - **B. Cards per program.** Each program's card shows its items as buttons in it (not a submenu); the icon row on
@@ -401,8 +407,8 @@ Shipped as named layouts; A is active for a new user, who can pick another, chan
 - As plan 01 3.8: any error before the window shows, or a layout that cannot be read: Windows' own menu shown
   instead; the error in the log.
 - Shift held while right-clicking shows Windows' own menu (in Explorer that is its extended menu, with more items);
-  "Windows' menu" at the end of every menu (on or off in the global settings) closes Dexmenu's menu and shows
-  Windows' at the same place.
+  "Windows' menu", Dexmenu's own item as a card the layout places (`"own": "windowsMenu"`), closes Dexmenu's menu
+  and shows Windows' at the same place.
 - Nothing slow on the show call: settings and layout read once per change; icons cached per process.
 
 ### 3.12 Tests

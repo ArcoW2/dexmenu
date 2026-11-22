@@ -34,7 +34,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Part | What | Reference |
 |---|---|---|
 | Layout format | a layout is one menu (`format`, `lines`); an older file read by its default menu, brought to the current form by the editor | 3.1; 6.1 |
-| Kinds setting | settings.json's ordered `kinds`; the DLL takes the first that fits; none: Windows' menu; first start makes the list and the Default layout | 3.2; 6.2 |
+| Kinds setting | settings.json's ordered `kinds`; the DLL takes the first that fits; none: Windows' menu; first start makes the list, every other kind on the shipped layout Default A (plan 02 3.10) | 3.2; 6.2 |
 | Open dialog | the dialog kinds, the layout chosen by them inside an Open or Save dialog | 3.2; 6.2 |
 | Desktop kind | `desktop`: registered for, told apart from a folder's empty part | 3.2; 6.2 |
 | Main window | `HomeForm`, `web/main.*`: the panels General and Layouts as tabs; the window's minimum from the page | 3.3; 6.3 |
@@ -58,8 +58,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   card), with `//` comments as now. It no longer has a section per kind of right-click (`file`, `folder`,
   `default`, ...).
 - The same layout can serve several kinds (a file and several items), and each kind can have a layout of its own.
-- The Default layout: made on first start (`layouts\Default.json`), holding only the remaining card, and set for
-  `default`, so every kind starts with it: Windows' menu as cards until the user changes it or sets other layouts.
+- The shipped layout Default A (plan 02 3.10), written into the layouts folder, is set for `default` on first start,
+  so every kind starts with it until the user changes it or sets other layouts.
 - The user's layouts stay as they are on an update: no file is rewritten, none is made from another. A file of
   today's form (a section per kind, as "First") is read by its `default` section as its one menu; its other kinds'
   sections are ignored, and dropped when the user saves that layout. A menu for another kind is a layout the user
@@ -88,7 +88,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   `kinds`, and reads that layout file (read again when it changes, as now). `DEXMENU_LAYOUT_FILE` stays for the
   tests: one layout for every kind.
 - `"layout"` in settings.json (today's "Make active") goes; on first start the layout it names is set for `default`
-  (`"kinds": [ ..., { "kind": "default", "layout": "<that name>" } ]`), else the Default layout (3.1).
+  (`"kinds": [ ..., { "kind": "default", "layout": "<that name>" } ]`), else Default A (3.1).
 - The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
   other (`default`). No kinds by file type: one menu per type has no use seen.
 - In an Open or Save dialog a right-click may want another menu than in Explorer (no "Open in new window", fewer
@@ -229,8 +229,8 @@ None.
 - The desktop's empty part: the handler gives `desktop` for a background right-click whose folder is the desktop
   (`ILIsEqual` with `CSIDL_DESKTOP`); `Registration.cs` and `register.ps1` register `DesktopBackground` too.
 - The app's first start (`DataFolder.EnsureKinds`, not for `--live`, `--selftest` or with `DEXMENU_LAYOUT_FILE`):
-  `kinds` in the starting order, all not set, `default` the older `layout`'s layout or the Default layout (made
-  when missing); the older `layout` removed; no layout file touched. Until the main window, the editor's "Make
+  `kinds` in the starting order, all not set, `default` the older `layout`'s layout or the shipped layout Default A
+  (plan 02 3.10); the older `layout` removed; no layout file touched. Until the main window, the editor's "Make
   active" sets `default`.
 - Tested: unit tests (a kind set; a kind not listed; a dialog kind first; a dialog kind not set falls to default;
   none; the order deciding between file and dialog-file; the older `layout`); the first start on a test data folder
