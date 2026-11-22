@@ -45,6 +45,9 @@ procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Select
 // (TViewCard.Sometimes) drawn with diagonal stripes; never at a right-click.
 function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single;
   const Marked: string = ''; Editing: Boolean = False): TPicture;
+// The look light or dark as told (the settings app's theme switch, plan 05 3.3): 0 as Windows' apps are, 1 light,
+// 2 dark. Only the settings app calls it; a right-click follows Windows.
+procedure DexmenuSetTheme(Mode: Integer); stdcall;
 // The box at a point (DIP within the level, scroll applied), or -1.
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
 
@@ -83,10 +86,23 @@ var
   DWrite: IDWriteFactory;
   NormalFormat, BoldFormat, GlyphFormat: IDWriteTextFormat;
 
+var
+  ThemeMode: Integer;   // DexmenuSetTheme: 0 as Windows' apps are, 1 light, 2 dark (the settings app's preview)
+
+procedure DexmenuSetTheme(Mode: Integer); stdcall;
+begin
+  ThemeMode := Mode;
+end;
+
 class function TLook.Current: TLook;
 var
   Value, Size: DWORD;
 begin
+  if ThemeMode in [1, 2] then
+  begin
+    Result.Dark := ThemeMode = 2;
+    Exit;
+  end;
   Value := 1;
   Size := SizeOf(Value);
   RegGetValueW(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',

@@ -189,6 +189,25 @@
   const zip = [...M.cards(L.default)].find(a => a.card.card === "Zip" && a.card.menu).card;
   check(zip && zip.menu[0].line[0].rules[0].name.startsWith === "7", "made a menu: its rules in the first card");
 
+  // copied between layouts (plan 05 3.6): a card with its menu gets new ids and its rules at the end of the list; a rule
+  // onto a card at the end; the remaining card never pasted
+  {
+    const from = sample(), to = sample();
+    const tools = [...M.cards(from.default)].find(x => x.card.card === "Tools").card;
+    const pasted = M.paste(to, to.default, M.clip("card", tools), id(to, "LexPen"));
+    const ids = [...M.cards(to.default)].map(a => a.card.id);
+    check(pasted && new Set(ids).size === ids.length, "a card with a menu pasted: every id new");
+    check(titles(to.default) === "LexPen / Tools[Git] / Clip | Zip / Tools[Git] / Rest", "after LexPen's line: " + titles(to.default));
+    check(M.ruleList(to.default).map(r => r.card.card).join() === "LexPen,Clip,Zip,Git,Git", "its rule at the end of the list");
+    const rest = [...M.cards(from.default)].find(x => x.card.card === "Rest").card;
+    check(!M.paste(to, to.default, M.clip("card", rest), null), "the remaining card is not pasted");
+    const zip = [...M.cards(to.default)].find(x => x.card.card === "Zip").card;
+    const lexRule = [...M.cards(from.default)].find(x => x.card.card === "LexPen").card.rules[0];
+    check(M.paste(to, to.default, M.clip("rule", lexRule), null, zip) && zip.rules.length === 2
+      && M.ruleList(to.default).slice(-1)[0].card === zip, "a rule pasted onto a card: at the end of the list");
+    check(!M.paste(to, to.default, "not ours", null), "other clipboard text: nothing");
+  }
+
   // the current form (plan 05 3.1): an older file brought to it by its default menu; a current one left as it is
   const old = M.upToDate({ default: [ { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ], folder: [ { line: [] } ] });
   check(old.changed && old.layout.format === M.formatVersion && old.layout.lines[0].line[0].card === "Rest" && !old.layout.folder,
@@ -200,10 +219,11 @@
   check(M.withoutComments('{ "r": "a//b" } // c') === '{ "r": "a//b" } \n', "// inside a string kept, after it a comment");
 
   // the editor's page script parses (not run: it needs the page); a syntax error there shows nowhere else
-  fetch("editor.js").then(r => r.text()).then(text => {
-    try { new Function(text); check(true, "editor.js parses"); }
-    catch (e) { check(false, "editor.js parses: " + e.message); }
-  }).catch(e => check(false, "editor.js read: " + e.message)).finally(() => {
+  // the pages' scripts parse (not run: they need their page); a syntax error there shows nowhere else
+  Promise.all(["editor.js", "main.js", "theme.js"].map(file => fetch(file).then(r => r.text()).then(text => {
+    try { new Function(text); check(true, file + " parses"); }
+    catch (e) { check(false, file + " parses: " + e.message); }
+  }).catch(e => check(false, file + " read: " + e.message)))).finally(() => {
     out.push(failures ? failures + " FAILED" : "OK");
     chrome.webview.postMessage({ type: "selftest", lines: out, failures });
   });

@@ -15,10 +15,13 @@ button:hover { border-color: var(--accent); }
 header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .grow { flex: 1; }
 #dirty { color: var(--accent); font-weight: 600; }
-#registration { display: flex; gap: 8px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-#regState.on { color: var(--accent); font-weight: 600; }
-#regState.off { color: var(--dim); }
-#regState.other { color: var(--bad); }
+/* the theme switch (theme.js), as in the main window */
+.segmented { display: inline-flex; }
+.segmented button { border-radius: 0; margin-left: -1px; padding: 2px 9px; font-size: 12px; }
+.segmented button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.segmented button:last-child { border-radius: 0 4px 4px 0; }
+.segmented button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+#layoutName { width: 220px; }
 #error { margin: 8px 12px; padding: 6px 10px; border-radius: 4px; }
 #error { border: 1px solid var(--bad); color: var(--bad); }
 .pane { padding: 6px 12px 10px; border-bottom: 1px solid var(--line); }
@@ -74,6 +77,7 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .divider.selected { box-shadow: 0 0 0 1px var(--accent); }
 .divider.hot { background: var(--hover); }
 h2 .grow { flex: 1; }
+h2 button { white-space: nowrap; }
 .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .card.hover { background: var(--hover); }
 .card.over { box-shadow: 0 0 0 2px var(--accent) inset; }

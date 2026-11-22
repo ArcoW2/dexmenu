@@ -5,18 +5,21 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace Dexmenu.Settings;
 
-/// <summary>The settings app's window (plan 00 steps 4 and 5): two panes. Left, the layout editor (web\index.html in
-/// WebView2); right, the preview, a window DexmenuShell.dll draws the menu into from the layout being edited and the
+/// <summary>A layout's editor window (plan 00 steps 4 and 5; docs/plans/05-PLAN-settings-windows.md 3.6): one layout,
+/// named in the title; several can be open. Left, the layout editor (web\index.html in WebView2); right, the preview, a window DexmenuShell.dll draws the menu into from the layout being edited and the
 /// items that kind of right-click showed. Every edit goes to the preview at once; saving writes the layout file. The
 /// file, settings.json and the seen items are watched: a change reloads them (an unsaved edit is kept). An item hovered
 /// or clicked in the preview selects the card and rule that placed it; a card selected marks its items there.
 /// Above the preview: the kind of right-click, and a base folder with the item(s) right-clicked in it; with a folder
 /// the preview shows Windows' real menu of that right-click there (ShellMenu: a Git folder differs from an SVN one),
 /// the seen items' others striped; without one, the seen items of that kind.
-/// With --selftest &lt;file&gt; it runs the editor's self-test (web\selftest.html) instead, writes its lines to the file
-/// and exits with the number of failures.</summary>
-sealed class MainForm : Form
+/// Every kind can be chosen for the preview; one this layout is not set for says so. Closing with unsaved changes
+/// asks to save them. With --selftest &lt;file&gt; it runs the editor's self-test (web\selftest.html) instead, writes
+/// its lines to the file and exits with the number of failures.</summary>
+sealed class EditorForm : Form, IThemed
 {
+    readonly Label notMeant = new() { AutoSize = true, ForeColor = Color.DarkGoldenrod, Padding = new Padding(0, 6, 0, 0),
+        Text = "This layout is not meant for this kind" };
     readonly WebView2 web = new() { Dock = DockStyle.Fill };
     readonly Panel previewPanel = new() { Dock = DockStyle.Fill };
     readonly FlowLayoutPanel previewBar = new() { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(4) };
@@ -45,16 +48,18 @@ sealed class MainForm : Form
     string? editedText;      // an edit not yet saved
     bool pageReady;
 
-    public MainForm(string? kindArgument, string? selftestFile)
+    /// <summary>layoutFile: the layout this window edits (null: the built-in base layout, the tests).</summary>
+    public EditorForm(string? layoutFile, string? kindArgument, string? selftestFile)
     {
-        Text = "Dexmenu";
         Width = 1500;
         Height = 820;
+        MinimumSize = new Size(900, 520);
         StartPosition = FormStartPosition.CenterScreen;
         selftest = selftestFile;
-        kind = kindArgument ?? DataFolder.SeenKinds().FirstOrDefault() ?? "file";
+        currentFile = layoutFile;
+        kind = kindArgument ?? FirstKindOfThis() ?? DataFolder.SeenKinds().FirstOrDefault() ?? "file";
         startOnLast = kindArgument is null;
-        currentFile = DataFolder.LayoutFile;
+        SetTitle();
         callback = Placed;
         split.Panel1.Controls.Add(web);
         split.Panel2.Controls.Add(previewPanel);
@@ -64,7 +69,48 @@ sealed class MainForm : Form
         Controls.Add(split);
         settle.Tick += (_, _) => { settle.Stop(); Reload(); };
         previewPanel.Resize += (_, _) => FitPreview();
+        HandleCreated += (_, _) => Themes.Apply(this, web);
+        FormClosing += AskToSave;
         Load += async (_, _) => await Start();
+    }
+
+    public string? LayoutName => currentFile is null ? null : Path.GetFileNameWithoutExtension(currentFile);
+
+    void SetTitle() => Text = "Dexmenu - " + (LayoutName ?? "(built in)");
+
+    // A kind of right-click this layout is set for, for the preview to start on.
+    string? FirstKindOfThis() =>
+        LayoutName is { } n ? DataFolder.Kinds().Where(k => string.Equals(k.Layout, n, StringComparison.OrdinalIgnoreCase))
+            .Select(k => k.Kind.StartsWith("dialog-") ? k.Kind["dialog-".Length..] : k.Kind)
+            .FirstOrDefault(k => Kinds.Any(x => x.Kind == k)) : null;
+
+    public void ApplyTheme()
+    {
+        Themes.Apply(this, web);
+        previewBar.BackColor = BackColor;
+        previewBar.ForeColor = ForeColor;
+        if (preview != IntPtr.Zero) Native.MoveWindow(preview, 0, 0, previewPanel.ClientSize.Width, previewPanel.ClientSize.Height, true);
+        Post(new { type = "theme", theme = DataFolder.Theme });
+        Reload();
+    }
+
+    /// <summary>The file renamed elsewhere (the main window's Rename): this window edits it under its new name.</summary>
+    public void FileRenamed(string path)
+    {
+        currentFile = path;
+        SetTitle();
+        Watch();
+        Reload();
+    }
+
+    // Closing with unsaved changes (plan 05 3.6): Yes saves them, No closes without, Cancel stays open.
+    void AskToSave(object? sender, FormClosingEventArgs e)
+    {
+        if (editedText is null || selftest is not null) return;
+        var answer = MessageBox.Show(this, $"Save the changes to \"{LayoutName ?? "the layout"}\"?", "Dexmenu",
+            MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+        if (answer == DialogResult.Cancel) { e.Cancel = true; return; }
+        if (answer == DialogResult.Yes && !Save(LayoutName ?? "Default", editedText)) e.Cancel = true;
     }
 
     async Task Start()
@@ -79,17 +125,13 @@ sealed class MainForm : Form
             if (startOnLast) ApplyLastRightClick();
             Reload();
         }
-        var data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Dexmenu", "WebView2");
-        var env = await CoreWebView2Environment.CreateAsync(null, data);
-        await web.EnsureCoreWebView2Async(env);
-        WebFiles.Serve(web.CoreWebView2);
-        web.CoreWebView2.WebMessageReceived += (_, e) => Received(e.WebMessageAsJson);
-        web.CoreWebView2.NavigationCompleted += (_, _) => { pageReady = true; Reload(); };
-        web.CoreWebView2.Navigate("https://dexmenu.app/" + (selftest is null ? "index.html" : "selftest.html"));
+        await Pages.Start(web, selftest is null ? "index.html" : "selftest.html", Received,
+            () => { pageReady = true; ApplyTheme(); });
     }
 
     static readonly (string Kind, string Name)[] Kinds =
-        [("file", "a file"), ("folder", "a folder"), ("several", "several items"), ("background", "a folder's empty part"), ("drive", "a drive")];
+        [("file", "a file"), ("folder", "a folder"), ("several", "several items"), ("background", "a folder's empty part"),
+         ("desktop", "the desktop's empty part"), ("drive", "a drive")];
 
     void BuildPreviewBar()
     {
@@ -99,7 +141,7 @@ sealed class MainForm : Form
         kindBox.SelectedIndex = Array.FindIndex(Kinds, x => x.Kind == kind);
         itemsDrop.Items.Add(new ToolStripControlHost(itemsList) { Padding = Padding.Empty, AutoSize = false, Size = itemsList.Size });
         previewBar.Controls.AddRange([Text("Right-click on"), kindBox, Text("in"), folderBox, folderButton, noFolderButton, itemBox, itemsButton,
-            lastButton, liveError]);
+            lastButton, notMeant, liveError]);
         kindBox.SelectedIndexChanged += (_, _) => { if (applying) return; kind = Kinds[kindBox.SelectedIndex].Kind; FillItems(); Live(); Reload(); };
         lastButton.Click += (_, _) => ApplyLastRightClick();
         lastButton.Enabled = DataFolder.LastRightClick() is not null;
@@ -185,11 +227,19 @@ sealed class MainForm : Form
         itemsButton.Text = n == 0 ? "Choose items..." : n + (n == 1 ? " item: " : " items: ") + string.Join(", ", itemsList.CheckedItems.Cast<string>().Take(2)) + (n > 2 ? ", ..." : "");
     }
 
-    // Windows' real menu of the right-click in the folder, or none (the seen items).
+    // Windows' real menu of the right-click in the folder, or none (the seen items). The desktop's empty part is the
+    // desktop's, whatever the folder.
     void Live()
     {
         liveSeen = null;
         liveError.Text = "";
+        if (kind == "desktop")
+        {
+            liveSeen = ShellMenu.SeenOf(Handle, "background", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), [],
+                DataFolder.ReadSeen(kind), out var desktopError);
+            liveError.Text = desktopError;
+            return;
+        }
         if (folder is null) return;
         IReadOnlyList<string> chosen = kind switch
         {
@@ -247,22 +297,14 @@ sealed class MainForm : Form
         return Native.BaseLayout();
     }
 
-    string? LayoutName => currentFile is null ? null : Path.GetFileNameWithoutExtension(currentFile);
-
-    static string[] LayoutNames()
-    {
-        var folder = Path.Combine(DataFolder.Root, "layouts");
-        return Directory.Exists(folder) ? Directory.GetFiles(folder, "*.json").Select(Path.GetFileNameWithoutExtension).OfType<string>().ToArray() : [];
-    }
-
-    // the layout every other kind of right-click gets (until plan 05's main window shows them all)
-    static string? ActiveName() => DataFolder.LayoutOf("default");
-
     // The preview from the edit in progress or the file; the page gets the file's state when nothing is being edited.
     void Reload()
     {
         if (selftest is not null) return;
         lastButton.Enabled = DataFolder.LastRightClick() is not null;
+        // a kind this layout is not set for (as the DLL decides; tests: one layout for every kind)
+        notMeant.Visible = LayoutName is { } me && Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is not { Length: > 0 }
+            && !string.Equals(DataFolder.Resolve(kind), me, StringComparison.OrdinalIgnoreCase);
         var text = FileText(out var source);
         var error = preview == IntPtr.Zero
             ? "DexmenuShell.dll did not make the preview"
@@ -273,8 +315,8 @@ sealed class MainForm : Form
             Post(new { type = "preview", error });
             return;
         }
-        Post(new { type = "state", kind, kindName = Kinds.FirstOrDefault(x => x.Kind == kind).Name ?? kind, layout = text, source, name = LayoutName, layouts = LayoutNames(), active = ActiveName(), error,
-            registration = RegistrationState() });
+        Post(new { type = "state", kind, kindName = Kinds.FirstOrDefault(x => x.Kind == kind).Name ?? kind, layout = text, source,
+            name = LayoutName, theme = DataFolder.Theme, error });
     }
 
     void Post(object message) => web.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message));
@@ -302,72 +344,66 @@ sealed class MainForm : Form
             case "save":
                 Save(Str("name"), Str("layout"));
                 break;
-            case "open":
-                if (Str("name") is { Length: > 0 } open)
-                {
-                    currentFile = Path.Combine(DataFolder.Root, "layouts", open + ".json");
-                    editedText = null;
-                    Watch();
-                    Reload();
-                }
+            case "saveAs":
+                if (LayoutFiles.Problem(Str("name")) is { } problem) { Post(new { type = "problem", text = problem }); break; }
+                Save(Str("name"), Str("layout"), asCopy: true);
                 break;
-            case "activate":
-                Activate(Str("name"));
+            case "close":
+                Close();
+                break;
+            case "theme":
+                DataFolder.Theme = Str("theme");
+                DexmenuApp.Instance?.ThemeChanged();
+                if (DexmenuApp.Instance is null) ApplyTheme();
                 break;
             case "mark":
                 if (preview != IntPtr.Zero) Native.DexmenuPreviewMark(preview, Str("cardId"));
                 break;
-            case "register":
-            case "unregister":
-                try
-                {
-                    if (Str("type") == "register") Registration.Register(); else Registration.Unregister();
-                    if (m.TryGetProperty("restart", out var restart) && restart.GetBoolean()) Registration.RestartExplorer();
-                    Post(new { type = "registration", registration = RegistrationState() });
-                }
-                catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
-                {
-                    Post(new { type = "registration", registration = RegistrationState(), error = e.Message });
-                }
-                break;
         }
     }
 
-    // What the page shows about the registration: on for this user (this app's DLL), another DLL registered, or off.
-    static object RegistrationState()
+    // The layout written under a name (layouts\<name>.json; with DEXMENU_LAYOUT_FILE, the tests, to that file). A new
+    // name renames this layout (the kinds set to it follow) unless asCopy (Save as: the old file stays, this window
+    // edits the new one). False when not written.
+    bool Save(string name, string text, bool asCopy = false)
     {
-        var dll = Registration.RegisteredDll;
-        var ours = dll is not null && string.Equals(Path.GetFullPath(dll), Path.GetFullPath(Registration.DllPath), StringComparison.OrdinalIgnoreCase);
-        return new { registered = dll is not null, ours, dll, enabled = Registration.Enabled };
-    }
-
-    // The layout written under a name (layouts\<name>.json); with DEXMENU_LAYOUT_FILE (the tests) to that file.
-    void Save(string name, string text)
-    {
-        if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return;
-        var path = Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is { Length: > 0 } env && Path.GetFileNameWithoutExtension(env) == name
-            ? env
-            : Path.Combine(DataFolder.Root, "layouts", name + ".json");
+        name = name.Trim();
+        if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            Post(new { type = "problem", text = "not saved: the name is empty or holds \\ / : * ? \" < > |" });
+            return false;
+        }
+        string path;
+        if (Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is { Length: > 0 } env && Path.GetFileNameWithoutExtension(env) == name)
+            path = env;
+        else
+        {
+            path = DataFolder.LayoutPath(name);
+            var renaming = !asCopy && LayoutName is { } old && !string.Equals(old, name, StringComparison.OrdinalIgnoreCase)
+                && currentFile is not null && File.Exists(currentFile);
+            if (renaming)
+            {
+                if (LayoutFiles.Problem(name) is { } problem) { Post(new { type = "problem", text = "not saved: " + problem }); return false; }
+                var from = LayoutName!;
+                LayoutFiles.Rename(from, name);
+                foreach (var other in DexmenuApp.Instance?.Editors ?? []) if (other != this && other.LayoutName == from) other.FileRenamed(path);
+            }
+        }
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text + Environment.NewLine);
         currentFile = path;
         editedText = null;
+        SetTitle();
         Watch();
         Post(new { type = "saved" });
         Reload();
-    }
-
-    // settings.json's "layout": the layout Dexmenu uses at a right-click; its other settings kept.
-    // Until plan 05's main window: "Make active" sets the layout for every other kind of right-click (default).
-    static void Activate(string name)
-    {
-        if (name.Length == 0) return;
-        DataFolder.SetLayout("default", name);
+        return true;
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         foreach (var w in watchers) w.Dispose();
+        settle.Dispose();
         base.OnFormClosed(e);
     }
 }

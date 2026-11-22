@@ -7,21 +7,17 @@
 <link rel="stylesheet" href="editor.css">
 </head>
 <body>
+  <!-- one layout (docs/plans/05-PLAN-settings-windows.md 3.6): its name (a change renames it on Save), Save, Save as,
+       Close; the theme switch at the right -->
   <header>
-    <span class="grow"></span>
-    <label>Layout <select id="layouts"></select></label>
+    <label>Layout <input type="text" id="layoutName" title="A new name renames the layout when it is saved"></label>
     <span id="dirty" hidden>changed</span>
     <button id="save">Save</button>
     <button id="saveAs">Save as...</button>
-    <button id="activate">Make active</button>
-  </header>
-  <div id="registration">
-    <span id="regState"></span>
+    <button id="close">Close</button>
     <span class="grow"></span>
-    <label title="Explorer loads Dexmenu, or lets go of it, only when it starts; its open windows close"><input type="checkbox" id="restart" checked> Restart Explorer afterwards</label>
-    <button id="register">Register</button>
-    <button id="unregister">Unregister</button>
-  </div>
+    <span id="themeSwitch" class="segmented" title="Light, dark, or as Windows' apps are"></span>
+  </header>
   <div id="error" hidden></div>
   <main id="panes">
     <section class="pane" id="rulesPane">
@@ -40,7 +36,7 @@
           </div>
         </div>
         <div class="cards-main">
-          <h2>Cards <span class="hint" id="kindName"></span>
+          <h2>Cards
             <span class="grow"></span>
             <button id="addTop" draggable="true" title="Drag to where the new card goes; a click adds it at the end"></button>
             <button id="addDivider" draggable="true" title="Drag to where the new divider goes; a click adds it at the end"></button></h2>
@@ -60,6 +56,7 @@
       <menu><button value="cancel" formnovalidate>Cancel</button> <button value="ok">Save</button></menu>
     </form>
   </dialog>
+  <script src="theme.js"></script>
   <script src="layout-model.js"></script>
   <script src="editor.js"></script>
 </body>

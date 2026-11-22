@@ -5,6 +5,7 @@ Status: partly executed; see Status.
 - 2026-11-22: draft.
 - 2026-11-22: partly executed: the layout format.
 - 2026-11-22: partly executed: the kinds setting, the dialog and desktop kinds.
+- 2026-11-22: partly executed: the main window, the editor window, light and dark.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md` 3.7, 3.9: the settings app, registration) and plan 02 (`02-PLAN-own-menu.md`
 3.4, 3.5: layouts, the editor). Changes how layouts are chosen per kind of right-click and where they are edited.
@@ -36,17 +37,17 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Kinds setting | settings.json's ordered `kinds`; the DLL takes the first that fits; none: Windows' menu; first start makes the list and the Default layout | 3.2; 6.2 |
 | Open dialog | the dialog kinds, the layout chosen by them inside an Open or Save dialog | 3.2; 6.2 |
 | Desktop kind | `desktop`: registered for, told apart from a folder's empty part | 3.2; 6.2 |
+| Main window | `HomeForm`, `web/main.*`: the panels General and Layouts, side by side, stacked or as tabs by what fits; the window's minimum from the page | 3.3; 6.3 |
+| General panel | the registration (Restart Explorer lit until Explorer restarted); each kind with its layout, None or Not set, dragged to reorder, Edit | 3.4; 6.3 |
+| Layouts panel | New..., Edit, Copy..., Rename... (kinds follow), Delete (asks, names its kinds, sets them to None; recycle bin) | 3.5; 6.3 |
+| Editor window | `EditorForm`: one layout per window, several at once; name, Save, Save as..., Close (asks to save); every kind in the preview, marked when not meant for it; Ctrl+C / Ctrl+X / Ctrl+V of cards, dividers and rules between windows | 3.6; 6.3 |
+| Light and dark | settings.json `theme`; the switch at every window's top right; page, title bar and preview follow at once | 3.3; 6.3 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Layout versions | a format number in each layout; the editor updates an older file when it opens it; the DLL shows a warning (a note card) and the remaining card for a file it cannot use | Layout format; plan 02 Note card | 3.1.1 |
-| Light and dark | every window light or dark as Windows is at its start, switched from its top right | Main window; Editor window | 3.3 |
-| Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
-| General panel | the registration line and buttons (Restart Explorer lit after a change); each kind of right-click with its layout (or none) | Main window | 3.4 |
-| Layouts panel | the list; New..., Edit, Copy, Rename, Delete | Main window | 3.5 |
-| Editor window | one layout: name, Save, Save as..., Close (asks to save); the panes and preview; every kind in the preview, marked when not meant for it; several windows, cards and rules copied or moved between them | Layouts panel | 3.6 |
 | Tests | 3.7 | -- | 3.7 |
 
 ## 3. Details
@@ -246,3 +247,37 @@ None.
 - While testing, `--register` was run once and registered `bin` for the user; put back by hand at once (the path
   to `C:\Win32App\Dexmenu`, the desktop key removed). Tests that start the app now pass `DEXMENU_DATA` and no
   `--register`.
+
+### 6.3 The main window, the editor window, light and dark
+
+- The app (`Program.cs`, `App.cs` `DexmenuApp`): without arguments the main window (`HomeForm`); `--edit <layout>` an
+  editor; `--kind`, `--selftest` or `DEXMENU_LAYOUT_FILE` (the tests) an editor on the layout in use, as before. All
+  windows in one process; it ends when the last closes. Edit on a layout already open brings its window forward; a
+  rename in the main window or by an editor's Save reaches the open editors.
+- The main window's page measures nothing: each panel's minimum is set in CSS (General 440 x 380, Layouts 380 x 300
+  CSS pixels; the lists show at least three rows), `main.js` chooses side by side, stacked or tabs from them and sends
+  the window's minimum (the larger panel, margins, header and tabs), which `HomeForm` turns into `MinimumSize`.
+- The layouts' operations (`LayoutFiles.cs`): names checked (empty, a bad character, `none`, existing refused);
+  Delete to the recycle bin, its kinds set to `none`. Tested by `DexmenuSettings.exe --selftest-files <file>` on a
+  data folder of the test's own (`DEXMENU_DATA`): first start, names, New, Copy, Rename following, Delete setting
+  none, the order (default last), a dialog kind falling through.
+- Restart Explorer lit: after Register or Unregister until a new Explorer process is seen (checked every 1.5 s).
+- The editor window: the header holds the name (a new name renames on Save, the kinds following), Save, Save as...
+  (a copy, then edited here), Close; the registration and "Make active" are gone from it. Closing with unsaved
+  changes asks Yes / No / Cancel (WinForms). Above the preview: "This layout is not meant for this kind" when the
+  kind resolves (as the DLL decides) to another layout; the kinds include the desktop's empty part (its live menu
+  from the desktop's folder).
+- Between windows: Ctrl+C / Ctrl+X / Ctrl+V of the selected card (with its menu), divider or rule, as JSON on the
+  clipboard (`layout-model.js` `clip`, `paste`): a pasted card gets new ids and its rules places at the end of the
+  priority list, on a line after the selected card's (or at the end); a rule goes onto the selected card with rules;
+  the remaining card is never pasted. Dragging between windows: [not yet checked] whether WebView2 carries it.
+- Light and dark: settings.json `theme` (`windows`, `light`, `dark`); `theme.js` draws the switch; the app sets
+  WebView2's preferred colour scheme (the pages' CSS follows `prefers-color-scheme`), the title bar (DWM dark mode)
+  and the preview (`DexmenuSetTheme` in the DLL) for every window at once.
+- `DEXMENU_SCREENSHOT=<png>`: a window's page saved as a PNG after it loaded, then the window closes (to check the
+  look; used for the screenshots while building).
+- Tested: `--selftest-files` (all pass); the editor's self-test (paste: new ids, the line after, rules at the end,
+  the remaining card refused, a rule onto a card, other text ignored; every page script parses); both windows
+  opened on a test data folder and closed; screenshots of both checked. Not tested by a script: dragging kinds,
+  the panels' three arrangements by resizing, the theme switch, closing with unsaved changes, the clipboard between
+  two windows.

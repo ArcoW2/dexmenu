@@ -2,10 +2,10 @@
 // (a tree of lines and submenus, dragged around; a card selected shows its name, title, extra text and rules) and the
 // rules in priority order (dragged to change it). Every change goes to the app at once ({ type: "edit", layout }),
 // which has the DLL draw the preview from it; saving writes the file. The app sends:
-//   { type: "state", kind, kindName, layout, source, name, layouts, active, error }   a layout (re)loaded
+//   { type: "state", kind, layout, source, name, theme, error }      the layout (re)loaded
 //   { type: "preview", error }                                                      the preview of an edit
 //   { type: "placed", event, cardId, rule }      the preview: an item hovered (1) or clicked (2): who placed it
-// and gets { type: "edit" | "save" | "open" | "activate" | "mark", ... } back.
+// and gets { type: "edit" | "save" | "saveAs" | "close" | "mark" | "theme", ... } back.
 "use strict";
 
 const M = LayoutModel;
@@ -608,14 +608,8 @@ new ResizeObserver(() => { if (layout) placeToggles(); }).observe($("cards"));
 
 function load(state) {
   kind = state.kind;   // chosen above the preview (the app)
-  $("kindName").textContent = "for a right-click on " + (state.kindName || kindNames[kind] || kind);
-  const names = [...new Set([...(state.layouts || []), state.name].filter(Boolean))];
-  $("layouts").replaceChildren(...names.map(n => {
-    const o = el("option", "", n + (n === state.active ? " (active)" : ""));
-    o.value = n;
-    return o;
-  }));
-  $("layouts").value = state.name || "";
+  if (document.activeElement !== $("layoutName")) $("layoutName").value = state.name || "";
+  Theme.show(state.theme);
   $("error").hidden = !state.error;
   $("error").textContent = state.error || "";
   if (state.layout === loadedText && layout) { render(); return; }   // the same file again (after a save)
@@ -652,32 +646,18 @@ async function askName() {
   return new Promise(resolve => dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok" ? $("nameInput").value.trim() : ""), { once: true }));
 }
 
-// Registration for this user (Registration.cs): the state, Register / Unregister, Explorer restarted when asked.
-function showRegistration(r, error) {
-  const s = $("regState");
-  if (!r) return;
-  if (r.registered && r.ours && r.enabled) { s.className = "on"; s.textContent = "Dexmenu is registered and on for you."; }
-  else if (r.registered && !r.ours) { s.className = "other"; s.textContent = "Another DexmenuShell.dll is registered: " + r.dll; }
-  else if (r.registered) { s.className = "off"; s.textContent = "Dexmenu is registered but switched off."; }
-  else { s.className = "off"; s.textContent = "Dexmenu is not registered: right-clicks show Windows' own menu."; }
-  if (error) { s.className = "other"; s.textContent = "Not done: " + error; }
-  $("register").disabled = r.registered && r.ours && r.enabled;
-  $("unregister").disabled = !r.registered;
-}
-$("register").addEventListener("click", () => post({ type: "register", restart: $("restart").checked }));
-$("unregister").addEventListener("click", () => post({ type: "unregister", restart: $("restart").checked }));
-
-$("layouts").addEventListener("change", () => post({ type: "open", name: $("layouts").value }));
+// Save: under the name at the top (a new name renames the layout, the kinds set to it follow); Save as: a copy
+// under a new name, which this window then edits; Close: the app asks to save unsaved changes.
 $("save").addEventListener("click", async () => {
-  let name = $("layouts").value;
+  let name = $("layoutName").value.trim();
   if (!name) name = await askName();
   if (name) post({ type: "save", name, layout: JSON.stringify(layout, null, 2) });
 });
 $("saveAs").addEventListener("click", async () => {
   const name = await askName();
-  if (name) post({ type: "save", name, layout: JSON.stringify(layout, null, 2) });
+  if (name) post({ type: "saveAs", name, layout: JSON.stringify(layout, null, 2) });
 });
-$("activate").addEventListener("click", () => post({ type: "activate", name: $("layouts").value }));
+$("close").addEventListener("click", () => post({ type: "close" }));
 withIcon($("addTop"), "+ Card");
 $("addDivider").replaceChildren(dividerIcon(), document.createTextNode(" + Divider"));
 $("addDivider").addEventListener("click", () => {
@@ -729,17 +709,51 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
     });
   }
 })();
-document.addEventListener("keydown", e => {
-  if (e.key === "Delete" && selectedId && document.activeElement.tagName !== "INPUT" && M.deleteCard(linesOf(), selectedId)) {
+document.addEventListener("keydown", async e => {
+  const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
+  if (typing || !layout) return;
+  if (e.key === "Delete" && selectedId && M.deleteCard(linesOf(), selectedId)) {
     selectedId = null;
     changed();
+    return;
   }
+  // Ctrl+C / Ctrl+X / Ctrl+V (plan 05 3.6): a card, a divider or the selected rule, also between editor windows
+  // (another layout); Ctrl+X then Ctrl+V is a move.
+  if (!e.ctrlKey || !["c", "x", "v"].includes(e.key.toLowerCase())) return;
+  e.preventDefault();
+  const key = e.key.toLowerCase();
+  const at = selectedId ? M.find(linesOf(), selectedId) : null;
+  const div = selectedId ? M.findDivider(linesOf(), selectedId) : null;
+  if (key === "c" || key === "x") {
+    let text = null;
+    if (at && selectedRule >= 0 && at.card.rules && at.card.rules[selectedRule] !== undefined && at.card.rules[selectedRule] !== "remaining")
+      text = M.clip("rule", at.card.rules[selectedRule]);
+    else if (at && !M.isRemaining(at.card)) text = M.clip("card", at.card);
+    else if (div) text = M.clip("divider", div.entry);
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    if (key === "x") {
+      if (text.includes('"dexmenu":"rule"')) { M.deleteRule(linesOf(), at.card, selectedRule); selectedRule = -1; }
+      else if (div) { M.deleteDivider(linesOf(), selectedId); selectedId = null; }
+      else if (M.deleteCard(linesOf(), selectedId)) selectedId = null;
+      changed();
+    }
+    return;
+  }
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch (err) { return; }
+  const onto = at && !at.card.menu && !M.isRemaining(at.card) ? at.card : null;
+  const pasted = M.paste(layout, linesOf(), text, at ? selectedId : null, onto);
+  if (!pasted) return;
+  if (pasted.id) select(pasted.id, -1);
+  changed();
 });
 
 chrome.webview.addEventListener("message", e => {
   const m = e.data;
-  if (m.type === "state") { showRegistration(m.registration); load(m); }
-  else if (m.type === "registration") showRegistration(m.registration, m.error);
+  if (m.type === "state") load(m);
+  else if (m.type === "theme") Theme.show(m.theme);
+  else if (m.type === "problem") { $("error").hidden = false; $("error").textContent = m.text; }
   else if (m.type === "preview") { $("error").hidden = !m.error; $("error").textContent = m.error || ""; }
   else if (m.type === "placed" && m.cardId) {
     if (m.event === 2) select(m.cardId, m.rule);

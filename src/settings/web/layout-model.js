@@ -338,6 +338,50 @@ const LayoutModel = (() => {
     return true;
   }
 
+  // ---- copied between layouts (plan 05 3.6: Ctrl+C / Ctrl+V between editor windows) ---------------------------------
+
+  // What goes on the clipboard: { dexmenu: "card" | "divider" | "rule", item }, a deep copy.
+  function clip(type, item) { return JSON.stringify({ dexmenu: type, item: JSON.parse(JSON.stringify(item)) }); }
+
+  // A card, a divider or a rule from the clipboard into this layout. A card (with its menu) gets new ids and its rules
+  // places at the end of the priority list; it goes on a line of its own after the line of the card afterId (or at
+  // the end of the top level). The remaining card is never pasted (each layout has its own). A rule goes to the end
+  // of a card with rules (onto), at the end of the priority list. What was pasted, or null.
+  function paste(layout, lines, text, afterId, onto) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { return null; }
+    if (!data || typeof data.dexmenu !== "string" || !data.item) return null;
+    const item = data.item;
+    let nextId = +newId(layout).slice(1);   // counted on: the pasted items are not in the layout yet
+    const fresh = () => "c" + nextId++;
+    if (data.dexmenu === "rule") {
+      if (!onto || onto.menu || isRemaining(onto) || item === "remaining") return null;
+      delete item.priority;
+      onto.rules = onto.rules || [];
+      onto.rules.push(item);
+      item.priority = ruleList(lines).length + 1;
+      renumber(lines);
+      return item;
+    }
+    if (data.dexmenu !== "card" && data.dexmenu !== "divider") return null;
+    if (data.dexmenu === "card") {
+      const all = [item, ...(item.menu ? [...cards(item.menu)].map(a => a.card) : [])];
+      if (all.some(isRemaining)) return null;
+      let next = ruleList(lines).length + 1;
+      for (const c of all) {
+        c.id = "";
+        for (const r of c.rules || []) if (r !== "remaining") r.priority = next++;
+      }
+      for (const c of all) c.id = fresh();
+      if (item.menu) for (const d of dividers(item.menu)) d.entry.id = fresh();
+    } else item.id = fresh();
+    const entry = data.dexmenu === "card" ? { line: [item] } : item;
+    const at = afterId ? find(lines, afterId) : null;
+    if (at) at.lines.splice(at.lineIndex + 1, 0, entry); else lines.push(entry);
+    renumber(lines);
+    return item;
+  }
+
   // The layout in the current form (plan 05 3.1.1): { format, lines } - one menu. An older file (no "format": a
   // section per kind of right-click) brought to it: its "default" section becomes the menu, its other sections go.
   // Whether it changed, so the editor shows it as not saved.
@@ -371,5 +415,5 @@ const LayoutModel = (() => {
 
   return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
-    dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, addCard, makeMenu, remainingCount, withoutComments };
+    dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

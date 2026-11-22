@@ -26,6 +26,10 @@ static class Native
     [DllImport(Dll, CharSet = CharSet.Unicode)]
     public static extern void DexmenuPreviewMark(IntPtr wnd, string cardId);
 
+    /// <summary>The preview's look: 0 as Windows' apps are, 1 light, 2 dark.</summary>
+    [DllImport(Dll)]
+    public static extern void DexmenuSetTheme(int mode);
+
     [DllImport(Dll, CharSet = CharSet.Unicode)]
     static extern int DexmenuBaseLayout(StringBuilder? buffer, int chars);
 

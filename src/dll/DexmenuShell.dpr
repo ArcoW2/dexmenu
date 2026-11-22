@@ -30,7 +30,8 @@ exports
   DexmenuBaseLayout,
   DexmenuPreviewSetCallback,
   DexmenuPreviewMark,
-  DexmenuSeenOfMenu;
+  DexmenuSeenOfMenu,
+  DexmenuSetTheme;
 
 begin
 end.

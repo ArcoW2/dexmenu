@@ -24,7 +24,62 @@ static class DataFolder
         ["dialog-file", "dialog-folder", "dialog-several", "dialog-background", "dialog-drive",
          "file", "folder", "several", "background", "desktop", "drive", "default"];
 
-    static System.Text.Json.Nodes.JsonObject ReadSettings()
+    /// <summary>How the app names each kind of right-click.</summary>
+    public static readonly Dictionary<string, string> KindNames = new()
+    {
+        ["dialog-file"] = "a file in an Open or Save dialog", ["dialog-folder"] = "a folder in an Open or Save dialog",
+        ["dialog-several"] = "several items in an Open or Save dialog", ["dialog-background"] = "an empty part in an Open or Save dialog",
+        ["dialog-drive"] = "a drive in an Open or Save dialog",
+        ["file"] = "a file", ["folder"] = "a folder", ["several"] = "several items", ["background"] = "a folder's empty part",
+        ["desktop"] = "the desktop's empty part", ["drive"] = "a drive", ["default"] = "every other right-click",
+    };
+
+    /// <summary>The kinds as settings.json has them, in their order: kind and layout (a name, "none", or null: not set).
+    /// </summary>
+    public static List<(string Kind, string? Layout)> Kinds()
+    {
+        var list = new List<(string, string?)>();
+        if (ReadSettings()["kinds"] is System.Text.Json.Nodes.JsonArray kinds)
+            foreach (var e in kinds)
+                if (e?["kind"]?.GetValue<string>() is { Length: > 0 } k) list.Add((k, e["layout"]?.GetValue<string>()));
+        return list;
+    }
+
+    /// <summary>The kinds in a new order (a kind moved from one place to another); default stays last.</summary>
+    public static void MoveKind(int from, int to)
+    {
+        var settings = ReadSettings();
+        if (settings["kinds"] is not System.Text.Json.Nodes.JsonArray kinds || from < 0 || from >= kinds.Count || to < 0 || to >= kinds.Count) return;
+        var moved = kinds[from];
+        if (moved?["kind"]?.GetValue<string>() == "default") return;
+        kinds.RemoveAt(from);
+        kinds.Insert(Math.Min(to, kinds.Count), moved);
+        // default always last
+        var def = kinds.FirstOrDefault(e => e?["kind"]?.GetValue<string>() == "default");
+        if (def is not null) { kinds.Remove(def); kinds.Add(def); }
+        WriteSettings(settings);
+    }
+
+    /// <summary>The layout a kind of right-click gets, as the DLL decides (Dexmenu.Layout.CurrentLayout): the first kind
+    /// in the order that fits and is set; "none" for Windows' own menu; null for the built-in base layout.</summary>
+    public static string? Resolve(string kind)
+    {
+        foreach (var (k, layout) in Kinds())
+        {
+            var fits = k == kind || k == "default" || (kind.StartsWith("dialog-") && k == kind["dialog-".Length..]);
+            if (fits && layout is { Length: > 0 }) return layout;
+        }
+        return null;
+    }
+
+    /// <summary>Light, dark, or as Windows' apps are ("windows", also when not set): every window's look.</summary>
+    public static string Theme
+    {
+        get => ReadSettings()["theme"]?.GetValue<string>() is "light" or "dark" ? ReadSettings()["theme"]!.GetValue<string>() : "windows";
+        set { var s = ReadSettings(); s["theme"] = value; WriteSettings(s); }
+    }
+
+    internal static System.Text.Json.Nodes.JsonObject ReadSettings()
     {
         try
         {
@@ -35,7 +90,7 @@ static class DataFolder
         catch (Exception e) when (e is IOException or JsonException) { return []; }
     }
 
-    static void WriteSettings(System.Text.Json.Nodes.JsonObject settings)
+    internal static void WriteSettings(System.Text.Json.Nodes.JsonObject settings)
     {
         Directory.CreateDirectory(Root);
         File.WriteAllText(SettingsFile, settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

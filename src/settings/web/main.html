@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dexmenu</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="side">
+  <!-- docs/plans/05-PLAN-settings-windows.md 3.3 - 3.5: only about Dexmenu itself; editing is in a layout's window -->
+  <header>
+    <span class="app">Dexmenu</span>
+    <span class="grow"></span>
+    <span id="themeSwitch" class="segmented" title="Light, dark, or as Windows' apps are"></span>
+  </header>
+  <nav id="tabs">
+    <button data-panel="general" class="on">General</button>
+    <button data-panel="layouts">Layouts</button>
+  </nav>
+  <main id="panels">
+    <section class="panel" id="general">
+      <h2>General</h2>
+      <div id="registration">
+        <div id="regLine"></div>
+        <div class="buttons">
+          <button id="register">Register</button>
+          <button id="unregister">Unregister</button>
+          <button id="restart" title="Explorer takes a registration change only when it starts again; its windows close">Restart Explorer</button>
+        </div>
+      </div>
+      <h3>Which layout each right-click gets <span class="hint">(tried from the top: the first that fits and is set decides, Not set passes to the next; drag to reorder)</span></h3>
+      <ol id="kinds" class="list"></ol>
+    </section>
+    <section class="panel" id="layouts">
+      <h2>Layouts</h2>
+      <div class="buttons">
+        <button id="new">New...</button>
+        <button id="edit">Edit</button>
+        <button id="copy">Copy...</button>
+        <button id="rename">Rename...</button>
+        <button id="delete">Delete</button>
+      </div>
+      <ul id="layoutList" class="list"></ul>
+    </section>
+  </main>
+  <div id="problem" hidden></div>
+  <dialog id="nameDialog">
+    <form method="dialog">
+      <label><span id="nameLabel">Name</span> <input id="nameInput" required></label>
+      <menu><button value="cancel" formnovalidate>Cancel</button> <button value="ok" id="nameOk">OK</button></menu>
+    </form>
+  </dialog>
+  <dialog id="confirmDialog">
+    <form method="dialog">
+      <p id="confirmText"></p>
+      <menu><button value="cancel">Cancel</button> <button value="ok">Delete</button></menu>
+    </form>
+  </dialog>
+  <script src="theme.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
