@@ -188,7 +188,8 @@ function renderCard(card) {
   // a card with a menu folds; its toggle is in the pane's gutter (placeToggles)
   const folded = !!card.menu && collapsed.has(card.id);
   if (card.menu) box.dataset.fold = folded ? "folded" : "open";
-  const title = el("div", "title", card.card);
+  const title = el("div", "title");
+  title.append(el("span", "name", card.card));   // its own element, so a long name wraps inside the card
   title.append(...ruleBadges(card));
   const cardsIn = card.menu ? [...M.cards(card.menu)].length : 0;
   box.append(cardActions(card), title,
@@ -681,7 +682,8 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
 // The widths are kept in this page's storage (a convenience: without it the panes start at their default widths).
 (() => {
   const key = "dexmenu.paneWidths";
-  const fix = (pane, w) => { pane.style.flex = "0 0 " + Math.round(w) + "px"; };
+  // a dragged width is the pane's wish; it shrinks when the window is too narrow for all, so no pane runs off
+  const fix = (pane, w) => { pane.style.flex = "0 1 " + Math.round(w) + "px"; };
   try {
     const saved = JSON.parse(localStorage.getItem(key) || "{}");
     for (const [id, w] of Object.entries(saved)) if ($(id) && w > 0) fix($(id), w);
