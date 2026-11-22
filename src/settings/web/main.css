@@ -24,11 +24,8 @@ button.lit { background: var(--accent); color: var(--on-accent); border-color: v
 .hint { color: var(--dim); font-weight: normal; font-size: 12px; }
 header { flex: 0 0 var(--header-h); box-sizing: border-box; display: flex; align-items: center; padding: 0 var(--margin); border-bottom: 1px solid var(--line); }
 header .app { font-weight: 600; }
-.segmented { display: inline-flex; }
-.segmented button { border-radius: 0; margin-left: -1px; padding: 2px 9px; font-size: 12px; }
-.segmented button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
-.segmented button:last-child { border-radius: 0 4px 4px 0; }
-.segmented button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+/* the light / dark button (theme.js): a sun or a moon */
+button.theme { padding: 2px 6px; line-height: 0; }
 
 /* the panels: side by side, above each other, or as tabs (main.js chooses by what fits) */
 #tabs { display: none; flex: 0 0 var(--tabs-h); box-sizing: border-box; gap: 4px; padding: 4px var(--margin) 0; border-bottom: 1px solid var(--line); }

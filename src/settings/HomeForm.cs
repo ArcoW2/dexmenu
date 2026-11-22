@@ -90,7 +90,7 @@ sealed class HomeForm : Form, IThemed
             registration = new { registered = dll is not null, ours, dll, enabled = Registration.Enabled, restartPending },
             kinds = DataFolder.Kinds().Select(k => new { kind = k.Kind, name = DataFolder.KindNames.GetValueOrDefault(k.Kind, k.Kind), layout = k.Layout }),
             layouts = layouts.Select(n => new { name = n, kinds = LayoutFiles.KindsOf(n).Select(k => DataFolder.KindNames.GetValueOrDefault(k, k)) }),
-            theme = DataFolder.Theme,
+            theme = Themes.Name,
         });
     }
 
@@ -153,7 +153,7 @@ sealed class HomeForm : Form, IThemed
                     PostState();
                     break;
                 case "theme":
-                    DataFolder.Theme = Str("theme");
+                    Themes.Toggle();
                     DexmenuApp.Instance.ThemeChanged();
                     break;
                 case "minsize":

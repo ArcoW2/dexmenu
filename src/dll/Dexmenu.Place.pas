@@ -26,7 +26,7 @@ uses
   Winapi.Windows, System.Generics.Collections, Dexmenu.Tree, Dexmenu.Layout;
 
 type
-  TViewKind = (vkItem, vkMenu, vkSeparator);
+  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote);   // vkNote: a note card (Card), no button
 
   TFound = record
     Node: TNode;
@@ -133,6 +133,7 @@ begin
             // a rename that does not compile: the item's own text
           end;
       end;
+    vkNote: Result := Card.NoteText;
     vkMenu:
       if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
@@ -520,7 +521,13 @@ begin
       else
       begin
         V := nil;
-        if Card.Menu <> nil then
+        if Card.IsNote then
+        begin
+          V := TViewCard.Create;
+          V.Kind := vkNote;
+          V.Card := Card;
+        end
+        else if Card.Menu <> nil then
         begin
           Inner := PlaceLines(P, Card.Menu);   // what its menu would show: nothing, and it is not worth a card
           try

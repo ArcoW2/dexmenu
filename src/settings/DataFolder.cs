@@ -72,13 +72,6 @@ static class DataFolder
         return null;
     }
 
-    /// <summary>Light, dark, or as Windows' apps are ("windows", also when not set): every window's look.</summary>
-    public static string Theme
-    {
-        get => ReadSettings()["theme"]?.GetValue<string>() is "light" or "dark" ? ReadSettings()["theme"]!.GetValue<string>() : "windows";
-        set { var s = ReadSettings(); s["theme"] = value; WriteSettings(s); }
-    }
-
     internal static System.Text.Json.Nodes.JsonObject ReadSettings()
     {
         try

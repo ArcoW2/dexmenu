@@ -40,6 +40,21 @@ function cardIcon() {
   add("line", { x1: "3.5", y1: "6.5", x2: "8", y2: "6.5", stroke: "currentColor", "stroke-width": "1.3" });
   return svg;
 }
+// A note's icon: a sheet with lines of text, no button's frame.
+function noteIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 14 10");
+  svg.setAttribute("class", "card-icon");
+  svg.setAttribute("aria-hidden", "true");
+  for (const [y, x2] of [[2, 13], [5, 13], [8, 9]]) {
+    const l = document.createElementNS(ns, "line");
+    for (const [k, v] of Object.entries({ x1: 1, y1: y, x2, y2: y, stroke: "currentColor", "stroke-width": "1.4" })) l.setAttribute(k, v);
+    svg.append(l);
+  }
+  return svg;
+}
+
 // A divider's icon: a line with a short text in it.
 function dividerIcon() {
   const ns = "http://www.w3.org/2000/svg";
@@ -85,6 +100,7 @@ function ruleBadges(card) {
 }
 
 function describeCard(card) {
+  if (M.isNote(card)) return "a note: shown as text, no button";
   if (card.hidden && !M.isRemaining(card)) return "hidden: what it finds is left out of the menu";
   if (card.menu) return "a card with a menu";
   if (M.isRemaining(card)) return "the remaining card: every item no rule took, each a card of its own here";
@@ -114,8 +130,9 @@ function withDragged(e, place) {
   const isDivider = e.dataTransfer.types.includes("text/divider");
   let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
   if (!id) return;
-  const isNew = id === "new";
-  if (isNew) id = isDivider ? M.addDivider(layout, linesOf(), null).id : M.addCard(layout, linesOf(), null).id;
+  const isNew = id === "new" || id === "newnote";   // "+ Card", "+ Divider" or "+ Note" dragged
+  if (id === "newnote") id = M.addNote(layout, linesOf()).id;
+  else if (isNew) id = isDivider ? M.addDivider(layout, linesOf(), null).id : M.addCard(layout, linesOf(), null).id;
   if (place(id, isDivider)) {
     if (isNew) select(id, -1);
     changed();
@@ -189,7 +206,8 @@ function renderCard(card) {
   const folded = !!card.menu && collapsed.has(card.id);
   if (card.menu) box.dataset.fold = folded ? "folded" : "open";
   const title = el("div", "title");
-  title.append(el("span", "name", card.card));   // its own element, so a long name wraps inside the card
+  // its own element, so a long name wraps inside the card; a note shows its text (its first lines)
+  title.append(M.isNote(card) ? el("span", "name note-text", card.note || "(empty)") : el("span", "name", card.card));
   title.append(...ruleBadges(card));
   const cardsIn = card.menu ? [...M.cards(card.menu)].length : 0;
   box.append(cardActions(card), title,
@@ -218,7 +236,7 @@ function renderCard(card) {
     box.classList.remove(...zones);
     if (e.dataTransfer.types.includes("text/ruleref")) {   // a rule: onto the card, moved or (Shift) copied
       e.dataTransfer.dropEffect = e.shiftKey ? "copy" : "move";
-      if (!card.menu && !M.isRemaining(card)) box.classList.add("over");
+      if (!card.menu && !M.isRemaining(card) && !M.isNote(card)) box.classList.add("over");
       return;
     }
     box.classList.add(zoneClass(dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"))));
@@ -261,7 +279,7 @@ function cardActions(card) {
     collapsed.delete(card.id);
     addAndFocus(M.addCard(layout, linesOf(), card.id));
   }, true);
-  if (!card.menu && !M.isRemaining(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
+  if (!card.menu && !M.isRemaining(card) && !M.isNote(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
     M.makeMenu(layout, linesOf(), card.id);
     changed();
   });
@@ -447,6 +465,19 @@ function renderCardPane() {
     return;
   }
   const card = at.card;
+  if (M.isNote(card)) {
+    // a note: its text only (several lines; no name, rules or menu)
+    $("cardHeading").textContent = "A note";
+    const area = el("textarea");
+    area.rows = 6;
+    area.value = card.note || "";
+    area.placeholder = "(empty: a space in the menu)";
+    area.addEventListener("change", () => { card.note = area.value; changed(); });
+    const row = el("label", "field");
+    row.append(el("span", "", "Text"), area);
+    $("card").replaceChildren(row, el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
+    return;
+  }
   $("cardHeading").textContent = M.isRemaining(card) ? "The remaining card" : card.menu ? "A card with a menu" : "A card with rules";
   const box = $("card");
   box.replaceChildren();
@@ -661,6 +692,9 @@ $("saveAs").addEventListener("click", async () => {
 $("close").addEventListener("click", () => post({ type: "close" }));
 withIcon($("addTop"), "+ Card");
 $("addDivider").replaceChildren(dividerIcon(), document.createTextNode(" + Divider"));
+$("addNote").replaceChildren(noteIcon(), document.createTextNode(" + Note"));
+$("addNote").addEventListener("click", () => { if (layout) addAndFocus(M.addNote(layout, linesOf())); });
+$("addNote").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "newnote"); e.dataTransfer.effectAllowed = "copy"; });
 $("addDivider").addEventListener("click", () => {
   if (!layout) return;
   const d = M.addDivider(layout, linesOf(), null);

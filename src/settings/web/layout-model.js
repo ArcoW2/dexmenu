@@ -9,6 +9,8 @@ const LayoutModel = (() => {
   const matchKinds = ["equals", "contains", "startsWith", "endsWith", "wildcard", "regex", "any"];
 
   function isRemaining(card) { return Array.isArray(card.rules) && card.rules.includes("remaining"); }
+  // A note card ({ id, note: "<text>" }, plan 02 3.3): no button, no rules, no menu.
+  function isNote(card) { return card.note !== undefined; }
 
   // Every card of some lines, depth first, with where it is.
   function* cards(lines, parent = null) {
@@ -103,7 +105,7 @@ const LayoutModel = (() => {
 
   // A card that can never show anything (outlined red): a card with rules but none, or with an invalid rule.
   function useless(card) {
-    if (card.menu) return false;
+    if (card.menu || isNote(card)) return false;
     const rules = card.rules || [];
     return rules.length === 0 || rules.some(r => ruleProblem(r) !== "");
   }
@@ -156,7 +158,7 @@ const LayoutModel = (() => {
   // a card with a menu or the remaining card. The rule now on toCard, or null.
   function moveRuleToCard(lines, fromCard, index, toCard, copy) {
     const rule = fromCard.rules && fromCard.rules[index];
-    if (!rule || rule === "remaining" || !toCard || toCard.menu || isRemaining(toCard)) return null;
+    if (!rule || rule === "remaining" || !toCard || toCard.menu || isRemaining(toCard) || isNote(toCard)) return null;
     if (!copy && fromCard === toCard) return null;
     toCard.rules = toCard.rules || [];
     let placed = rule;
@@ -205,7 +207,7 @@ const LayoutModel = (() => {
   function dropOnCard(layout, lines, draggedId, targetId) {
     if (draggedId === targetId) return false;
     const dragged = find(lines, draggedId), target = find(lines, targetId);
-    if (!dragged || !target || contains(dragged.card, targetId)) return false;
+    if (!dragged || !target || contains(dragged.card, targetId) || isNote(target.card)) return false;   // not onto a note
     const firstId = newId(layout);   // before the dragged card is taken out: else its id counts as free
     const card = takeOut(lines, draggedId);
     const t = find(lines, targetId).card;
@@ -315,6 +317,12 @@ const LayoutModel = (() => {
     return true;
   }
 
+  function addNote(layout, lines) {
+    const card = { id: newId(layout), note: "" };
+    lines.push({ line: [card] });
+    return card;
+  }
+
   function addCard(layout, lines, parentId, besideId) {
     const card = { id: newId(layout), card: "New card", rules: [] };
     if (besideId) {
@@ -413,7 +421,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
+  return { matchKinds, isRemaining, isNote, addNote, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

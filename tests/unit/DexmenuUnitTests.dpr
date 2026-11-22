@@ -160,6 +160,12 @@ begin
   TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "kinds": [ ' +
     '{ "kind": "file", "layout": "Files" }, { "kind": "dialog-file", "layout": "Dialog" }, { "kind": "default", "layout": "Default" } ] }');
   Check(Title('dialog-file') = 'Files', 'the order decides: file before dialog-file, so a file in a dialog gets Files');
+  // a layout of a newer format: a note with the warning, then every item as cards (plan 05 3.1.1)
+  TFile.WriteAllText(TPath.Combine(Layouts, 'Newer.json'), '{ "format": 99, "lines": [] }');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "kinds": [ { "kind": "default", "layout": "Newer" } ] }');
+  L := CurrentLayout('file', ToWindows, Error);
+  Check((L <> nil) and L.Lines('')[0].Cards[0].IsNote and (Pos('needs updating', L.Lines('')[0].Cards[0].NoteText) > 0) and
+    L.Lines('')[1].Cards[0].IsRemaining, 'a newer format: a note with the warning, then the remaining card');
   TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "layout": "Files" }');
   Check(Title('folder') = 'Files', 'the older setting ("layout"): that layout for every kind');
   TDirectory.Delete(Data, True);
@@ -244,6 +250,7 @@ begin
         Line := Line + ' | ';
       case V.Kind of
         vkSeparator: if V.Divider <> nil then Line := Line + 'D:' + V.Divider.DividerText else Line := Line + '-';
+        vkNote: Line := Line + 'N:' + V.Title;
         vkItem: Line := Line + 'I:' + V.Title;
         vkMenu: Line := Line + 'M:' + V.Title;
       else
@@ -523,6 +530,9 @@ begin
     'a hidden card with a menu: the rules in it still take their items');
   Expect(Shows('[ { "line": [ { "card": "Rest", "hidden": true, "rules": [ "remaining" ] } ] } ]'), AllRest,
     'the remaining card cannot be hidden');
+  // note cards (plan 02 3.3): placed where they stand, beside other cards too; no button
+  Expect(Shows('[ { "line": [ { "note": "Pick one" } ] }, { "line": [ { "card": "X", "rules": [ { "name": { "equals": "Cut" } } ] }, ' +
+    '{ "note": "" } ] } ]'), 'N:Pick one / I:Cut | N:', 'notes: a text on a line of its own, an empty one beside a card');
   // dividers from the layout: kept where they are (also first); a Windows separator next to one goes
   Expect(Shows('[ { "divider": "Programs", "align": "left" }, ' + Card('X', '{ "name": { "equals": "Cut" } }') +
     ', { "divider": true }, ' + Card('Y', '{ "name": { "equals": "Copy" } }') + ' ]'), 'D:Programs / I:Cut / D: / I:Copy',

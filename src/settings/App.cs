@@ -77,27 +77,29 @@ interface IThemed
     void ApplyTheme();
 }
 
-/// <summary>Light or dark (docs/plans/05-PLAN-settings-windows.md 3.3): settings.json's "theme", "windows" as Windows'
-/// apps are. A window's title bar (DWM), its page (WebView2's preferred colour scheme, which the pages' CSS follows) and
-/// the preview the DLL draws.</summary>
+/// <summary>Light or dark (docs/plans/05-PLAN-settings-windows.md 3.3): the app starts as Windows' apps are set at
+/// that moment; the sun / moon button at every window's top right turns every window to the other (not kept: the next
+/// start follows Windows again). A window's title bar (DWM), its page (WebView2's preferred colour scheme, which the
+/// pages' CSS follows) and the preview the DLL draws.</summary>
 static class Themes
 {
     [DllImport("dwmapi.dll")]
     static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
     const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
-    public static bool Dark => DataFolder.Theme switch
-    {
-        "dark" => true,
-        "light" => false,
-        _ => Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-            "AppsUseLightTheme", 1) is int v && v == 0,
-    };
+    public static bool Dark { get; private set; } =
+        Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            "AppsUseLightTheme", 1) is int v && v == 0;
+
+    /// <summary>"dark" or "light", as the pages show it.</summary>
+    public static string Name => Dark ? "dark" : "light";
+
+    public static void Toggle() => Dark = !Dark;
 
     /// <summary>What is the same for every window: the preview's look (the DLL).</summary>
     public static void ApplyGlobal()
     {
-        try { Native.DexmenuSetTheme(DataFolder.Theme switch { "light" => 1, "dark" => 2, _ => 0 }); }
+        try { Native.DexmenuSetTheme(Dark ? 2 : 1); }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { }
     }
 
@@ -108,12 +110,7 @@ static class Themes
         form.BackColor = Dark ? Color.FromArgb(0x1F, 0x1F, 0x1F) : SystemColors.Control;
         form.ForeColor = Dark ? Color.FromArgb(0xF0, 0xF0, 0xF0) : SystemColors.ControlText;
         if (web?.CoreWebView2 is { } core)
-            core.Profile.PreferredColorScheme = DataFolder.Theme switch
-            {
-                "light" => CoreWebView2PreferredColorScheme.Light,
-                "dark" => CoreWebView2PreferredColorScheme.Dark,
-                _ => CoreWebView2PreferredColorScheme.Auto,
-            };
+            core.Profile.PreferredColorScheme = Dark ? CoreWebView2PreferredColorScheme.Dark : CoreWebView2PreferredColorScheme.Light;
     }
 }
 

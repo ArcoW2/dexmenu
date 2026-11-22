@@ -78,7 +78,7 @@ sealed class EditorForm : Form, IThemed
     {
         Themes.Apply(this, web);
         previewHost.BackColor = BackColor;
-        Post(new { type = "theme", theme = DataFolder.Theme });
+        Post(new { type = "theme", theme = Themes.Name });
         Reload();
     }
 
@@ -255,7 +255,7 @@ sealed class EditorForm : Form, IThemed
             Post(new { type = "preview", error });
             return;
         }
-        Post(new { type = "state", kind, layout = text, source, name = LayoutName, theme = DataFolder.Theme, error });
+        Post(new { type = "state", kind, layout = text, source, name = LayoutName, theme = Themes.Name, error });
     }
 
     void Post(object message) => web.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message));
@@ -291,7 +291,7 @@ sealed class EditorForm : Form, IThemed
                 Close();
                 break;
             case "theme":
-                DataFolder.Theme = Str("theme");
+                Themes.Toggle();
                 DexmenuApp.Instance.ThemeChanged();
                 break;
             case "mark":

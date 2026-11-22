@@ -85,6 +85,7 @@ var
   D2D: ID2D1Factory;
   DWrite: IDWriteFactory;
   NormalFormat, BoldFormat, GlyphFormat: IDWriteTextFormat;
+  NoteFormat: IDWriteTextFormat;   // a note card's text: wraps, from the top (plan 02 3.3)
 
 var
   ThemeMode: Integer;   // DexmenuSetTheme: 0 as Windows' apps are, 1 light, 2 dark (the settings app's preview)
@@ -141,6 +142,10 @@ begin
     NormalFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, FontSize, False);
     BoldFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_SEMI_BOLD, FontSize, False);
     GlyphFormat := MakeFormat(GlyphFont, DWRITE_FONT_WEIGHT_NORMAL, 10, True);
+    DWrite.CreateTextFormat(PWideChar(TextFont), nil, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+      DWRITE_FONT_STRETCH_NORMAL, FontSize, 'en-us', NoteFormat);
+    NoteFormat.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+    NoteFormat.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
   finally
     FactoryLock.Leave;
   end;
@@ -156,6 +161,34 @@ begin
     Exit;
   if Succeeded(Layout.GetMetrics(M)) then
     Result := M.widthIncludingTrailingWhitespace;
+end;
+
+const
+  NotePad = 8;   // a note's text from its card's edges (DIP)
+
+// A note's height at a card width: its wrapped text, or one line's height when it has none.
+function NoteHeight(const Text: string; Width: Single): Single;
+var
+  Layout: IDWriteTextLayout;
+  M: TDWriteTextMetrics;
+begin
+  Result := ItemHeight;
+  if (Text = '') or Failed(DWrite.CreateTextLayout(PWideChar(Text), Length(Text), NoteFormat, Max(1, Width - 2 * NotePad), 10000,
+    Layout)) then
+    Exit;
+  if Succeeded(Layout.GetMetrics(M)) then
+    Result := Max(ItemHeight, M.height + 2 * NotePad);
+end;
+
+// A note's widest line, for the menu's width (the menu still stops at its maximum; the note then wraps).
+function NoteWidth(const Text: string): Single;
+var
+  Line: string;
+begin
+  Result := 0;
+  for Line in Text.Split([#10]) do
+    Result := Max(Result, TextWidth(Line.TrimRight([#13]), NormalFormat));
+  Result := Result + 2 * NotePad;
 end;
 
 function Measure(Level: TViewLevel): TGeometry;
@@ -176,6 +209,8 @@ begin
     for V in Line.Cards do
       if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
         Need := Need + TextWidth(V.Divider.DividerText, NormalFormat) + 48
+      else if V.Kind = vkNote then
+        Need := Need + NoteWidth(V.Title)
       else if V.Kind <> vkSeparator then
       begin
         if V.IsDefault then
@@ -204,6 +239,9 @@ begin
     else
       H := ItemHeight;
     CardW := (W - 2 * OuterPad) / N;
+    for I := 0 to N - 1 do   // a line as high as its highest card (a note may wrap to several lines)
+      if Line.Cards[I].Kind = vkNote then
+        H := Max(H, NoteHeight(Line.Cards[I].Title, CardW));
     X := OuterPad;
     for I := 0 to N - 1 do
     begin
@@ -324,6 +362,15 @@ begin
     R.bottom := R.bottom - ScrollY;
     if (R.bottom < 0) or (R.top > VisibleHeight) then
       Continue;
+    if V.Kind = vkNote then
+    begin
+      // a note: its text in the dim colour, no button (no hover, no mark)
+      Title := V.Title;
+      if Title <> '' then
+        T.DrawText(PWideChar(Title), Length(Title), NoteFormat, D2D1RectF(R.left + NotePad, R.top + NotePad,
+          R.right - NotePad, R.bottom - NotePad), Dim, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      Continue;
+    end;
     if V.Kind = vkSeparator then
     begin
       Y := Round((R.top + R.bottom) / 2) + 0.5;
@@ -453,6 +500,7 @@ finalization
   Pointer(NormalFormat) := nil;
   Pointer(BoldFormat) := nil;
   Pointer(GlyphFormat) := nil;
+  Pointer(NoteFormat) := nil;
   Pointer(DWrite) := nil;
   Pointer(D2D) := nil;
 

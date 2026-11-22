@@ -54,6 +54,10 @@ type
     // "skipDuplicates": of the items its rules found, one per name (Windows 11 shows some programs' items twice: a
     // newer and an older copy); the others are taken all the same, so they show nowhere
     SkipDuplicates: Boolean;
+    // A note card ({ "note": "<text>" }, plan 02 3.3): no button, no rules or menu; an empty space or a text of
+    // several lines
+    IsNote: Boolean;
+    NoteText: string;
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -204,6 +208,19 @@ begin
     Exit;
   end;
   Obj := TJSONObject(Value);
+  if Obj.GetValue('note') is TJSONString then
+  begin
+    Card := TCard.Create;
+    Card.IsNote := True;
+    Card.NoteText := Obj.GetValue('note').Value;
+    Card.Parent := Parent;
+    Inc(NextCardId);
+    if Obj.GetValue('id') is TJSONString then
+      Card.Id := Obj.GetValue('id').Value
+    else
+      Card.Id := 'c' + IntToStr(NextCardId);
+    Exit(True);
+  end;
   if not (Obj.GetValue('card') is TJSONString) then
   begin
     Error := Where + ': a card needs "card" (its title)';
@@ -490,6 +507,9 @@ begin
   end;
 end;
 
+// A layout the DLL cannot use for a newer format (plan 05 3.1.1): a note saying so, then the remaining card.
+function WarningLayout(const Path: string): ILayout; forward;
+
 function CurrentLayout(const Kind: string; out ToWindows: Boolean; out Error: string): ILayout;
 var
   Path, Text: string;
@@ -526,11 +546,47 @@ begin
         C.Layout := ParseLayout(Text, Path, C.Error);
       if C.Layout = nil then
         Log('layout not used: ' + C.Error);
+      if (C.Layout = nil) and (Pos('a newer form', C.Error) > 0) then
+        C.Layout := WarningLayout(Path);   // plan 05 3.1.1: say so, and every item as a card
     end;
     Error := C.Error;
+    if C.Layout <> nil then
+      Error := '';
     Result := C.Layout;
   finally
     Lock.Leave;
+  end;
+end;
+
+function WarningLayout(const Path: string): ILayout;
+var
+  Root, Note, Rest: TJSONObject;
+  Lines, Line1, Line2, Rules: TJSONArray;
+  Error: string;
+begin
+  // { "format": 1, "lines": [ { "line": [ { "note": "..." } ] }, { "line": [ { "card": "Remaining", ... } ] } ] }
+  Root := TJSONObject.Create;
+  try
+    Note := TJSONObject.Create;
+    Note.AddPair('note', 'Layout ' + ChangeFileExt(ExtractFileName(Path), '') +
+      ' needs updating: open it in Dexmenu''s editor (it was saved by a newer Dexmenu).');
+    Rules := TJSONArray.Create;
+    Rules.Add('remaining');
+    Rest := TJSONObject.Create;
+    Rest.AddPair('card', 'Remaining');
+    Rest.AddPair('rules', Rules);
+    Line1 := TJSONArray.Create;
+    Line1.AddElement(Note);
+    Line2 := TJSONArray.Create;
+    Line2.AddElement(Rest);
+    Lines := TJSONArray.Create;
+    Lines.AddElement(TJSONObject.Create(TJSONPair.Create('line', Line1)));
+    Lines.AddElement(TJSONObject.Create(TJSONPair.Create('line', Line2)));
+    Root.AddPair('format', TJSONNumber.Create(FormatVersion));
+    Root.AddPair('lines', Lines);
+    Result := ParseLayout(Root.ToJSON, Path + ' (needs updating)', Error);
+  finally
+    Root.Free;
   end;
 end;
 

@@ -208,6 +208,16 @@
     check(!M.paste(to, to.default, "not ours", null), "other clipboard text: nothing");
   }
 
+  // note cards: added at the end, never useless, nothing dropped onto them, no rule onto them
+  {
+    const L2 = sample();
+    const note = M.addNote(L2, L2.default);
+    check(M.isNote(note) && !M.useless(note) && L2.default[L2.default.length - 1].line[0] === note, "a note added at the end, not outlined red");
+    check(!M.dropOnCard(L2, L2.default, id(L2, "Zip"), note.id), "a card is not dropped onto a note");
+    const lex = [...M.cards(L2.default)].find(x => x.card.card === "LexPen").card;
+    check(!M.moveRuleToCard(L2.default, lex, 0, note, true), "a rule is not put on a note");
+  }
+
   // the current form (plan 05 3.1): an older file brought to it by its default menu; a current one left as it is
   const old = M.upToDate({ default: [ { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ], folder: [ { line: [] } ] });
   check(old.changed && old.layout.format === M.formatVersion && old.layout.lines[0].line[0].card === "Rest" && !old.layout.folder,

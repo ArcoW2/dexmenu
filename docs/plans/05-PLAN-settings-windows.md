@@ -6,6 +6,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: the layout format.
 - 2026-11-22: partly executed: the kinds setting, the dialog and desktop kinds.
 - 2026-11-22: partly executed: the main window, the editor window, light and dark.
+- 2026-11-22: partly executed: the layout versions' warning.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md` 3.7, 3.9: the settings app, registration) and plan 02 (`02-PLAN-own-menu.md`
 3.4, 3.5: layouts, the editor). Changes how layouts are chosen per kind of right-click and where they are edited.
@@ -41,13 +42,13 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | General panel | the registration (Restart Explorer lit until Explorer restarted); each kind with its layout, None or Not set, dragged to reorder, Edit | 3.4; 6.3 |
 | Layouts panel | New..., Edit, Copy..., Rename... (kinds follow), Delete (asks, names its kinds, sets them to None; recycle bin) | 3.5; 6.3 |
 | Editor window | `EditorForm`: one layout per window, several at once; name, Save, Save as..., Close (asks to save); every kind in the preview, marked when not meant for it; Ctrl+C / Ctrl+X / Ctrl+V of cards, dividers and rules between windows | 3.6; 6.3 |
-| Light and dark | settings.json `theme`; the switch at every window's top right; page, title bar and preview follow at once | 3.3; 6.3 |
+| Light and dark | the app starts as Windows is at that moment; a sun / moon button at every window's top right turns every window (page, title bar, preview) to the other; not kept | 3.3; 6.3 |
+| Layout versions | `format` in each layout; the editor brings an older file to the current form; a newer format gives a note with the warning and the remaining card | 3.1.1; 6.4 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Layout versions | a format number in each layout; the editor updates an older file when it opens it; the DLL shows a warning (a note card) and the remaining card for a file it cannot use | Layout format; plan 02 Note card | 3.1.1 |
 | Tests | 3.7 | -- | 3.7 |
 
 ## 3. Details
@@ -139,10 +140,9 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - The panels are one page; the page measures the panels' minimums and tells the app (its `MinimumSize`), and on
   every resize chooses the placement, so resizing the window rearranges them at once, without a reload.
 - A WebView2 page as today's editor (`web/main.html`), the same host code serving it.
-- Light and dark: every window of the app (the main window and each editor window) opens light or dark as Windows'
-  apps are set, and has a switch at its top right (Light, Dark, as Windows) that changes it at once. The choice is
-  kept for the next start (settings.json `"theme"`: `light`, `dark` or `windows`) and goes for every window, an
-  editor's preview included (its look follows: the DLL draws light or dark as told).
+- Light and dark: the app starts light or dark as Windows' apps are set at that moment; a button at every window's
+  top right (a moon while light, a sun while dark) turns every window to the other at once, an editor's preview
+  included (the DLL draws light or dark as told). The choice is not kept: the next start follows Windows again.
 
 ### 3.4 The General panel
 
@@ -271,9 +271,10 @@ None.
   clipboard (`layout-model.js` `clip`, `paste`): a pasted card gets new ids and its rules places at the end of the
   priority list, on a line after the selected card's (or at the end); a rule goes onto the selected card with rules;
   the remaining card is never pasted. Dragging between windows: [not yet checked] whether WebView2 carries it.
-- Light and dark: settings.json `theme` (`windows`, `light`, `dark`); `theme.js` draws the switch; the app sets
-  WebView2's preferred colour scheme (the pages' CSS follows `prefers-color-scheme`), the title bar (DWM dark mode)
-  and the preview (`DexmenuSetTheme` in the DLL) for every window at once.
+- Light and dark: `Themes.Dark` read from Windows when the app starts, turned by the button (`theme.js`: a moon or a
+  sun, drawn as SVG); the app sets WebView2's preferred colour scheme (the pages' CSS follows
+  `prefers-color-scheme`), the title bar (DWM dark mode) and the preview (`DexmenuSetTheme` in the DLL) for every
+  window at once.
 - The editor's page fills its window with four panes: the rules, the cards, the selected card and the preview, with
   the same splitters between them (a splitter changes only the pane on its left; minimums 320, 520, 400 and 300 CSS
   pixels; the preview takes the rest). The preview's bar (the kind, the folder, the item(s), Last right-click, "not
@@ -287,3 +288,12 @@ None.
   opened on a test data folder and closed; screenshots of both checked. Not tested by a script: dragging kinds,
   the panels' three arrangements by resizing, the theme switch, closing with unsaved changes, the clipboard between
   two windows.
+
+### 6.4 The layout versions' warning
+
+- A layout file whose `format` is newer than the DLL's: `Dexmenu.Layout.CurrentLayout` gives a layout made on the
+  spot, a note card (plan 02) "Layout <name> needs updating: open it in Dexmenu's editor (it was saved by a newer
+  Dexmenu)" and the remaining card, so every item is still there. A file that is not valid in another way: Windows'
+  own menu, as before.
+- Tested: a unit test (a format-99 layout set for every kind: the note with the warning first, then the remaining
+  card).

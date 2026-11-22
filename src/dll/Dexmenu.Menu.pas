@@ -834,6 +834,7 @@ begin
         case V.Kind of
           vkItem: begin Kind := 'item'; Id := V.Node.Id; end;
           vkMenu: Kind := 'menu';
+          vkNote: Kind := 'note';
         else
           Kind := 'separator';
         end;

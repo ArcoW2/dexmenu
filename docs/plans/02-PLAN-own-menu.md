@@ -44,13 +44,13 @@ the preview is the result.
 | Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the priority list, several found at the card's place, `also`, `consume`, `skipDuplicates`, hidden cards, the remaining card; submenus filled only when opened opened first for rules that look inside | 3.3; plan 00 6.5 |
 | Layout editing | the cards view and the rules view (priority list, draggable); dragging cards and dividers (onto a card, beside, above or below), the remaining card; preview and editor tied; comments, hints | 3.5; plan 00 6.5; plan 05 6.3 |
 | Layouts | saved under a name, JSON with comments, one menu per layout; which kinds use which layout: plan 05 | 3.4; 3.5; plan 05 |
+| Note card | `{ "note": "<text>" }`: no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Note card | a card that is no button: an empty space with an optional text of several lines | -- | 3.3 |
 | Global settings | the settings for every layout (submenus on hover or on click, the most used row's size, ...) | -- | 3.4 |
 | Submenus | half under, or in place of the menu (with `<<`); on click only | Global settings | 3.7 |
 | Edit menu | "Edit menu..." in the menu: the settings app's layout editor opened on this menu as it is | -- | 3.6 |
