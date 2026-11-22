@@ -35,18 +35,20 @@ procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;
 // A real Windows menu (the settings app built it for a right-click in a folder, its submenus filled) as seen items'
 // text: every level read, merged into Seen (a seen file's text, or '') as within one right-click, so items Seen has
 // and this menu lacks are kept, marked "sometimes". Into Buffer; the number of characters it needs (with the #0).
-function DexmenuSeenOfMenu(Menu: HMENU; Seen, Kind: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+// Hints: the items' own hints (help text) the settings app read, as JSON { "<id>": "<hint>" }, or ''.
+function DexmenuSeenOfMenu(Menu: HMENU; Seen, Kind, Hints: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 
 implementation
 
 uses
   Winapi.Messages, Winapi.D2D1, System.SysUtils, System.Math, System.Classes, System.Generics.Collections, System.JSON,
-  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen;
+  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip;
 
 const
   PreviewClassName = 'DexmenuPreview';
   Margin = 16;   // DIP around the menu in the preview
   HoverTimer = 1;
+  TipTimer = 2;
   SPI_GETMENUSHOWDELAY = $006A;
 
 function GetDpiForWindow(Wnd: HWND): UINT; stdcall; external user32 name 'GetDpiForWindow';
@@ -73,6 +75,10 @@ type
     Levels: TObjectList<TPreviewLevel>;
     Callback: TPreviewCallback;
     Marked: string;
+    Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
+    Tip: TTip;
+    TipLevel, TipBox: Integer;
+    procedure ShowTip;
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
@@ -103,6 +109,8 @@ end;
 destructor TPreview.Destroy;
 begin
   Clear;
+  Tip.Free;
+  Hints.Free;
   Levels.Free;
   inherited;
 end;
@@ -238,6 +246,33 @@ begin
   end;
 end;
 
+procedure TPreview.ShowTip;
+var
+  L: TPreviewLevel;
+  V: TViewCard;
+  R: TD2D1RectF;
+  Regular: string;
+  Pt: TPoint;
+  S: Single;
+begin
+  if (TipLevel < 0) or (TipLevel >= Levels.Count) then
+    Exit;
+  L := Levels[TipLevel];
+  if (TipBox < 0) or (TipBox > High(L.Geometry.Boxes)) then
+    Exit;
+  V := L.Geometry.Boxes[TipBox].Card;
+  Regular := '';
+  if (V.Kind = vkItem) and (Hints <> nil) then
+    Hints.TryGetValue(HintKey(V.Node), Regular);
+  R := L.Geometry.Boxes[TipBox].Rect;
+  S := Scale;
+  Pt := Point(Round((L.X + R.left + 8) * S), Round((L.Y + R.bottom + 2) * S));
+  ClientToScreen(Wnd, Pt);
+  if Tip = nil then
+    Tip := TTip.Create(Wnd);
+  Tip.Show(ShownHint(V, Regular), Pt.X, Pt.Y);
+end;
+
 procedure TPreview.Dump;
 var
   Env: array[0..MAX_PATH] of Char;
@@ -334,6 +369,13 @@ begin
           if Box <> L.Selected then
           begin
             L.Selected := Box;
+            if P.Tip <> nil then
+              P.Tip.Hide;
+            KillTimer(Wnd, TipTimer);
+            P.TipLevel := Index;
+            P.TipBox := Box;
+            if Box >= 0 then
+              SetTimer(Wnd, TipTimer, HoverTime, nil);
             if (Box >= 0) and Assigned(P.Callback) then
               P.Callback(1, PWideChar(L.Geometry.Boxes[Box].Card.CardId), L.Geometry.Boxes[Box].Card.RuleIndex);
             KillTimer(Wnd, HoverTimer);
@@ -353,7 +395,19 @@ begin
           TME.dwHoverTime := 0;
           TrackMouseEvent(TME);
         end;
+      WM_MOUSELEAVE:
+        begin
+          KillTimer(Wnd, TipTimer);
+          if P.Tip <> nil then
+            P.Tip.Hide;
+        end;
       WM_TIMER:
+        if WP = TipTimer then
+        begin
+          KillTimer(Wnd, TipTimer);
+          P.ShowTip;
+        end
+        else
         begin
           KillTimer(Wnd, HoverTimer);
           for Index := P.Levels.Count - 1 downto 0 do
@@ -471,6 +525,8 @@ begin
         if Text = '' then
           Text := '{ "items": [] }';
         P.Menu := MenuFromSeen(Text, Problem);
+        FreeAndNil(P.Hints);
+        P.Hints := HintsOf(Text);
       end;
       if (P.Layout <> nil) and (P.Menu <> 0) then
       begin
@@ -515,8 +571,11 @@ begin
     end;
 end;
 
-function DexmenuSeenOfMenu(Menu: HMENU; Seen, Kind: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+function DexmenuSeenOfMenu(Menu: HMENU; Seen, Kind, Hints: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 var
+  HintsById: TDictionary<UINT, string>;
+  HintsJson: TJSONValue;
+  Pair: TJSONPair;
   Top: TNodes;
   Live, Merged: TJSONArray;
   Before: TJSONValue;
@@ -529,10 +588,17 @@ begin
     Top := ReadLevel(Menu, '');
     Before := nil;
     Live := nil;
+    HintsJson := nil;
+    HintsById := TDictionary<UINT, string>.Create;
     Root := TJSONObject.Create;
     try
+      if (Hints <> nil) and (Hints^ <> #0) then
+        HintsJson := ParseWithComments(Hints, Error);
+      if HintsJson is TJSONObject then
+        for Pair in TJSONObject(HintsJson) do
+          HintsById.AddOrSetValue(StrToIntDef(Pair.JsonString.Value, 0), Pair.JsonValue.Value);
       ReadDeep(Top);
-      Live := SeenJson(Top);
+      Live := SeenJson(Top, HintsById);
       Old := nil;
       if (Seen <> nil) and (Seen^ <> #0) then
         Before := ParseWithComments(Seen, Error);
@@ -546,6 +612,8 @@ begin
       Root.Free;
       Live.Free;
       Before.Free;
+      HintsJson.Free;
+      HintsById.Free;
       Top.Free;
     end;
   except

@@ -95,6 +95,9 @@ function KeyOf(Node: TNode): string;
 // Whether a kind's layout has a rule that looks inside Windows submenus (scope anywhere, or a path): then a
 // right-click opens the submenus an extension fills only when opened, before the rules run (Dexmenu.Menu).
 function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
+// The hint shown on hover over a card: its layout card's hint (a text, or a regex on the item's own hint), else the
+// item's own hint (Regular: from the seen items, Dexmenu.Seen.HintsOf); '' for none.
+function ShownHint(V: TViewCard; const Regular: string): string;
 
 implementation
 
@@ -300,6 +303,21 @@ begin
       if Card.Menu <> nil then
         CollectRules(Card.Menu, Rules);
     end;
+end;
+
+function ShownHint(V: TViewCard; const Regular: string): string;
+begin
+  Result := Regular;
+  if (V = nil) or (V.Card = nil) then
+    Exit;
+  if V.Card.HintIsRegex then
+    try
+      Result := TRegEx.Replace(Regular, V.Card.HintFrom, V.Card.HintTo);
+    except
+      // a regex that does not compile: the item's own hint
+    end
+  else if V.Card.HintText <> '' then
+    Result := V.Card.HintText;
 end;
 
 function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;

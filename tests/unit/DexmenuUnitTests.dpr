@@ -511,6 +511,31 @@ begin
   end;
 end;
 
+// A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
+procedure TestHints;
+var
+  V: TViewCard;
+  C: TCard;
+begin
+  C := TCard.Create;
+  V := TViewCard.Create;
+  try
+    V.Kind := vkItem;
+    V.Card := C;
+    Check(ShownHint(V, 'Own') = 'Own', 'no hint on the card: the item''s own');
+    C.HintText := 'Mine';
+    Check(ShownHint(V, 'Own') = 'Mine', 'a text hint in place of the item''s own');
+    C.HintText := '';
+    C.HintIsRegex := True;
+    C.HintFrom := '^(.*)$';
+    C.HintTo := '$1 (via LexPen)';
+    Check(ShownHint(V, 'Own') = 'Own (via LexPen)', 'a regex hint added to the item''s own: ' + ShownHint(V, 'Own'));
+  finally
+    V.Free;
+    C.Free;
+  end;
+end;
+
 procedure TestSeen;
 const
   ABC = '[ {"name":"A"}, {"name":"B"}, {"separator":true}, {"name":"C"} ]';
@@ -520,6 +545,8 @@ var
   Error: string;
   Top: TNodes;
   Last: TJSONObject;
+  Hints: TJSONArray;
+  HintMap: TDictionary<string, string>;
 begin
   Check(Merged(ABC, ACD, True) = 'A,B*,C,D*', 'merged: an old item missing now kept after the one it followed, ' +
     'a new one marked: ' + Merged(ABC, ACD, True));
@@ -536,6 +563,21 @@ begin
     '[ {"name":"S","submenu":true,"items":[ {"name":"x"} ]} ]', True) = 'S[x,y*]', 'a submenu''s items merged too');
   Check(Merged('[ {"name":"Open"}, {"name":"Open"} ]', '[ {"name":"Open"} ]', True) = 'Open,Open*',
     'two items of one name: matched one to one');
+  // hints: kept by a later right-click that has none; read back by submenu path and name
+  Hints := MergeSeen(Items('[ {"name":"Cut","hint":"Removes it"} ]'), Items('[ {"name":"Cut"} ]'), True);
+  try
+    Check(Hints.ToJSON.Contains('"hint":"Removes it"'), 'a hint kept when a right-click has none');
+  finally
+    Hints.Free;
+  end;
+  HintMap := HintsOf('{ "items": [ {"name":"Cut","hint":"Removes it"}, {"name":"7-Zip","submenu":true,"items":[ ' +
+    '{"name":"Add to archive...","hint":"Packs it"} ]} ] }');
+  try
+    Check((HintMap.Count = 2) and (HintMap[#9'Cut'] = 'Removes it') and (HintMap['7-Zip'#9'Add to archive...'] = 'Packs it'),
+      'hints read back by submenu path and name');
+  finally
+    HintMap.Free;
+  end;
   Last := TJSONObject.ParseJSONValue(RightClickJson('several', 'C:\x', ['C:\x\a.txt', 'C:\x\b'])) as TJSONObject;
   try
     Check((Last.GetValue('kind').Value = 'several') and (Last.GetValue('folder').Value = 'C:\x') and
@@ -561,6 +603,7 @@ begin
   TestRules;
   TestEmptySubmenu;
   TestEmptyMenuCard;
+  TestHints;
   TestSeen;
   if Failures = 0 then
     Writeln('OK')

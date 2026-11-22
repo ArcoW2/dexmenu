@@ -15,10 +15,15 @@ unit Dexmenu.Seen;
 interface
 
 uses
-  Winapi.Windows, System.JSON, Dexmenu.Tree;
+  Winapi.Windows, System.JSON, System.Generics.Collections, Dexmenu.Tree;
 
-// The items of a menu as written to the seen file.
-function SeenJson(Top: TNodes): TJSONArray;
+// The items of a menu as written to the seen file; Hints: an item's own hint (help text) by its id, where the settings
+// app read them (ShellMenu), else nil.
+function SeenJson(Top: TNodes; Hints: TDictionary<UINT, string> = nil): TJSONArray;
+// The items' own hints in a seen file's text, by HintKey; the caller frees it.
+function HintsOf(const SeenText: string): TDictionary<string, string>;
+// An item's key among the hints: its submenu path and its name.
+function HintKey(Node: TNode): string;
 // Old and New merged into a new array (neither freed): New's items in New's order, Old's items missing from New
 // inserted after the item they followed in Old, marked "sometimes"; MarkNew: New's items missing from Old marked too
 // (only where Old had items at that level).
@@ -29,6 +34,8 @@ procedure WriteSeen(const Kind: string; Items: TJSONArray);
 // "sometimes" items get SometimesData as their item data (TNode.Sometimes).
 function MenuFromSeen(const Text: string; out Error: string): HMENU;
 function SeenFolder: string;
+// A kind's seen file's text, '' when there is none.
+function ReadSeenText(const Kind: string): string;
 // A right-click as the settings app's preview can repeat it: { "kind", "folder", "items": [ paths ] }.
 function RightClickJson(const Kind, Folder: string; const Items: TArray<string>): string;
 // The last right-click Dexmenu showed its menu for, to <SeenFolder>\last.json (the preview starts on it).
@@ -37,7 +44,7 @@ procedure WriteLastRightClick(const Json: string);
 implementation
 
 uses
-  System.SysUtils, System.Classes, System.IOUtils, System.Generics.Collections, Dexmenu.Log, Dexmenu.Json, Dexmenu.Menus;
+  System.SysUtils, System.Classes, System.IOUtils, Dexmenu.Log, Dexmenu.Json, Dexmenu.Menus;
 
 // DEXMENU_SEEN_FOLDER (the tests), else %APPDATA%\Dexmenu\seen.
 function SeenFolder: string;
@@ -47,6 +54,18 @@ begin
   if GetEnvironmentVariable('DEXMENU_SEEN_FOLDER', Env, MAX_PATH) > 0 then
     Exit(Env);
   Result := RoamingAppData + '\Dexmenu\seen';
+end;
+
+function ReadSeenText(const Kind: string): string;
+begin
+  Result := '';
+  try
+    if FileExists(SeenFolder + '' + Kind + '.json') then
+      Result := TFile.ReadAllText(SeenFolder + '' + Kind + '.json', TEncoding.UTF8);
+  except
+    on E: Exception do
+      Log('seen items not read: ' + E.Message);
+  end;
 end;
 
 function RightClickJson(const Kind, Folder: string; const Items: TArray<string>): string;
@@ -84,10 +103,11 @@ begin
   end;
 end;
 
-function SeenJson(Top: TNodes): TJSONArray;
+function SeenJson(Top: TNodes; Hints: TDictionary<UINT, string>): TJSONArray;
 var
   N: TNode;
   O: TJSONObject;
+  Hint: string;
 begin
   Result := TJSONArray.Create;
   for N in Top do
@@ -101,6 +121,8 @@ begin
     end;
     O.AddPair('text', N.Item.Text);
     O.AddPair('name', N.Name);
+    if (Hints <> nil) and Hints.TryGetValue(N.Id, Hint) and (Trim(Hint) <> '') and not SameText(Trim(Hint), N.Name) then
+      O.AddPair('hint', Trim(Hint));
     if not N.Enabled then
       O.AddPair('enabled', TJSONBool.Create(False));
     if N.Checked then
@@ -111,12 +133,59 @@ begin
     begin
       O.AddPair('submenu', TJSONBool.Create(True));
       if N.Children <> nil then
-        O.AddPair('items', SeenJson(N.Children));
+        O.AddPair('items', SeenJson(N.Children, Hints));
     end;
   end;
 end;
 
 function BoolOf(O: TJSONObject; const Name: string; Default: Boolean): Boolean; forward;
+
+function HintKey(Node: TNode): string;
+begin
+  Result := Node.Path + #9 + Node.Name;
+end;
+
+function HintsOf(const SeenText: string): TDictionary<string, string>;
+var
+  Root: TJSONValue;
+  Error: string;
+
+  procedure Walk(Items: TJSONArray; const Path: string);
+  var
+    V: TJSONValue;
+    O: TJSONObject;
+    Name: string;
+  begin
+    for V in Items do
+    begin
+      if not (V is TJSONObject) then
+        Continue;
+      O := TJSONObject(V);
+      if not (O.GetValue('name') is TJSONString) then
+        Continue;
+      Name := O.GetValue('name').Value;
+      if (O.GetValue('hint') is TJSONString) and not Result.ContainsKey(Path + #9 + Name) then
+        Result.Add(Path + #9 + Name, O.GetValue('hint').Value);
+      if O.GetValue('items') is TJSONArray then
+        if Path = '' then
+          Walk(TJSONArray(O.GetValue('items')), Name)
+        else
+          Walk(TJSONArray(O.GetValue('items')), Path + ' > ' + Name);
+    end;
+  end;
+
+begin
+  Result := TDictionary<string, string>.Create;
+  if SeenText = '' then
+    Exit;
+  Root := ParseWithComments(SeenText, Error);
+  try
+    if (Root is TJSONObject) and (TJSONObject(Root).GetValue('items') is TJSONArray) then
+      Walk(TJSONArray(TJSONObject(Root).GetValue('items')), '');
+  finally
+    Root.Free;
+  end;
+end;
 
 function IsSeparatorJson(V: TJSONValue): Boolean;
 begin
@@ -214,6 +283,8 @@ begin
         end;
         if BoolOf(M, 'sometimes', False) then
           MarkSometimes(C);
+        if (C.GetValue('hint') = nil) and (M.GetValue('hint') is TJSONString) then   // a right-click has no hints: kept
+          C.AddPair('hint', M.GetValue('hint').Value);
         OldSub := M.GetValue('items');
         NewSub := C.GetValue('items');
         if not (OldSub is TJSONArray) or not BoolOf(C, 'submenu', False) then

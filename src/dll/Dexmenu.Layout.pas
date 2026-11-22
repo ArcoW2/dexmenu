@@ -42,6 +42,11 @@ type
     RenameFrom, RenameTo: string;   // "rename": { "regex": ..., "replace": ... } on the item's text
     Parent: TCard;         // the card with a menu it sits in; nil at the top
     Hidden: Boolean;       // "hidden": shows nothing; its rules still take their items, so they show nowhere
+    // "hint": shown on hover in place of the item's own hint: a text, or { "regex", "replace" } on the item's own hint
+    // (so it can be added to). "comment" is the editor's only.
+    HintText: string;
+    HintFrom, HintTo: string;
+    HintIsRegex: Boolean;
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -197,6 +202,15 @@ begin
       Card.Id := 'c' + IntToStr(NextCardId);
     if Obj.GetValue('title') is TJSONString then
       Card.ShownTitle := Obj.GetValue('title').Value;
+    if Obj.GetValue('hint') is TJSONString then
+      Card.HintText := Obj.GetValue('hint').Value
+    else if (Obj.GetValue('hint') is TJSONObject) and (TJSONObject(Obj.GetValue('hint')).GetValue('regex') <> nil) then
+    begin
+      Card.HintIsRegex := True;
+      Card.HintFrom := TJSONObject(Obj.GetValue('hint')).GetValue('regex').Value;
+      if TJSONObject(Obj.GetValue('hint')).GetValue('replace') <> nil then
+        Card.HintTo := TJSONObject(Obj.GetValue('hint')).GetValue('replace').Value;
+    end;
     if Obj.GetValue('hidden') is TJSONBool then
       Card.Hidden := TJSONBool(Obj.GetValue('hidden')).AsBoolean;   // not for the remaining card (Dexmenu.Place)
     if (Obj.GetValue('rename') is TJSONObject) and (TJSONObject(Obj.GetValue('rename')).GetValue('regex') <> nil) then

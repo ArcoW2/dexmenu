@@ -294,6 +294,13 @@ None.
   rule with a path) needs bin's DLL registered and has not run yet.
 - A card with a menu that shows nothing (its cards found nothing in this right-click) is left out at a right-click;
   the preview shows it, striped (plan 02 3.8). Tested: unit tests.
+- A card's comment (`comment`, the editor's only) and hint (`hint`: a text in place of the item's own hint, or
+  `{ "regex", "replace" }` on it, so it can be added to). The items' own hints are their handlers' help texts
+  (`GCS_HELPTEXTW`), read by the settings app when it builds the live menu and kept with the seen items (a right-click
+  keeps them); a text equal to the item's name or its command's name is no hint. The menu and the preview show the
+  hint on hover after Windows' hover time, in Windows' tooltip, just below the card (`src/dll/Dexmenu.Tip.pas`).
+  Tested: unit tests (the text and regex forms, a hint kept by a merge, read back by path and name); `--live` gave
+  real hints (Cut, Copy, the view's items, TortoiseGit's). Not tested: the tooltip showing, by hand.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

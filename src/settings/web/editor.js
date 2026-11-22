@@ -374,6 +374,28 @@ function renderCardPane() {
     card.menu ? "(its name)" : "(the item's own text for one item)"));
   box.append(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
     "(shown with the look, step 6)"));
+  // the hint on hover: a text in place of the item's own hint, or a regex on it (so it can be added to)
+  const hint = card.hint;
+  box.append(textField("Hint", typeof hint === "string" ? hint : "", v => {
+    if (v) card.hint = v; else if (typeof card.hint === "string") delete card.hint;
+    changed();
+  }, "(the item's own hint)"));
+  box.append(textField("Hint regex", hint && typeof hint === "object" ? hint.regex : "", v => {
+    if (v) card.hint = { regex: v, replace: (card.hint && typeof card.hint === "object" && card.hint.replace) || "" };
+    else if (card.hint && typeof card.hint === "object") delete card.hint;
+    changed();
+  }, "e.g. ^(.*)$ to add to it"), textField("... replace with", hint && typeof hint === "object" ? hint.replace : "", v => {
+    if (card.hint && typeof card.hint === "object") { card.hint.replace = v; changed(); }
+  }, "e.g. $1 (via LexPen)"));
+  // the comment: for the editor only, never in the menu
+  const comment = el("label", "field");
+  const area = el("textarea");
+  area.rows = 3;
+  area.value = card.comment || "";
+  area.placeholder = "(only here, never in the menu)";
+  area.addEventListener("change", () => { if (area.value) card.comment = area.value; else delete card.comment; changed(); });
+  comment.append(el("span", "", "Comment"), area);
+  box.append(comment);
   if (!M.isRemaining(card)) {
     const cb = el("input");
     cb.type = "checkbox";

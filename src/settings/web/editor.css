@@ -79,7 +79,8 @@ h2 .grow { flex: 1; }
 
 /* the selected card */
 .field { display: grid; grid-template-columns: 110px 1fr; gap: 4px 8px; align-items: center; margin: 3px 0; }
-.field input[type=text] { width: 100%; box-sizing: border-box; }
+.field input[type=text], .field textarea { width: 100%; box-sizing: border-box; }
+textarea { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; resize: vertical; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .rule { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
 .rule.selected { border-color: var(--accent); }

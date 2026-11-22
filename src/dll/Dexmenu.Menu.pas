@@ -16,7 +16,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.Types, System.Generics.Collections, System.JSON, Dexmenu.Tree, Dexmenu.Place,
-  Dexmenu.Layout, Dexmenu.Draw;
+  Dexmenu.Layout, Dexmenu.Draw, Dexmenu.Tip;
 
 type
   TMenuSession = class;
@@ -52,12 +52,19 @@ type
     FChecked: TDictionary<HMENU, Boolean>;   // submenus looked at for that
     FEarly: TList<HMENU>;    // submenus opened before the user opened them (FindEmpty): open until the menu closes
     FDeep: Boolean;          // the layout's rules look inside submenus (RulesLookDeeper)
+    FHints: TDictionary<string, string>;   // the items' own hints, from the seen items (Dexmenu.Seen.HintsOf)
+    FTip: TTip;
+    FTipLevel: TLevelWindow; // the level and box a hint waits for (TipTimer) or shows for
+    FTipBox: Integer;
     FPlacement: TPlacement;
     FLevels: TObjectList<TLevelWindow>;
     FDone: Boolean;
     FChosen: UINT;
     FRefreshPosted: Boolean;
     FHoverTimerLevel: Integer;
+    procedure HoverTip(L: TLevelWindow; Box: Integer);
+    procedure ShowTip(L: TLevelWindow);
+    procedure HideTip;
     function Notify: Boolean;
     function MakeWindow(Index: Integer; Activate: Boolean): HWND;
     procedure PlaceTop(X, Y: Integer; Params: PTPMParams);
@@ -96,6 +103,7 @@ const
   MenuClassName = 'DexmenuMenu';
   WM_DEXMENU_REFRESH = WM_APP + $D3;
   HoverTimer = 1;
+  TipTimer = 2;
   SPI_GETMENUSHOWDELAY = $006A;
 
 function GetDpiForWindow(Wnd: HWND): UINT; stdcall; external user32 name 'GetDpiForWindow';
@@ -180,6 +188,8 @@ begin
   FEmpty.Free;
   FChecked.Free;
   FEarly.Free;
+  FTip.Free;
+  FHints.Free;
   inherited;
 end;
 
@@ -294,6 +304,7 @@ begin
     SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(FOriginal), MakeLParam(0, 0));
   end;
   FTop := ReadLevel(FOriginal, '');
+  FHints := HintsOf(ReadSeenText(FKind));
   FDeep := RulesLookDeeper(FLayout, FKind);
   FindEmpty(FTop);
   FPlacement := TPlacement.Create(FLayout, FKind, FTop);
@@ -308,6 +319,7 @@ begin
   FLevels.Add(L);
   L.Wnd := MakeWindow(0, True);
   SetWindowLongPtr(L.Wnd, GWLP_USERDATA, LONG_PTR(L));
+  FTip := TTip.Create(L.Wnd);
   PlaceTop(X, Y, Params);
   L.Redraw;
   ShowWindow(L.Wnd, SW_SHOW);
@@ -335,6 +347,7 @@ begin
     ActiveSession := nil;
   end;
 
+  HideTip;
   FLevels.Clear;   // the windows gone
   if Notify then
     for I := FEarly.Count - 1 downto 0 do   // the submenus opened early close with the menu
@@ -367,6 +380,8 @@ begin
   for I := FLevels.Count - 1 downto Max(Index, 1) do
   begin
     L := FLevels[I];
+    if L = FTipLevel then
+      HideTip;
     // one opened early stays open until the menu closes (Run)
     if Notify and (L.Opener <> nil) and (L.Opener.Kind = vkItem) and not FEarly.Contains(L.Opener.Node.SubMenu) then
       SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(L.Opener.Node.SubMenu), 0);
@@ -640,6 +655,43 @@ begin
   end;
 end;
 
+// The hint of the card under the mouse (ShownHint), after Windows' hover time, just below the card.
+procedure TMenuSession.HoverTip(L: TLevelWindow; Box: Integer);
+begin
+  HideTip;
+  FTipLevel := L;
+  FTipBox := Box;
+  if Box >= 0 then
+    SetTimer(L.Wnd, TipTimer, HoverTime, nil);
+end;
+
+procedure TMenuSession.ShowTip(L: TLevelWindow);
+var
+  V: TViewCard;
+  R: TD2D1RectF;
+  Regular: string;
+begin
+  KillTimer(L.Wnd, TipTimer);
+  if (FTip = nil) or (L <> FTipLevel) or (FTipBox < 0) or (FTipBox > High(L.Geometry.Boxes)) then
+    Exit;
+  V := L.Geometry.Boxes[FTipBox].Card;
+  Regular := '';
+  if (V.Kind = vkItem) and (FHints <> nil) then
+    FHints.TryGetValue(HintKey(V.Node), Regular);
+  R := L.Geometry.Boxes[FTipBox].Rect;
+  FTip.Show(ShownHint(V, Regular), L.Pos.X + Round((R.left + 8) * L.Scale),
+    L.Pos.Y + Round((R.bottom - L.ScrollY + 2) * L.Scale));
+end;
+
+procedure TMenuSession.HideTip;
+begin
+  if FTipLevel <> nil then
+    KillTimer(FTipLevel.Wnd, TipTimer);
+  FTipLevel := nil;
+  if FTip <> nil then
+    FTip.Hide;
+end;
+
 // What the menu holds now merged into what it held before in this right-click: an item Windows' menu lost while shown
 // (Explorer deletes the items it hides after the show) is kept, marked "sometimes".
 procedure TMenuSession.KeepSeen;
@@ -827,6 +879,7 @@ begin
         begin
           L.Selected := Box;
           L.Redraw;
+          S.HoverTip(L, Box);
           KillTimer(Wnd, HoverTimer);
           if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu then
           begin
@@ -845,13 +898,19 @@ begin
         TrackMouseEvent(TME);
       end;
     WM_MOUSELEAVE:
+      begin
+      if L = S.FTipLevel then
+        S.HideTip;
       if (S.FLevels.Count <= L.Index + 1) and (L.Selected >= 0) then
       begin
         L.Selected := -1;
         L.Redraw;
       end;
+      end;
     WM_TIMER:
-      if WP = HoverTimer then
+      if WP = TipTimer then
+        S.ShowTip(L)
+      else if WP = HoverTimer then
       begin
         KillTimer(Wnd, HoverTimer);
         if (L.Selected >= 0) and L.Geometry.Boxes[L.Selected].Card.HasSubmenu then

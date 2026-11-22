@@ -33,9 +33,12 @@ static class ShellMenu
             var hr = menu.QueryContextMenu(hmenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_CANRENAME);
             if (hr < 0) { error = $"Windows gave no menu for this right-click (0x{hr:X8})"; return null; }
             OpenSubmenus(menu, hmenu);
-            var chars = Native.DexmenuSeenOfMenu(hmenu, seen, kind, null, 0);
+            var hints = new Dictionary<string, string>();
+            HelpTexts(menu, hmenu, hints);
+            var hintsJson = System.Text.Json.JsonSerializer.Serialize(hints);
+            var chars = Native.DexmenuSeenOfMenu(hmenu, seen, kind, hintsJson, null, 0);
             var buffer = new System.Text.StringBuilder(chars);
-            Native.DexmenuSeenOfMenu(hmenu, seen, kind, buffer, chars);
+            Native.DexmenuSeenOfMenu(hmenu, seen, kind, hintsJson, buffer, chars);
             return buffer.ToString();
         }
         catch (Exception e) when (e is COMException or ArgumentException or IOException or InvalidCastException)
@@ -139,6 +142,41 @@ static class ShellMenu
         }
     }
 
+    // Every item's own hint: the help text its handler gives (GCS_HELPTEXTW, what Explorer once showed in its status
+    // bar), by the item's id; items without one are left out.
+    static void HelpTexts(IContextMenu menu, IntPtr hmenu, Dictionary<string, string> hints)
+    {
+        var buffer = Marshal.AllocHGlobal(1024 * 2);
+        try { Walk(hmenu); }
+        finally { Marshal.FreeHGlobal(buffer); }
+
+        string Command(int id, uint type)
+        {
+            Marshal.WriteInt16(buffer, 0);
+            try
+            {
+                return menu.GetCommandString((UIntPtr)(id - 1), type, IntPtr.Zero, buffer, 1024) >= 0
+                    ? Marshal.PtrToStringUni(buffer)?.Trim() ?? "" : "";
+            }
+            catch (COMException) { return ""; }   // a handler that gives none
+        }
+
+        void Walk(IntPtr m)
+        {
+            var count = GetMenuItemCount(m);
+            for (var i = 0; i < count; i++)
+            {
+                var sub = GetSubMenu(m, i);
+                if (sub != IntPtr.Zero) { Walk(sub); continue; }
+                var id = GetMenuItemID(m, i);
+                if (id < 1 || id > 0x7FFF) continue;
+                var text = Command(id, GCS_HELPTEXTW);
+                // some handlers give their command's name (7-Zip's SevenZipCompress) or the item's own text: no hint
+                if (text.Length > 0 && text != Command(id, GCS_VERBW)) hints[id.ToString()] = text;
+            }
+        }
+    }
+
     static void Check(int hr)
     {
         if (hr < 0) Marshal.ThrowExceptionForHR(hr);
@@ -173,6 +211,11 @@ static class ShellMenu
         [PreserveSig] int SelectItem(IntPtr pidl, uint flags);
         [PreserveSig] int GetItemObject(uint item, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out object obj);
     }
+
+    const uint GCS_VERBW = 4, GCS_HELPTEXTW = 5;
+
+    [DllImport("user32.dll")]
+    static extern int GetMenuItemID(IntPtr menu, int position);
 
     const uint CMF_NORMAL = 0, CMF_CANRENAME = 0x10, WM_INITMENUPOPUP = 0x0117;
 
