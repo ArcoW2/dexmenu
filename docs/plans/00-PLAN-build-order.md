@@ -309,6 +309,13 @@ None.
   alignment in the panel) and deleted on hover. Tested: unit tests (dividers placed, with and without text; the
   Windows separator next to one); the editor's self-test (added, moved between lines and into a card's menu, ids,
   deleted); the preview with dividers drawn (its dump).
+- Skip duplicates (`skipDuplicates` on a rule, or on a card for all its rules): of the items found with one name
+  (without `&`, any case), only the first shows; the others are taken all the same, so not in the remaining card
+  either. Why: Windows' own menu has some items twice (seen with the test host, Dexmenu off, `--hold 3000`: the
+  newer-style Move to OneDrive, Unlock with File Locksmith, Rename with PowerRename beside their older copies).
+  Checkboxes on the rule and the card. Tested: unit tests (without, on a rule, on a card).
+- The test host's `--hold <ms>` with Dexmenu off: Windows' menu kept open that long, then printed as it is (the
+  shell's late changes in).
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

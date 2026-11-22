@@ -9,6 +9,7 @@ unit Dexmenu.Rules;
 //     "states": [ "enabled", "disabled" ],         the states taken (default: both)
 //     "caseSensitive": false, "also": false,       also: shown here even when an earlier rule took it
 //     "consume": true,                              false: the item stays free for later rules and the remaining card
+//     "skipDuplicates": false,                      true: of items of one name it finds, only the first shows
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
 // A rule with both a scope and a path, an unknown match kind or a regex that does not compile is invalid: it finds
@@ -43,6 +44,7 @@ type
     CaseSensitive: Boolean;
     Also: Boolean;
     Consume: Boolean;    // default True
+    SkipDuplicates: Boolean;
     Priority: Integer;   // -1: none given
   end;
 
@@ -215,6 +217,8 @@ begin
   if Obj.GetValue('also') is TJSONBool then
     Result.Also := TJSONBool(Obj.GetValue('also')).AsBoolean;
   Result.Consume := True;
+  if Obj.GetValue('skipDuplicates') is TJSONBool then
+    Result.SkipDuplicates := TJSONBool(Obj.GetValue('skipDuplicates')).AsBoolean;
   if Obj.GetValue('consume') is TJSONBool then
     Result.Consume := TJSONBool(Obj.GetValue('consume')).AsBoolean;
   if Obj.GetValue('priority') is TJSONNumber then

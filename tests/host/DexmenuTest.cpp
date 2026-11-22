@@ -67,7 +67,7 @@ HMENU windowsMenu = nullptr;
 bool on = false;
 UINT lateDisable = 0, lateDelete = 0;
 std::wstring dumpPath, chooseVerb, openText;
-int holdMs = 0;   // --hold: the menu left open this long before the test acts (for a screenshot)
+int holdMs = 0;   // --hold: the menu left open this long before the test acts (for a screenshot); off: then printed
 UINT chooseId = 0;
 
 // What happened while the menu was shown.
@@ -403,10 +403,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         if (lateDisable || lateDelete) ApplyLate();
         shownWindows = Tree(windowsMenu, 1);
         sawWindowsMenu = true;
-        SetTimer(hwnd, 1, 50, nullptr);
+        SetTimer(hwnd, 1, holdMs > 0 ? holdMs : 50, nullptr);   // --hold: the changes the shell makes while shown come in
         return 0;
     }
-    if (msg == WM_TIMER && wp == 1) { KillTimer(hwnd, 1); EndMenu(); return 0; }
+    if (msg == WM_TIMER && wp == 1)
+    {
+        KillTimer(hwnd, 1);
+        if (holdMs > 0)
+        {
+            // Off and held: Windows' own menu as it is after the shell's late changes (items added, deleted)
+            wprintf(L"== Windows' menu after %d ms shown\n", holdMs);
+            Print(Tree(windowsMenu, 1), 2);
+        }
+        EndMenu();
+        return 0;
+    }
     if (msg == WM_TIMER && wp == 2) { Tick(hwnd); return 0; }
     return DefWindowProcW(hwnd, msg, wp, lp);
 }

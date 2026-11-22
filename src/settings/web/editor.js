@@ -385,7 +385,8 @@ function ruleEditor(card, rule, index) {
     l.append(cb, " " + s);
     opts.append(l);
   }
-  for (const [flag, label] of [["caseSensitive", "case sensitive"], ["also", "also when taken"]]) {
+  for (const [flag, label] of [["caseSensitive", "case sensitive"], ["also", "also when taken"],
+    ["skipDuplicates", "skip duplicates (one per name)"]]) {
     const cb = el("input");
     cb.type = "checkbox";
     cb.checked = !!rule[flag];
@@ -478,6 +479,18 @@ function renderCardPane() {
     l.lastChild.append(cb, " not shown: what it finds is left out of the menu");
     box.append(l);
   }
+  if (!card.menu && !M.isRemaining(card)) {
+    // one item per name over all its rules (Windows 11 shows some items twice: a newer and an older copy)
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.checked = !!card.skipDuplicates;
+    cb.addEventListener("change", () => { if (cb.checked) card.skipDuplicates = true; else delete card.skipDuplicates; changed(); });
+    const l = el("label", "field");
+    l.title = "Of the items its rules find with the same name, only the first shows; the others show nowhere";
+    l.append(el("span", "", "Duplicates"), el("span"));
+    l.lastChild.append(cb, " skip: one item per name");
+    box.append(l);
+  }
   if (!card.menu)
     box.append(textField("Rename (regex)", card.rename && card.rename.regex, v => {
       if (v) card.rename = { regex: v, replace: (card.rename && card.rename.replace) || "" }; else delete card.rename;
@@ -505,6 +518,7 @@ function summary(rule) {
   if (rule.states && rule.states.length === 1) s += ", " + rule.states[0] + " only";
   if (rule.also) s += ", also";
   if (rule.consume === false) s += ", not consumed";
+  if (rule.skipDuplicates) s += ", skip duplicates";
   return s;
 }
 

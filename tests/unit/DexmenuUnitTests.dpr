@@ -519,6 +519,54 @@ begin
   end;
 end;
 
+// Skip duplicates: a menu with two items of one name (Windows 11's newer and older copy of a program's item).
+function ShowsOnDuplicates(const Lines: string): string;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+begin
+  Layout := ParseLayout('{ "default": ' + Lines + ' }', 'test', Error);
+  if Layout = nil then
+    Exit('LAYOUT: ' + Error);
+  Menu := CreatePopupMenu;
+  Add(Menu, 'Rename with PowerRename');
+  Add(Menu, 'Unlock');
+  Add(Menu, 'Rename with Pow&erRename');
+  Add(Menu, 'Unlock');
+  Add(Menu, 'Other');
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      Result := Describe(Level);
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+procedure TestDuplicates;
+const
+  RestLine = '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] }';
+begin
+  Expect(ShowsOnDuplicates('[ ' + Card('PR', '{ "name": { "contains": "PowerRename" } }') + ', ' + RestLine + ' ]'),
+    'I:Rename with PowerRename / I:Rename with PowerRename / I:Unlock / I:Unlock / I:Other', 'without skipDuplicates: both copies');
+  Expect(ShowsOnDuplicates('[ ' + Card('PR', '{ "name": { "contains": "PowerRename" }, "skipDuplicates": true }') + ', ' + RestLine + ' ]'),
+    'I:Rename with PowerRename / I:Unlock / I:Unlock / I:Other', 'skipDuplicates on a rule: one copy; the other not in the rest either');
+  Expect(ShowsOnDuplicates('[ ' + Card('Two', '{ "name": { "contains": "PowerRename" } }, { "name": { "equals": "Unlock" } }',
+    ', "skipDuplicates": true') + ', ' + RestLine + ' ]'), 'I:Rename with PowerRename / I:Unlock / I:Other',
+    'skipDuplicates on a card: one per name over all its rules');
+end;
+
 // A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
 procedure TestHints;
 var
@@ -612,6 +660,7 @@ begin
   TestEmptySubmenu;
   TestEmptyMenuCard;
   TestHints;
+  TestDuplicates;
   TestSeen;
   if Failures = 0 then
     Writeln('OK')

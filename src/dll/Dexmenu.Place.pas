@@ -7,7 +7,8 @@ unit Dexmenu.Place;
 // goes to the first rule that finds it; an item with a submenu takes its subitems along, except those an earlier rule
 // took, which stay there and are left out of its submenu. A rule with "also" shows an item even when an earlier rule
 // took it; a rule with "consume": false shows what it found without taking it, so later rules and the remaining card
-// can show it too. The remaining card takes every top-level item no rule took (Windows' separators among them) and places
+// can show it too. "skipDuplicates" (on a rule, or on a card for all its rules) shows one item per name; the others
+// are taken all the same, so they show nowhere. The remaining card takes every top-level item no rule took (Windows' separators among them) and places
 // each, with its subitems, as a card of its own on its own line where it stands.
 //
 // A card with rules places what it found where it stands, as the remaining card does: each found item a card of its
@@ -376,6 +377,7 @@ end;
 
 procedure TPlacement.Evaluate;
 var
+  Names: TDictionary<string, Boolean>;
   Rules: TList<TRule>;
   Order: TDictionary<TRule, Integer>;
   R: TRule;
@@ -395,10 +397,12 @@ var
       end;
   end;
 
-  procedure Visit(Nodes: TNodes; R: TRule);
+  procedure Visit(Nodes: TNodes; R: TRule; Names: TDictionary<string, Boolean>);
   var
     N: TNode;
     List: TList<TFound>;
+    F: TFound;
+    Twice: Boolean;
   begin
     for N in Nodes do
     begin
@@ -409,9 +413,17 @@ var
           List := TList<TFound>.Create;
           FFound.Add(R.Card, List);
         end;
+        // a second item of a name this rule (skipDuplicates) or its card (skipDuplicates) already has: taken, not shown
+        Twice := R.Spec.SkipDuplicates and Names.ContainsKey(AnsiLowerCase(N.Name));
+        if not Twice and R.Card.SkipDuplicates then
+          for F in List do
+            if SameText(F.Node.Name, N.Name) then
+              Twice := True;
+        Names.AddOrSetValue(AnsiLowerCase(N.Name), True);
         Found.Node := N;
         Found.Rule := R;
-        List.Add(Found);
+        if not Twice then
+          List.Add(Found);
         if R.Spec.Consume and not FTaken.ContainsKey(KeyOf(N)) then
         begin
           FTaken.AddOrSetValue(KeyOf(N), True);
@@ -420,7 +432,7 @@ var
         end;
       end;
       if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
-        Visit(N.Children, R);
+        Visit(N.Children, R, Names);
     end;
   end;
 
@@ -452,7 +464,14 @@ begin
         Break;
       end;
     for R in Rules do
-      Visit(Top, R);
+    begin
+      Names := TDictionary<string, Boolean>.Create;
+      try
+        Visit(Top, R, Names);
+      finally
+        Names.Free;
+      end;
+    end;
     for I := 0 to Top.Count - 1 do
       if not FTaken.ContainsKey(KeyOf(Top[I])) or Top[I].IsSeparator then
         Remaining.Add(Top[I]);

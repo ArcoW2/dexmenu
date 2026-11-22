@@ -47,6 +47,9 @@ type
     HintText: string;
     HintFrom, HintTo: string;
     HintIsRegex: Boolean;
+    // "skipDuplicates": of the items its rules found, one per name (Windows 11 shows some programs' items twice: a
+    // newer and an older copy); the others are taken all the same, so they show nowhere
+    SkipDuplicates: Boolean;
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -218,6 +221,8 @@ begin
       if TJSONObject(Obj.GetValue('hint')).GetValue('replace') <> nil then
         Card.HintTo := TJSONObject(Obj.GetValue('hint')).GetValue('replace').Value;
     end;
+    if Obj.GetValue('skipDuplicates') is TJSONBool then
+      Card.SkipDuplicates := TJSONBool(Obj.GetValue('skipDuplicates')).AsBoolean;
     if Obj.GetValue('hidden') is TJSONBool then
       Card.Hidden := TJSONBool(Obj.GetValue('hidden')).AsBoolean;   // not for the remaining card (Dexmenu.Place)
     if (Obj.GetValue('rename') is TJSONObject) and (TJSONObject(Obj.GetValue('rename')).GetValue('regex') <> nil) then
