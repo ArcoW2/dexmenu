@@ -114,6 +114,8 @@
   M.moveRule(L.default, 3, 0);
   check(M.ruleList(L.default).map(r => r.card.card).join() === "Git,LexPen,Clip,Zip", "Git's rule moved to the top of the priority list");
   check(M.ruleList(L.default).map(r => r.rule.priority).join() === "1,2,3,4", "priorities renumbered 1..n");
+  M.moveRule(L.default, 0, 3);   // dropped on the last line of the list: to the end
+  check(M.ruleList(L.default).map(r => r.card.card).join() === "LexPen,Clip,Zip,Git", "the first rule moved to the end of the list");
   const added = M.addRule(L.default, [...M.cards(L.default)].find(a => a.card.card === "Zip").card);
   check(added.priority === 5 && M.ruleList(L.default).length === 5, "a new rule goes at the end of the list");
   M.deleteRule(L.default, [...M.cards(L.default)].find(a => a.card.card === "Zip").card, 1);

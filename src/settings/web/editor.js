@@ -442,6 +442,16 @@ function renderRules() {
   });
   const rest = [...M.cards(linesOf())].find(a => M.isRemaining(a.card));
   const last = el("li", "fixed", "Last, always: " + (rest ? rest.card.card : "the remaining card") + " takes every item no rule took");
+  // a rule dropped here goes to the end of the list (before this line, which always stays last)
+  const count = M.ruleList(linesOf()).length;
+  last.addEventListener("dragover", e => { if (e.dataTransfer.types.includes("text/rule")) { e.preventDefault(); last.classList.add("over"); } });
+  last.addEventListener("dragleave", () => last.classList.remove("over"));
+  last.addEventListener("drop", e => {
+    e.preventDefault();
+    last.classList.remove("over");
+    const from = +e.dataTransfer.getData("text/rule");
+    if (!Number.isNaN(from) && from !== count - 1) { M.moveRule(linesOf(), from, count - 1); changed(); }
+  });
   list.append(last);
 }
 
