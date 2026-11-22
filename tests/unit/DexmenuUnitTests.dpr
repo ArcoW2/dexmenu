@@ -603,6 +603,67 @@ begin
   end;
 end;
 
+// Icons kept for the preview (plan 02 3.8): an item's bitmap saved as PNG by its key, read back with its pixels.
+procedure TestKeptIcons;
+var
+  Folder: string;
+  BMI: TBitmapInfo;
+  Bits: Pointer;
+  Bmp: HBITMAP;
+  Menu: HMENU;
+  Info: TMenuItemInfo;
+  Top: TNodes;
+  P: TIconPixels;
+  I: Integer;
+  Same: Boolean;
+begin
+  Folder := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-seen');
+  if TDirectory.Exists(Folder) then
+    TDirectory.Delete(Folder, True);
+  SetEnvironmentVariable('DEXMENU_SEEN_FOLDER', PChar(Folder));
+  FillChar(BMI, SizeOf(BMI), 0);
+  BMI.bmiHeader.biSize := SizeOf(BMI.bmiHeader);
+  BMI.bmiHeader.biWidth := 16;
+  BMI.bmiHeader.biHeight := -16;
+  BMI.bmiHeader.biPlanes := 1;
+  BMI.bmiHeader.biBitCount := 32;
+  Bmp := CreateDIBSection(0, BMI, DIB_RGB_COLORS, Bits, 0, 0);
+  Menu := CreatePopupMenu;
+  Top := nil;
+  try
+    for I := 0 to 255 do   // left half opaque red, right half clear
+      if I mod 16 < 8 then
+        PCardinal(NativeUInt(Bits) + NativeUInt(I * 4))^ := $FFFF0000
+      else
+        PCardinal(NativeUInt(Bits) + NativeUInt(I * 4))^ := 0;
+    FillChar(Info, SizeOf(Info), 0);
+    Info.cbSize := SizeOf(Info);
+    Info.fMask := MIIM_STRING or MIIM_ID or MIIM_BITMAP;
+    Info.wID := 7;
+    Info.dwTypeData := 'Edit in LexPen';
+    Info.hbmpItem := Bmp;
+    InsertMenuItem(Menu, 0, True, Info);
+    Top := ReadLevel(Menu, '');
+    SaveIcons(Top);
+    Check(Length(TDirectory.GetFiles(TPath.Combine(Folder, 'icons'), '*.png')) = 1, 'an item''s bitmap kept as a PNG');
+    ForgetKeptIcons;
+    Same := KeptIconPixels('Edit in LexPen', P) and (P.Width = 16) and (P.Height = 16) and (Length(P.Bits) = 16 * 16 * 4);
+    if Same then
+      for I := 0 to 255 do
+        if PCardinal(@P.Bits[I * 4])^ <> PCardinal(NativeUInt(Bits) + NativeUInt(I * 4))^ then
+          Same := False;
+    Check(Same, '... read back by its key with the same pixels');
+    Check(not KeptIconPixels('No such item', P), 'an item without a kept icon: none');
+  finally
+    Top.Free;
+    DestroyMenu(Menu);
+    DeleteObject(Bmp);
+    if TDirectory.Exists(Folder) then
+      TDirectory.Delete(Folder, True);
+    SetEnvironmentVariable('DEXMENU_SEEN_FOLDER', nil);
+  end;
+end;
+
 procedure TestSubmenuModes;
 var
   C: TCard;
@@ -954,6 +1015,7 @@ begin
   TestDuplicates;
   TestUsage;
   TestIcons;
+  TestKeptIcons;
   TestSubmenuModes;
   TestSeen;
   if Failures = 0 then

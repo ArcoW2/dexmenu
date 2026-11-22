@@ -70,7 +70,7 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Icons;
+  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Icons, Dexmenu.Usage;
 
 const
   RRF_RT_REG_DWORD = $00000010;
@@ -151,7 +151,8 @@ end;
 
 // The icon in the slot left of a card's text (plan 02 3.8), the first there is: the layout card's own (a glyph, or an
 // icon in a file), the item's own bitmap, else the title's first letter.
-procedure DrawIcon(T: ID2D1RenderTarget; V: TViewCard; const R: TD2D1RectF; Brush, Dim: ID2D1SolidColorBrush);
+procedure DrawIcon(T: ID2D1RenderTarget; V: TViewCard; const R: TD2D1RectF; Brush, Dim: ID2D1SolidColorBrush;
+  Editing: Boolean);
 var
   Spec, Glyph, Title: string;
   Pixels: TIconPixels;
@@ -173,6 +174,12 @@ begin
     Exit;
   end;
   if (V.Kind = vkItem) and (V.Node <> nil) and BitmapPixels(V.Node.Item.Info.hbmpItem, Pixels) then
+  begin
+    DrawPixels(T, Pixels, CX, CY);
+    Exit;
+  end;
+  // the preview: the icon a right-click or the live menu kept for this item (Dexmenu.Icons)
+  if Editing and (V.Kind = vkItem) and (V.Node <> nil) and KeptIconPixels(UsageKey(V.Node), Pixels) then
   begin
     DrawPixels(T, Pixels, CX, CY);
     Exit;
@@ -512,7 +519,7 @@ begin
       T.DrawText(PWideChar(CheckGlyph), 1, GlyphFormat, D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom),
         Brush)
     else if V.Kind in [vkItem, vkMenu, vkCommand] then
-      DrawIcon(T, V, R, Brush, Dim);
+      DrawIcon(T, V, R, Brush, Dim, Editing);
     // the marks (the global settings): a submenu's (the chevron unless one is set), an action's (none unless set)
     if V.HasSubmenu and (SubmenuMark = '') then
       T.DrawText(PWideChar(ChevronGlyph), 1, GlyphFormat, D2D1RectF(R.right - MarkWidth, R.top, R.right - 6, R.bottom),

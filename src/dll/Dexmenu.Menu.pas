@@ -113,7 +113,7 @@ threadvar
 implementation
 
 uses
-  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage;
+  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage, Dexmenu.Icons;
 
 const
   MenuClassName = 'DexmenuMenu';
@@ -379,6 +379,7 @@ begin
       SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(FEarly[I]), 0);
   KeepSeen;
   WriteSeen(FKind, FSeen);   // for the settings app's preview (Dexmenu.Seen)
+  SaveIcons(FTop);           // the items' icons too (Dexmenu.Icons)
   if Notify then
   begin
     SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(FOriginal), 0);

@@ -45,7 +45,7 @@ implementation
 
 uses
   Winapi.Messages, Winapi.D2D1, System.SysUtils, System.Math, System.Classes, System.Generics.Collections, System.JSON,
-  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip, Dexmenu.Usage;
+  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip, Dexmenu.Usage, Dexmenu.Icons;
 
 const
   PreviewClassName = 'DexmenuPreview';
@@ -570,6 +570,7 @@ begin
     else
     begin
       P.Clear;
+      ForgetKeptIcons;   // read again: a right-click or the live menu may have kept new ones
       P.Kind := Kind;
       if P.Kind = '' then
         P.Kind := 'default';
@@ -689,6 +690,7 @@ begin
         for Pair in TJSONObject(HintsJson) do
           HintsById.AddOrSetValue(StrToIntDef(Pair.JsonString.Value, 0), Pair.JsonValue.Value);
       ReadDeep(Top);
+      SaveIcons(Top);   // the real menu's icons kept for the preview (Dexmenu.Icons)
       Live := SeenJson(Top, HintsById);
       Old := nil;
       if (Seen <> nil) and (Seen^ <> #0) then

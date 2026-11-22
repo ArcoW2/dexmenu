@@ -14,6 +14,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: the use counts in the editor.
 - 2026-11-22: partly executed: icons (the layout's, the item's own bitmap, the first letter).
 - 2026-11-22: partly executed: Dexmenu's own items as cards; the shipped layouts Default A, C and D.
+- 2026-11-22: partly executed: the items' icons in the preview.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -60,6 +61,7 @@ the preview is the result.
 | Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
 | Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else the title's first letter; set in the editor's card panel | 3.8 |
 | Shipped layouts | "Default A", "Default C" (by task) and "Default D" (minimal, without its search box yet), each written once into the layouts folder (settings.json `shipped`); every other kind on Default A at a first start; each ends with a note, "Edit menu..." and "Windows' menu" | 3.10 |
+| Icons in the preview | the items' own bitmaps kept as PNG files in the seen folder's `icons` (by a hash of the item's path and text), by every right-click and by the settings app's real menu of a folder; the preview draws them; an icon this process kept with the same pixels is not encoded again | 3.8 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -67,7 +69,6 @@ the preview is the result.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Icons in the preview | every right-click saves the icons of the items it shows (PNG files next to the seen items), the preview draws them | Icons | 3.8 |
 | Explorer's own icons | Explorer asked to draw its owner-drawn items into Dexmenu's memory, the icon cut out; first a probe in Explorer | Icons | 3.8 |
 | Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | items as buttons in a card; the search box | 3.10 |
 | Search box in Default D | Default D's search box | the search box (3.6) | 3.10 |
@@ -325,8 +326,10 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
     the icon cut out of it: [not yet checked] whether it works;
   - otherwise the first letter of its title.
   A checked item shows its check mark in the slot instead.
-- The preview draws the items' own icons too: every right-click saves the icons of the items it shows, as PNG files
-  next to the seen items, keyed by the item's path and text (as the use counts, 3.9); the preview reads them.
+- The preview draws the items' own icons too: every right-click, and the settings app's real menu of a folder, keep
+  the items' bitmaps as PNG files in the seen folder's `icons`, named by a hash of the item's path and text (its key,
+  as the use counts', 3.9); the preview reads them. Items Explorer draws itself have no bitmap to keep: they show
+  their first letter until Explorer's own icons are read (below).
 - One drawing engine for the menu and its preview. The settings app (plan 01 3.7, .NET 10 and WebView2) loads the same
   DLL and gives it a window of its own next to the editor; the DLL draws the menu there from the seen items (plan 01
   3.6) and the layout being edited, and draws it again on every change. The preview is the real window, live: hover,
