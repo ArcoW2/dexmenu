@@ -7,7 +7,7 @@ program DexmenuUnitTests;
 {$APPTYPE CONSOLE}
 
 uses
-  Winapi.Windows, System.SysUtils, System.IOUtils,
+  Winapi.Windows, System.SysUtils, System.IOUtils, System.Generics.Collections,
   Dexmenu.Json in '..\..\src\dll\Dexmenu.Json.pas',
   Dexmenu.Log in '..\..\src\dll\Dexmenu.Log.pas',
   Dexmenu.Rules in '..\..\src\dll\Dexmenu.Rules.pas',
@@ -284,6 +284,47 @@ begin
     end;
 end;
 
+// A Windows submenu found empty even when opened (Dexmenu.Menu at a right-click): its item is not shown; without that
+// list (the preview) it is.
+procedure TestEmptySubmenu;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+  Empty: TDictionary<HMENU, Boolean>;
+begin
+  Layout := ParseLayout('{ "default": [ ' + '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] }' + ' ] }', 'test', Error);
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  Empty := TDictionary<HMENU, Boolean>.Create;
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Empty.Add(GetSubMenu(Menu, 1), True);   // Open with's
+    P.Empty := Empty;
+    Level := P.TopLevel;
+    try
+      Check(Pos('Open with', Describe(Level)) = 0, 'an empty submenu''s item not shown at a right-click');
+    finally
+      Level.Free;
+    end;
+    P.Empty := nil;
+    Level := P.TopLevel;
+    try
+      Check(Pos('I:Open with', Describe(Level)) > 0, '... shown without the list (the preview)');
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Empty.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 procedure TestRules;
 begin
   Expect(Shows('[ ' + Rest + ' ]'), AllRest, 'the remaining card alone: Windows'' menu as cards');
@@ -480,6 +521,7 @@ begin
   TestLayouts;
   TestCurrent;
   TestRules;
+  TestEmptySubmenu;
   TestSeen;
   if Failures = 0 then
     Writeln('OK')

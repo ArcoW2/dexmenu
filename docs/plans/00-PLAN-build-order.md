@@ -282,6 +282,10 @@ None.
   its background menu), so View, Sort by, Group by, Refresh and Paste are there as in Explorer. Tested: `--live
   background` on a folder gave them; the suite's live case asks for its submenus. A card just added gets the focus:
   selected, scrolled into view, its name selected in its panel.
+- Empty Windows submenus: at a right-click, an item whose submenu holds nothing even when opened (Bash's on a DLL) is
+  not shown; a submenu with no items yet is opened once (`WM_INITMENUPOPUP`, then `WM_UNINITMENUPOPUP`, as Windows'
+  menu does on hover) and read; one with items is never opened early. The preview still shows such items. Tested: a
+  unit test (the placement leaves the item out with the list, shows it without); at a right-click: not yet.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

@@ -22,7 +22,7 @@ unit Dexmenu.Place;
 interface
 
 uses
-  System.Generics.Collections, Dexmenu.Tree, Dexmenu.Layout;
+  Winapi.Windows, System.Generics.Collections, Dexmenu.Tree, Dexmenu.Layout;
 
 type
   TViewKind = (vkItem, vkMenu, vkSeparator);
@@ -76,6 +76,10 @@ type
     Kind: string;
     Top: TNodes;            // not owned
     Remaining: TList<TNode>;
+    // Windows submenus found empty even when opened (Dexmenu.Menu, a right-click only; not owned, may be nil): their
+    // items are not shown. The preview has none, so it shows them.
+    Empty: TDictionary<HMENU, Boolean>;
+    function Hides(Node: TNode): Boolean;
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes);
     destructor Destroy; override;
     function TopLevel: TViewLevel;
@@ -89,6 +93,11 @@ implementation
 
 uses
   System.SysUtils, System.RegularExpressions, System.Generics.Defaults, Dexmenu.Rules;
+
+function TPlacement.Hides(Node: TNode): Boolean;
+begin
+  Result := (Empty <> nil) and (Node.SubMenu <> 0) and Empty.ContainsKey(Node.SubMenu);
+end;
 
 function KeyOf(Node: TNode): string;
 begin
@@ -427,7 +436,8 @@ begin
       begin
         Out := nil;   // the remaining items each take a line of their own
         for N in P.Remaining do
-          AddNodeLine(Result, N, Card, nil);
+          if not P.Hides(N) then
+            AddNodeLine(Result, N, Card, nil);
       end
       else
       begin
@@ -438,7 +448,7 @@ begin
           V.Kind := vkMenu;
           V.Card := Card;
         end
-        else if P.FFound.TryGetValue(Card, List) and (List.Count = 1) then
+        else if P.FFound.TryGetValue(Card, List) and (List.Count = 1) and not P.Hides(List[0].Node) then
         begin
           V := TViewCard.Create;
           V.Kind := vkItem;
@@ -450,7 +460,8 @@ begin
         begin
           Out := nil;   // several found: each takes a line of its own, as the remaining card's items
           for F in List do
-            AddNodeLine(Result, F.Node, Card, F.Rule, True);
+            if not P.Hides(F.Node) then
+              AddNodeLine(Result, F.Node, Card, F.Rule, True);
           Continue;
         end;
         if V = nil then
@@ -480,7 +491,7 @@ begin
   Result := TViewLevel.Create;
   if Node.Children <> nil then
     for N in Node.Children do
-      if not FDirect.ContainsKey(KeyOf(N)) then
+      if not FDirect.ContainsKey(KeyOf(N)) and not Hides(N) then
         AddNodeLine(Result, N, nil, nil);
   CleanSeparators(Result);
 end;

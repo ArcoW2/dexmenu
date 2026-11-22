@@ -48,6 +48,8 @@ type
     FKind: string;
     FTop: TNodes;
     FSeen: TJSONArray;    // every item seen while shown, also those Windows' menu lost (Dexmenu.Seen)
+    FEmpty: TDictionary<HMENU, Boolean>;     // Windows submenus empty even when opened: their items not shown
+    FChecked: TDictionary<HMENU, Boolean>;   // submenus looked at for that
     FPlacement: TPlacement;
     FLevels: TObjectList<TLevelWindow>;
     FDone: Boolean;
@@ -66,6 +68,7 @@ type
     procedure CharKey(Ch: Char);
     procedure Refresh;
     procedure KeepSeen;
+    procedure FindEmpty(Nodes: TNodes);
     procedure Dump;
     function IsOurs(Wnd: HWND): Boolean;
   public
@@ -161,6 +164,8 @@ begin
   FFlags := Flags;
   FLayout := Layout;
   FLevels := TObjectList<TLevelWindow>.Create;
+  FEmpty := TDictionary<HMENU, Boolean>.Create;
+  FChecked := TDictionary<HMENU, Boolean>.Create;
 end;
 
 destructor TMenuSession.Destroy;
@@ -169,6 +174,8 @@ begin
   FPlacement.Free;
   FTop.Free;
   FSeen.Free;
+  FEmpty.Free;
+  FChecked.Free;
   inherited;
 end;
 
@@ -282,7 +289,9 @@ begin
     SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(FOriginal), MakeLParam(0, 0));
   end;
   FTop := ReadLevel(FOriginal, '');
+  FindEmpty(FTop);
   FPlacement := TPlacement.Create(FLayout, FKind, FTop);
+  FPlacement.Empty := FEmpty;
 
   L := TLevelWindow.Create;
   L.Session := Self;
@@ -404,6 +413,7 @@ begin
       SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(V.Node.SubMenu), MakeLParam(Index, 0));
     end;
     ReadChildren(V.Node);
+    FindEmpty(V.Node.Children);
     L.View := FPlacement.SubmenuLevel(V.Node);
   end;
   FLevels.Add(L);
@@ -568,6 +578,51 @@ begin
   PostMessage(FLevels[0].Wnd, WM_DEXMENU_REFRESH, 0, 0);
 end;
 
+// The Windows submenus of these items that hold nothing even when opened (an extension's submenu it fills with
+// nothing here, such as Bash's on a DLL): their items are not shown. A submenu with no items yet is opened once, as
+// Windows' menu does on hover (WM_INITMENUPOPUP, then WM_UNINITMENUPOPUP), and read; one with items is never
+// opened early. Each submenu is looked at once per right-click.
+procedure TMenuSession.FindEmpty(Nodes: TNodes);
+var
+  N, C: TNode;
+  Items: TNodes;
+  Index: Integer;
+  HasItem: Boolean;
+begin
+  if Nodes = nil then
+    Exit;
+  for N in Nodes do
+  begin
+    if (N.SubMenu = 0) or N.IsSeparator or FChecked.ContainsKey(N.SubMenu) then
+      Continue;
+    FChecked.Add(N.SubMenu, True);
+    if GetMenuItemCount(N.SubMenu) > 0 then
+      Continue;
+    Index := 0;
+    while (Index < GetMenuItemCount(N.Menu)) and (GetSubMenu(N.Menu, Index) <> N.SubMenu) do
+      Inc(Index);
+    if Notify then
+      SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(N.SubMenu), MakeLParam(Index, 0));
+    Items := ReadLevel(N.SubMenu, '');
+    try
+      HasItem := False;
+      for C in Items do
+        if not C.IsSeparator and ((C.Name <> '') or (C.SubMenu <> 0)) then
+          HasItem := True;
+    finally
+      Items.Free;
+    end;
+    if Notify then
+      SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(N.SubMenu), 0);
+    if not HasItem then
+    begin
+      FEmpty.AddOrSetValue(N.SubMenu, True);
+      if Tracing then
+        Log(Format('submenu %s of "%s" empty: not shown', [Hex(N.SubMenu), N.Name]));
+    end;
+  end;
+end;
+
 // What the menu holds now merged into what it held before in this right-click: an item Windows' menu lost while shown
 // (Explorer deletes the items it hides after the show) is kept, marked "sometimes".
 procedure TMenuSession.KeepSeen;
@@ -601,7 +656,9 @@ begin
   if FLevels.Count = 0 then
     Exit;
   NewTop := ReadLevel(FOriginal, '');
+  FindEmpty(NewTop);
   NewPlacement := TPlacement.Create(FLayout, FKind, NewTop);
+  NewPlacement.Empty := FEmpty;
   OldViews := TObjectList<TViewLevel>.Create;
   try
     for I := 0 to FLevels.Count - 1 do
@@ -645,6 +702,7 @@ begin
           else
           begin
             ReadChildren(Found.Node);
+            FindEmpty(Found.Node.Children);
             L.View := NewPlacement.SubmenuLevel(Found.Node);
           end;
         end;
