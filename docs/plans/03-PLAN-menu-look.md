@@ -23,7 +23,9 @@ A drawing engine in the Delphi DLL with Direct2D and DirectWrite draws a fixed s
 lines, cards, dividers, the icon row, the search box, submenu panels and a scrollbar, each in a fixed set
 of states (normal, hover, pressed, focused, disabled, unavailable). A theme is a JSON file as in LexPen (a name, a base
 theme, only what differs), but what it holds is per element and per state: colours, a background (colour, gradient
-or image), border, corner radius, padding, gap and font. The layout positions cards on lines by the level's width,
+or image), border, corner radius, padding, gap and font. The colours come from the theme's palette: named colours and
+a base colour, an element naming a palette colour and how strongly it shows against the base colour. The layout
+positions cards on lines by the level's width,
 the cards' minimum widths and weights, and their heights; a single card on a line is drawn as a menu item. A card can
 overrule its background and colours in the layout. Settings pick a theme for light and one for dark.
 
@@ -99,10 +101,17 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
     and font), `mark` (the action and submenu marks' colour), `border` (colour and width), `radius`, `padding`,
     `gap` (between cards on a line and
     between lines), `font` (family, size, weight), `iconSize`, `opacity`.
-- **A palette:** named colours at the top of the theme (`accent`, `text`, `surface`, ...), used by name in the
-  elements, so a theme on a base can change a few palette colours and recolour every element using them. This
-  takes the place of LexPen's CSS variables.
-- **Colours:** `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgba(r, g, b, a)` as in LexPen's themes, or a palette name.
+- **A palette makes the colours:** named colours at the top of the theme (`accent`, `text`, `surface`, ...) and a
+  `basecolour`, the theme's generic base colour. The elements use the palette's colours by name, so a theme on a
+  base can change a few palette colours (or only the base colour) and recolour every element using them. This takes
+  the place of LexPen's CSS variables.
+- **A colour in an element:** an object naming a palette colour and its intensity against the base colour:
+  `{ "colour": "surface", "intensity": 80 }` is surface moved a little towards the base colour: 100 the palette
+  colour itself, 0 the base colour, the values between a mix of the two (80: four parts surface, one part base).
+  `intensity` left out: 100. Short for 100: the palette name alone, `"surface"`. Wherever a colour goes: a
+  background, a gradient's stops, a tint, the foreground, the border, the mark.
+- **Colours in the palette:** `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgba(r, g, b, a)` as in LexPen's themes; in an
+  element a literal colour is allowed too, for the rare one the palette does not hold.
 - **Following Windows:** `accent` can be `system` (Windows' accent colour); light or dark per Windows' mode, as the
   global settings say (plan 02 3.4: `themeLight`, `themeDark`).
 - An example, in the shape it may take:
@@ -110,10 +119,12 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   ```json
   // Dark ocean: on Dark, bluer.
   { "name": "Dark ocean", "base": "dark",
-    "palette": { "surface": "#161c27", "text": "#d8e0ee", "accent": "#6aa8ff" },
-    "menu": { "normal": { "background": { "gradient": ["#161c27", "#1d2533"], "angle": 90 } } },
-    "card": { "normal": { "radius": 6 },
-              "hover": { "background": { "color": "rgba(106, 168, 255, .18)" } } }
+    "palette": { "basecolour": "#161c27", "surface": "#1d2533", "text": "#d8e0ee", "accent": "#6aa8ff" },
+    "menu": { "normal": { "background": { "gradient": [ "basecolour", { "colour": "surface", "intensity": 60 } ],
+                                          "angle": 90 } } },
+    "card": { "normal": { "radius": 6, "background": { "colour": "surface", "intensity": 80 },
+                          "foreground": "text" },
+              "hover": { "background": { "colour": "accent", "intensity": 30 } } }
   }
   ```
 
@@ -126,8 +137,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   - Parchment: `light-parchment` and `dark-parchment`;
   - Sky and ocean: `light-sky` and `dark-ocean`;
   - Seafoam and forest: `light-seafoam` and `dark-forest`.
-- Each changes the palette only, LexPen's app colours mapped onto it: `bg` the menu's background, `bgSide` a card's,
-  `bgBar` a divider's and a panel's, `fg` the text, `fgDim` the extra text, `border`, `accent`, `hover`, `active`
+- Each changes the palette only, LexPen's app colours mapped onto it: `bg` the base colour and the menu's
+  background, `bgSide` a card's, `bgBar` a divider's and a panel's, `fg` the text, `fgDim` the extra text, `border`, `accent`, `hover`, `active`
   for pressed, `select` for focused.
 - Which theme is used: the global settings (plan 02 3.4) follow Windows' light or dark mode, or are fixed to light
   or to dark; one theme is chosen for light (`themeLight`) and one for dark (`themeDark`), so a pair as above follows
@@ -136,7 +147,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 ### 3.4 The menu window and backgrounds
 
 - **A background** (for the menu, a panel, a card): one of
-  - `color`: one colour, with alpha;
+  - `colour`: one colour (a palette colour with its intensity, 3.2), with alpha;
   - `gradient`: two or more colours, an angle (linear) or a centre (radial): the shade;
   - `image`: a file, with `fit`, `opacity`, and an optional `tint` colour over it so text stays readable. `fit`:
     `stretch` (to the whole area), `fit` (whole image inside, its proportions kept), `center` (its own size, in the
@@ -265,10 +276,15 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - Dividers: without a label, with a label left, middle and right; own height, background and label colour.
 - A menu without a background: the gaps and corners see-through, a card asking for alpha drawn opaque and reported;
   with a background, a transparent card showing it.
-- Themes: a theme on a base with only palette changes recolours every element using them; an unknown property or a
+- Colours: a palette colour at intensity 100, 0 (the base colour) and between (the mix); left out (100); a palette
+  name alone; an unknown palette name reported, the base's value used.
+- Themes: a theme on a base with only palette changes recolours every element using them; one changing only the
+  base colour moves every colour below intensity 100; an unknown property or a
   bad colour reported, the base's value used.
 - By hand: Explorer and the settings app's preview side by side, the same layout and theme, the same picture.
 
 ## 4. Open questions
 
-None.
+1. How two colours mix for an intensity: per channel in sRGB (simple; a mix of two far colours can look muddy) or
+   in a perceptual space such as OKLab (even steps, more work)? And alpha: mixed as well?
+2. Can an intensity go above 100 (further away from the base colour than the palette colour), or below 0?
