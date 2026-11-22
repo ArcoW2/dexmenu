@@ -12,14 +12,16 @@ interface
 uses
   Winapi.Windows;
 
-// A shell right-click menu being built (the handler's QueryContextMenu). Sets the hooks the first time.
-procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind: string);
+// A shell right-click menu being built (the handler's QueryContextMenu). Sets the hooks the first time. Where: the
+// right-click as the preview can repeat it (Dexmenu.Seen.RightClickJson), '' when it cannot; written to the last
+// right-click after Dexmenu's menu for it was shown.
+procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind, Where: string);
 
 implementation
 
 uses
   System.SysUtils, System.StrUtils, System.SyncObjs, System.Generics.Collections, DDetours, Dexmenu.Log,
-  Dexmenu.Layout, Dexmenu.Menu;
+  Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen;
 
 const
   GET_MODULE_HANDLE_EX_FLAG_PIN = $00000001;
@@ -51,10 +53,11 @@ var
   NotedLock: TCriticalSection;
   Noted: TList<HMENU>;
   NotedKinds: TList<string>;   // the kind of right-click of each noted menu
+  NotedWhere: TList<string>;   // and where it was (NoteMenu)
   HooksLock: TCriticalSection;
   HooksTried, HooksSet: Boolean;
 
-function TakeNoted(Menu: HMENU; out Kind: string): Boolean;
+function TakeNoted(Menu: HMENU; out Kind, Where: string): Boolean;
 var
   I: Integer;
 begin
@@ -65,8 +68,10 @@ begin
     if Result then
     begin
       Kind := NotedKinds[I];
+      Where := NotedWhere[I];
       Noted.Delete(I);
       NotedKinds.Delete(I);
+      NotedWhere.Delete(I);
     end;
   finally
     NotedLock.Leave;
@@ -138,11 +143,11 @@ var
   Layout: ILayout;
   Error: string;
   Session: TMenuSession;
-  Kind: string;
+  Kind, Where: string;
 begin
   Result := False;
   Shown := False;
-  if not TakeNoted(Menu, Kind) or not Enabled or (ActiveSession <> nil) then
+  if not TakeNoted(Menu, Kind, Where) or not Enabled or (ActiveSession <> nil) then
   begin
     if Tracing then
       Log(Format('show %s (%d items): not noted, passed through', [Hex(Menu), GetMenuItemCount(Menu)]));
@@ -164,6 +169,8 @@ begin
   finally
     Session.Free;
   end;
+  if Where <> '' then
+    WriteLastRightClick(Where);   // the settings app's preview starts on it
   if Tracing then
     Log(Format('show %s closed, returned %d', [Hex(Menu), Integer(Result)]));
 end;
@@ -248,7 +255,7 @@ begin
   Result := (GetEnvironmentVariable('DEXMENU_EDITOR', Env, Length(Env)) > 0) and (Env[0] = '1');
 end;
 
-procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind: string);
+procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind, Where: string);
 var
   I: Integer;
 begin
@@ -261,15 +268,20 @@ begin
       begin
         Noted.Delete(I);
         NotedKinds.Delete(I);
+        NotedWhere.Delete(I);
       end;
     I := Noted.IndexOf(Menu);
     if I < 0 then
     begin
       Noted.Add(Menu);
       NotedKinds.Add(Kind);
+      NotedWhere.Add(Where);
     end
     else
+    begin
       NotedKinds[I] := Kind;
+      NotedWhere[I] := Where;
+    end;
   finally
     NotedLock.Leave;
   end;
@@ -281,6 +293,7 @@ initialization
   NotedLock := TCriticalSection.Create;
   Noted := TList<HMENU>.Create;
   NotedKinds := TList<string>.Create;
+  NotedWhere := TList<string>.Create;
   HooksLock := TCriticalSection.Create;
 
 end.

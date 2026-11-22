@@ -24,6 +24,9 @@ sealed class MainForm : Form
     readonly TextBox folderBox = new() { ReadOnly = true, Width = 230, PlaceholderText = "no folder: the seen items" };
     readonly Button folderButton = new() { Text = "Folder...", AutoSize = true };
     readonly Button noFolderButton = new() { Text = "x", Width = 24 };
+    readonly Button lastButton = new() { Text = "Last right-click", AutoSize = true };
+    bool applying;           // the bar set from the last right-click: its own change events wait
+    readonly bool startOnLast;   // no --kind given: the preview starts on the last right-click
     readonly ComboBox itemBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
     readonly Button itemsButton = new() { AutoSize = true };
     readonly CheckedListBox itemsList = new() { CheckOnClick = true, Width = 260, Height = 300, BorderStyle = BorderStyle.None };
@@ -50,6 +53,7 @@ sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         selftest = selftestFile;
         kind = kindArgument ?? DataFolder.SeenKinds().FirstOrDefault() ?? "file";
+        startOnLast = kindArgument is null;
         currentFile = DataFolder.LayoutFile;
         callback = Placed;
         split.Panel1.Controls.Add(web);
@@ -72,6 +76,7 @@ sealed class MainForm : Form
             if (preview != IntPtr.Zero) Native.DexmenuPreviewSetCallback(preview, callback);
             FitPreview();
             Watch();
+            if (startOnLast) ApplyLastRightClick();
             Reload();
         }
         var data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Dexmenu", "WebView2");
@@ -93,8 +98,11 @@ sealed class MainForm : Form
         if (!Kinds.Any(x => x.Kind == kind)) kind = "file";
         kindBox.SelectedIndex = Array.FindIndex(Kinds, x => x.Kind == kind);
         itemsDrop.Items.Add(new ToolStripControlHost(itemsList) { Padding = Padding.Empty, AutoSize = false, Size = itemsList.Size });
-        previewBar.Controls.AddRange([Text("Right-click on"), kindBox, Text("in"), folderBox, folderButton, noFolderButton, itemBox, itemsButton, liveError]);
-        kindBox.SelectedIndexChanged += (_, _) => { kind = Kinds[kindBox.SelectedIndex].Kind; FillItems(); Live(); Reload(); };
+        previewBar.Controls.AddRange([Text("Right-click on"), kindBox, Text("in"), folderBox, folderButton, noFolderButton, itemBox, itemsButton,
+            lastButton, liveError]);
+        kindBox.SelectedIndexChanged += (_, _) => { if (applying) return; kind = Kinds[kindBox.SelectedIndex].Kind; FillItems(); Live(); Reload(); };
+        lastButton.Click += (_, _) => ApplyLastRightClick();
+        lastButton.Enabled = DataFolder.LastRightClick() is not null;
         folderButton.Click += (_, _) =>
         {
             using var dialog = new FolderBrowserDialog { SelectedPath = folder ?? "", Description = "The folder in which the preview's right-click is" };
@@ -105,10 +113,35 @@ sealed class MainForm : Form
             Reload();
         };
         noFolderButton.Click += (_, _) => { folder = null; FillItems(); Live(); Reload(); };
-        itemBox.SelectedIndexChanged += (_, _) => { if (itemBox.Visible) { Live(); Reload(); } };
+        itemBox.SelectedIndexChanged += (_, _) => { if (itemBox.Visible && !applying) { Live(); Reload(); } };
         itemsButton.Click += (_, _) => itemsDrop.Show(itemsButton, 0, itemsButton.Height);
-        itemsList.ItemCheck += (_, _) => BeginInvoke(() => { ItemsButtonText(); Live(); Reload(); });
+        itemsList.ItemCheck += (_, _) => { if (!applying) BeginInvoke(() => { ItemsButtonText(); Live(); Reload(); }); };
         FillItems();
+    }
+
+    // The preview set to the last right-click Dexmenu showed its menu for (DataFolder.LastRightClick): its kind, its
+    // folder and the items right-clicked there, so the live menu is that right-click's.
+    void ApplyLastRightClick()
+    {
+        if (DataFolder.LastRightClick() is not { } last || !Kinds.Any(x => x.Kind == last.Kind) || !Directory.Exists(last.Folder)) return;
+        applying = true;
+        try
+        {
+            kind = last.Kind;
+            kindBox.SelectedIndex = Array.FindIndex(Kinds, x => x.Kind == kind);
+            folder = last.Folder;
+            FillItems();
+            var names = last.Items.Select(Path.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (itemBox.Visible)
+                for (var i = 0; i < itemBox.Items.Count; i++)
+                    if (names.Contains((string)itemBox.Items[i])) { itemBox.SelectedIndex = i; break; }
+            if (itemsButton.Visible)
+                for (var i = 0; i < itemsList.Items.Count; i++) itemsList.SetItemChecked(i, names.Contains((string)itemsList.Items[i]));
+            ItemsButtonText();
+        }
+        finally { applying = false; }
+        Live();
+        Reload();
     }
 
     // The items the kind right-clicks in the folder: files (a file), subfolders (a folder), both (several); the first
@@ -233,6 +266,7 @@ sealed class MainForm : Form
     void Reload()
     {
         if (selftest is not null) return;
+        lastButton.Enabled = DataFolder.LastRightClick() is not null;
         var text = FileText(out var source);
         var error = preview == IntPtr.Zero
             ? "DexmenuShell.dll did not make the preview"

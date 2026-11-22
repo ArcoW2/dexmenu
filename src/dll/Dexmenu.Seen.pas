@@ -29,6 +29,10 @@ procedure WriteSeen(const Kind: string; Items: TJSONArray);
 // "sometimes" items get SometimesData as their item data (TNode.Sometimes).
 function MenuFromSeen(const Text: string; out Error: string): HMENU;
 function SeenFolder: string;
+// A right-click as the settings app's preview can repeat it: { "kind", "folder", "items": [ paths ] }.
+function RightClickJson(const Kind, Folder: string; const Items: TArray<string>): string;
+// The last right-click Dexmenu showed its menu for, to <SeenFolder>\last.json (the preview starts on it).
+procedure WriteLastRightClick(const Json: string);
 
 implementation
 
@@ -43,6 +47,41 @@ begin
   if GetEnvironmentVariable('DEXMENU_SEEN_FOLDER', Env, MAX_PATH) > 0 then
     Exit(Env);
   Result := RoamingAppData + '\Dexmenu\seen';
+end;
+
+function RightClickJson(const Kind, Folder: string; const Items: TArray<string>): string;
+var
+  Root: TJSONObject;
+  List: TJSONArray;
+  Item: string;
+begin
+  Root := TJSONObject.Create;
+  try
+    Root.AddPair('kind', Kind);
+    Root.AddPair('folder', Folder);
+    List := TJSONArray.Create;
+    for Item in Items do
+      List.Add(Item);
+    Root.AddPair('items', List);
+    Result := Root.Format(2);
+  finally
+    Root.Free;
+  end;
+end;
+
+procedure WriteLastRightClick(const Json: string);
+var
+  Path: string;
+begin
+  try
+    ForceDirectories(SeenFolder);
+    Path := SeenFolder + '\last.json';
+    TFile.WriteAllText(Path + '.tmp', Json, TEncoding.UTF8);
+    MoveFileEx(PChar(Path + '.tmp'), PChar(Path), MOVEFILE_REPLACE_EXISTING);
+  except
+    on E: Exception do
+      Log('last right-click not written: ' + E.Message);
+  end;
 end;
 
 function SeenJson(Top: TNodes): TJSONArray;

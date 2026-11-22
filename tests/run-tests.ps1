@@ -299,6 +299,23 @@ if ($null -eq $live -or @(Names $live.items).Count -eq 0) { $problems += 'a fold
 $runs = @()
 Report 'the preview''s live menu: Windows'' real menu of a right-click in a folder' $runs $problems ''
 
+# The last right-click (seen\last.json, written by the DLL after its menu was shown), where the preview starts: a file
+# in the work folder right-clicked, its kind, folder and item recorded.
+$problems = @()
+$lastFile = Join-Path $env:DEXMENU_SEEN_FOLDER 'last.json'
+Remove-Item $lastFile -ErrorAction SilentlyContinue
+WithLeft '' {
+    $script:runs = @((Run @("$Work\a.txt") $true) | Add-Member -NotePropertyName Name -NotePropertyValue 'on, a file right-clicked' -PassThru)
+}
+if (-not (Test-Path $lastFile)) { $problems += 'no last right-click written' }
+else {
+    $last = Get-Content $lastFile -Raw -Encoding utf8 | ConvertFrom-Json
+    if ($last.kind -ne 'file' -or $last.folder -ne $Work -or @($last.items).Count -ne 1 -or $last.items[0] -ne "$Work\a.txt") {
+        $problems += "last right-click: kind '$($last.kind)', folder '$($last.folder)', items [$(@($last.items) -join '; ')]"
+    }
+}
+Report 'the last right-click recorded for the preview' $runs $problems ''
+
 # Registering for the current user from the settings app (Registration.cs), without restarting Explorer: unregistered,
 # then registered again (as the tests need it).
 function RegState {

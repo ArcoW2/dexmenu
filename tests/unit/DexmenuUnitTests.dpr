@@ -440,6 +440,7 @@ var
   Menu: HMENU;
   Error: string;
   Top: TNodes;
+  Last: TJSONObject;
 begin
   Check(Merged(ABC, ACD, True) = 'A,B*,C,D*', 'merged: an old item missing now kept after the one it followed, ' +
     'a new one marked: ' + Merged(ABC, ACD, True));
@@ -456,6 +457,14 @@ begin
     '[ {"name":"S","submenu":true,"items":[ {"name":"x"} ]} ]', True) = 'S[x,y*]', 'a submenu''s items merged too');
   Check(Merged('[ {"name":"Open"}, {"name":"Open"} ]', '[ {"name":"Open"} ]', True) = 'Open,Open*',
     'two items of one name: matched one to one');
+  Last := TJSONObject.ParseJSONValue(RightClickJson('several', 'C:\x', ['C:\x\a.txt', 'C:\x\b'])) as TJSONObject;
+  try
+    Check((Last.GetValue('kind').Value = 'several') and (Last.GetValue('folder').Value = 'C:\x') and
+      (TJSONArray(Last.GetValue('items')).Count = 2) and (TJSONArray(Last.GetValue('items')).Items[1].Value = 'C:\x\b'),
+      'the last right-click as text: kind, folder, items');
+  finally
+    Last.Free;
+  end;
   Menu := MenuFromSeen('{ "items": [ {"text":"A","name":"A"}, {"text":"B","name":"B","sometimes":true} ] }', Error);
   Top := ReadLevel(Menu, '');
   try

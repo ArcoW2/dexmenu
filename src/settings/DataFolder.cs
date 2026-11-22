@@ -37,8 +37,26 @@ static class DataFolder
     public static string[] SeenKinds() =>
         Directory.Exists(SeenFolder)
             ? new DirectoryInfo(SeenFolder).GetFiles("*.json").OrderByDescending(f => f.LastWriteTimeUtc)
-                .Select(f => Path.GetFileNameWithoutExtension(f.Name)).ToArray()
+                .Select(f => Path.GetFileNameWithoutExtension(f.Name)).Where(k => k != "last").ToArray()
             : [];
+
+    /// <summary>The last right-click Dexmenu showed its menu for (seen\last.json, written by the DLL): its kind, folder
+    /// and items; null when there is none or it cannot be read.</summary>
+    public static (string Kind, string Folder, string[] Items)? LastRightClick()
+    {
+        var path = Path.Combine(SeenFolder, "last.json");
+        try
+        {
+            if (!File.Exists(path)) return null;
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var r = doc.RootElement;
+            var kind = r.GetProperty("kind").GetString() ?? "";
+            var folder = r.GetProperty("folder").GetString() ?? "";
+            var items = r.TryGetProperty("items", out var list) ? list.EnumerateArray().Select(i => i.GetString() ?? "").ToArray() : [];
+            return kind.Length > 0 && folder.Length > 0 ? (kind, folder, items) : null;
+        }
+        catch (Exception e) when (e is IOException or JsonException or InvalidOperationException or KeyNotFoundException) { return null; }
+    }
 
     public static string ReadSeen(string kind)
     {

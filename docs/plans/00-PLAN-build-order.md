@@ -272,6 +272,12 @@ None.
   left, collapse all and expand all at the top (folding is not saved). Splitters between the rules, the cards and the
   card's panel, their widths kept in the page's storage. The self-test also parses editor.js. Not tested: the
   dragging, folding and splitters by hand.
+- The last right-click: the handler tells where a right-click is (the folder, the items on disk; nothing for what is
+  not on disk) and after Dexmenu's menu for it the DLL writes it to `seen\last.json`. The settings app, started
+  without `--kind`, sets the preview to it (kind, folder, items: the live menu of that right-click); "Last
+  right-click" above the preview goes back to it. Tested: a unit test (the text written); the app started on a
+  `last.json` written for the test: the preview shows that file's live menu; a suite case (a right-click writes it),
+  which needs bin's DLL registered, as the suite does.
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

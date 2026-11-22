@@ -15,6 +15,7 @@ type
   TDexmenuHandler = class(TComObject, IShellExtInit, IContextMenu)
   private
     FKind: string;   // the kind of right-click (KindOf)
+    FWhere: string;  // where (WhereOf), for the preview; '' when it has no folder on disk
   protected
     function IShellExtInit.Initialize = ShellInit;
     function ShellInit(pidlFolder: PItemIDList; lpdobj: IDataObject; hKeyProgID: HKEY): HResult; stdcall;
@@ -27,7 +28,7 @@ type
 implementation
 
 uses
-  System.Win.ComServ, Dexmenu.Hook;
+  System.SysUtils, System.Win.ComServ, Dexmenu.Hook, Dexmenu.Seen;
 
 // The kind of right-click (docs/plans/02-PLAN-own-menu.md 3.5): a folder's empty part (no items), several items, a
 // drive, a folder or a file; 'default' when it cannot be told.
@@ -64,12 +65,57 @@ begin
   end;
 end;
 
+// Where the right-click was, as files and folders on disk: the folder and the items right-clicked in it (none for a
+// folder's empty part). '' for anything not on disk (This PC, a library, a phone).
+function WhereOf(const Kind: string; pidlFolder: PItemIDList; DataObject: IDataObject): string;
+var
+  Items: IShellItemArray;
+  Item: IShellItem;
+  Count, I: DWORD;
+  Raw: Pointer;
+  Path: PWideChar;
+  Folder: array[0..MAX_PATH] of Char;
+  Paths: TArray<string>;
+begin
+  Result := '';
+  if DataObject = nil then
+  begin
+    if (pidlFolder <> nil) and SHGetPathFromIDList(pidlFolder, Folder) then
+      Result := RightClickJson(Kind, Folder, nil);
+    Exit;
+  end;
+  Raw := nil;
+  if Failed(SHCreateShellItemArrayFromDataObject(DataObject, IShellItemArray, Raw)) then
+    Exit;
+  Items := IShellItemArray(Raw);
+  IUnknown(Raw)._Release;   // the cast above took its own reference
+  if Failed(Items.GetCount(Count)) or (Count = 0) then
+    Exit;
+  SetLength(Paths, Count);
+  for I := 0 to Count - 1 do
+  begin
+    if Failed(Items.GetItemAt(I, Item)) or Failed(Item.GetDisplayName(SIGDN_FILESYSPATH, Path)) then
+      Exit;
+    Paths[I] := Path;
+    CoTaskMemFree(Path);
+  end;
+  if Kind = 'drive' then
+    Result := RightClickJson(Kind, Paths[0], nil)
+  else
+    Result := RightClickJson(Kind, ExtractFileDir(Paths[0]), Paths);
+end;
+
 function TDexmenuHandler.ShellInit(pidlFolder: PItemIDList; lpdobj: IDataObject; hKeyProgID: HKEY): HResult;
 begin
   try
     FKind := KindOf(lpdobj);
   except
     FKind := 'default';
+  end;
+  try
+    FWhere := WhereOf(FKind, pidlFolder, lpdobj);
+  except
+    FWhere := '';
   end;
   Result := S_OK;
 end;
@@ -79,7 +125,7 @@ begin
   try
     if FKind = '' then
       FKind := 'default';
-    NoteMenu(Menu, uFlags, FKind);
+    NoteMenu(Menu, uFlags, FKind, FWhere);
   except
     // never let an error reach the program building the menu
   end;
