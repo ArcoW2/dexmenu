@@ -35,7 +35,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Layout format | a layout is one menu (its lines); the Default layout; old files with a menu per kind converted | -- | 3.1 |
+| Layout format | a layout is one menu (its lines); the Default layout; the user's layouts kept, an old file read by its default menu | -- | 3.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
 | Open dialog | a right-click in an Open or Save dialog as kinds of their own (a file, a folder, several, an empty part, a drive in a dialog) | Kinds setting | 3.2 |
 | Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
@@ -55,9 +55,10 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - The same layout can serve several kinds (a file and several items), and each kind can have a layout of its own.
 - The Default layout: made on first start (`layouts\Default.json`), holding only the remaining card, and set for
   `default`, so every kind starts with it: Windows' menu as cards until the user changes it or sets other layouts.
-- Files of today's form (a section per kind, as "First"): their `default` section becomes the layout's one menu;
-  every other kind's section is saved as a layout of its own ("First - folder", "First - background"), set for no
-  kind, so nothing is lost and the user can set them in General. The file is converted once, on first start.
+- The user's layouts stay as they are on an update: no file is rewritten, none is made from another. A file of
+  today's form (a section per kind, as "First") is read by its `default` section as its one menu; its other kinds'
+  sections are ignored, and dropped when the user saves that layout. A menu for another kind is a layout the user
+  makes (New, or Copy).
 
 ### 3.2 Which layout a right-click gets
 
@@ -175,8 +176,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   and a narrow short window), and the window refusing to get smaller than a panel's minimum.
 - The suite: a right-click on a file and on a folder's empty part with two different layouts in `kinds`, each
   showing its own menu; a kind set to none showing Windows' menu; a right-click in an Open dialog with `dialog` set
-  showing that layout; the conversion of an old file (its default menu kept, the other kinds' sections as layouts of
-  their own); registration adds and removes the
+  showing that layout; an old file read by its default menu, the file itself unchanged until saved; registration
+  adds and removes the
   desktop's handler key; the desktop's empty part right-clicked in the test host gives the kind `desktop`.
 
 ## 4. Open questions
