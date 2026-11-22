@@ -35,8 +35,9 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Layout format | a layout is one menu (its lines); old files with a menu per kind converted | Open question 1 | 3.1 |
+| Layout format | a layout is one menu (its lines); the Default layout; old files with a menu per kind converted | -- | 3.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
+| Open dialog | a right-click in an Open or Save dialog as a choice of its own | Kinds setting; Open question 1 | 3.2 |
 | Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
 | Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
 | General panel | the registration line and buttons (Restart Explorer lit after a change); each kind of right-click with its layout (or none) | Main window | 3.4 |
@@ -52,18 +53,28 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   card), with `//` comments as now. It no longer has a section per kind of right-click (`file`, `folder`,
   `default`, ...).
 - The same layout can serve several kinds (a file and several items), and each kind can have a layout of its own.
-- Files of today's form (a section per kind, as "First"): Open question 1.
+- The Default layout: made on first start (`layouts\Default.json`), holding only the remaining card, and set for
+  `default`, so every kind starts with it: Windows' menu as cards until the user changes it or sets other layouts.
+- Files of today's form (a section per kind, as "First"): their `default` section becomes the layout's one menu;
+  every other kind's section is saved as a layout of its own ("First - folder", "First - background"), set for no
+  kind, so nothing is lost and the user can set them in General. The file is converted once, on first start.
 
 ### 3.2 Which layout a right-click gets
 
 - `%APPDATA%\Dexmenu\settings.json`: `"kinds": { "file": "First", "folder": "Folders", "background": "Empty part",
-  "default": "First" }`. `default` is used for every kind not listed; a kind set to none: Open question 2.
+  "default": "First" }`. `default` is used for every kind not listed. A kind set to `none` gets Windows' own menu: Dexmenu leaves that kind to
+  Windows.
 - The DLL (`Dexmenu.Layout.CurrentLayout`) takes the right-click's kind (as now, from the handler), looks it up in
   `kinds`, and reads that layout file (read again when it changes, as now). `DEXMENU_LAYOUT_FILE` stays for the
   tests: one layout for every kind.
 - `"layout"` in settings.json (today's "Make active") goes; on first start it becomes `"kinds": { "default": ... }`.
 - The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
-  other (`default`). More kinds (by file type, or by the program showing the menu): Open question 5.
+  other (`default`). No kinds by file type: one menu per type has no use seen.
+- An Open or Save dialog (`dialog`): a right-click there may want another menu than in Explorer (no "Open in new
+  window", fewer programs). In settings.json `"dialog"`, a layout (or `none`) used for every right-click inside an
+  Open or Save dialog, before the kinds; not set: the kinds as in Explorer. Per kind inside a dialog: Open
+  question 1. The handler tells a dialog by the window that shows the menu: its top window is a file dialog
+  (class `#32770` holding a shell view): [not yet checked] that this holds for every program's dialog.
 - The desktop's empty part (`desktop`): the handler is registered for it too (`DesktopBackground`, by
   `Registration.cs` and `register.ps1`, removed with the others); the handler tells it from a folder's empty part
   by its folder being the desktop. Its seen items, last right-click and live preview as for the other kinds; the
@@ -72,6 +83,10 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   folder's.
 
 ### 3.3 The main window
+
+- Only about Dexmenu itself, never inside a layout: the registration, which layout each kind uses, and the layouts
+  as files (new, copy, rename, delete). Editing a layout happens in its editor window (3.6), which knows only that
+  layout.
 
 - Two panels, General and Layouts. Each has a minimum width and height, set by Dexmenu: what its content needs, a
   list or table at least three rows (General: the registration and three kinds; Layouts: its buttons and three
@@ -104,7 +119,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - After Register or Unregister, Restart Explorer gets the focus and is lit (drawn as the main button, in the accent
   colour), with the line saying the change takes effect in Explorer after a restart. It stays lit until Explorer has
   restarted (from this button, or Explorer started again otherwise, which the app sees by Explorer's process).
-- Below it, one row per kind of right-click (3.2), each with a choice of the layouts (and none, Open question 2).
+- Below it, one row per kind of right-click (3.2), each with a choice of the layouts and None (Windows' own menu),
+  then a row "In an Open or Save dialog" with the layouts, None, and "as in Explorer" (not set).
 - A change is written to settings.json at once (no Save here); the DLL reads it at the next right-click.
 - Beside each row, Edit opens that layout's editor (3.6).
 
@@ -115,7 +131,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - Edit: opens the selected layout's editor.
 - Copy: a copy under a new name ("First copy", the name asked), not used by any kind yet.
 - Rename: the file renamed; the kinds using it follow (settings.json changed with it).
-- Delete: the file removed (to the recycle bin); a layout in use: Open question 3.
+- Delete: asks first; for a layout in use the question names the kinds using it and says they will be set to None
+  (Windows' own menu) when it is deleted. Then the file goes to the recycle bin and those kinds are set to `none`.
 
 ### 3.6 The editor window
 
@@ -146,19 +163,12 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   the priority list) and the remaining card refused. The three arrangements of the panels seen by hand (a wide, a narrow
   and a narrow short window), and the window refusing to get smaller than a panel's minimum.
 - The suite: a right-click on a file and on a folder's empty part with two different layouts in `kinds`, each
-  showing its own menu; the conversion of an old file (Open question 1); registration adds and removes the
+  showing its own menu; a kind set to none showing Windows' menu; a right-click in an Open dialog with `dialog` set
+  showing that layout; the conversion of an old file (its default menu kept, the other kinds' sections as layouts of
+  their own); registration adds and removes the
   desktop's handler key; the desktop's empty part right-clicked in the test host gives the kind `desktop`.
 
 ## 4. Open questions
 
-1. Today's layout files with a menu per kind (as "First"): split on first start into one layout per kind
-   ("First - file", "First - folder", ...) with `kinds` set to match, or keep only the `default` menu and drop the
-   others?
-2. A kind set to no layout: Windows' own menu for that kind (Dexmenu off for it)? Suggested: yes, so a kind can be
-   left to Windows.
-3. Delete a layout that kinds use: refuse until no kind uses it, or set those kinds to none (Windows' menu)?
-4. Does the main window need anything of the editor (a preview, the last right-click), or is it only the two
-   panels? Suggested: only those.
-5. More kinds: a layout per file type (images, video, audio, text, documents, or one extension such as `.zip`), or
-   per program showing the menu (Explorer, an Open dialog, Foldex)? The handler knows both. When several fit (an
-   image in an Open dialog), which wins?
+1. An Open or Save dialog: one layout for every right-click in it (as planned), or a layout per kind there too (a
+   file in a dialog, a folder's empty part in a dialog, ...)?
