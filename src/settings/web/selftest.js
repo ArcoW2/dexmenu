@@ -109,6 +109,21 @@
   check(titles(L.default) === "LexPen / Clip / Zip / Tools[Git | Rest]", "Rest beside Git: " + titles(L.default));
   check(!M.moveCardNext(L.default, id(L, "Tools"), id(L, "Git"), "before"), "a card not next to a card in its own menu");
 
+  // dividers: added, moved between lines and into a card's menu, deleted; ids of their own
+  L = sample();
+  const lineNames = lines => lines.map(e => e.divider !== undefined ? "D(" + e.divider + ")" : e.line.map(c => c.card).join("|")).join(" / ");
+  const dv = M.addDivider(L, L.default, null);
+  check(/^c\d+$/.test(dv.id) && lineNames(L.default) === "LexPen / Clip|Zip / Tools / Rest / D()", "a divider added at the end: " + lineNames(L.default));
+  dv.divider = "Programs";
+  check(M.moveDivider(L.default, dv.id, null, 1), "the divider moved before Clip's line");
+  check(lineNames(L.default) === "LexPen / D(Programs) / Clip|Zip / Tools / Rest", "between LexPen and Clip: " + lineNames(L.default));
+  check(M.moveDividerNext(L.default, dv.id, id(L, "Git"), "above"), "the divider moved above Git, in Tools' menu");
+  check(lineNames([...M.cards(L.default)].find(a => a.card.card === "Tools").card.menu) === "D(Programs) / Git", "in Tools' menu: first");
+  check(M.moveDivider(L.default, dv.id, null, 0) && lineNames(L.default) === "D(Programs) / LexPen / Clip|Zip / Tools / Rest", "back to the top: " + lineNames(L.default));
+  const ids2 = [...[...M.cards(L.default)].map(a => a.card.id), ...[...M.dividers(L.default)].map(d => d.entry.id)];
+  check(new Set(ids2).size === ids2.length, "a divider's id is not a card's");
+  check(M.deleteDivider(L.default, dv.id) && lineNames(L.default) === "LexPen / Clip|Zip / Tools / Rest", "the divider deleted");
+
   // the priority list
   L = sample();
   M.moveRule(L.default, 3, 0);

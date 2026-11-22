@@ -40,6 +40,23 @@ function cardIcon() {
   add("line", { x1: "3.5", y1: "6.5", x2: "8", y2: "6.5", stroke: "currentColor", "stroke-width": "1.3" });
   return svg;
 }
+// A divider's icon: a line with a short text in it.
+function dividerIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 14 10");
+  svg.setAttribute("class", "card-icon");
+  svg.setAttribute("aria-hidden", "true");
+  for (const [x1, x2] of [[0.5, 3.5], [10.5, 13.5]]) {
+    const l = document.createElementNS(ns, "line");
+    for (const [k, v] of Object.entries({ x1, y1: 5, x2, y2: 5, stroke: "currentColor", "stroke-width": "1.5" })) l.setAttribute(k, v);
+    svg.append(l);
+  }
+  const t = document.createElementNS(ns, "line");
+  for (const [k, v] of Object.entries({ x1: 5, y1: 5, x2: 9, y2: 5, stroke: "currentColor", "stroke-width": "3", "stroke-linecap": "round" })) t.setAttribute(k, v);
+  svg.append(t);
+  return svg;
+}
 const withIcon = (button, label) => { button.replaceChildren(cardIcon(), document.createTextNode(" " + label)); return button; };
 
 function el(tag, cls, text) {
@@ -89,24 +106,51 @@ function dropZone(cls, onDrop) {
   return z;
 }
 
-// The card being dropped: a card of the layout, or a new one ("+ Card" dragged: made now, at the end, then moved by
-// the drop like any card; taken out again when the drop cannot place it). place(id) moves it and says whether it did.
+// What is being dropped: a card or a divider of the layout, or a new one ("+ Card" or "+ Divider" dragged: made now, at
+// the end, then moved by the drop like any; taken out again when the drop cannot place it). place(id, isDivider)
+// moves it and says whether it did.
 function withDragged(e, place) {
-  let id = e.dataTransfer.getData("text/card");
+  const isDivider = e.dataTransfer.types.includes("text/divider");
+  let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
+  if (!id) return;
   const isNew = id === "new";
-  if (isNew) id = M.addCard(layout, linesOf(), null).id;
-  if (place(id)) {
+  if (isNew) id = isDivider ? M.addDivider(layout, linesOf(), null).id : M.addCard(layout, linesOf(), null).id;
+  if (place(id, isDivider)) {
     if (isNew) select(id, -1);
     changed();
     if (isNew) focusNew(id);
-  } else if (isNew) M.deleteCard(linesOf(), id);
+  } else if (isNew) isDivider ? M.deleteDivider(linesOf(), id) : M.deleteCard(linesOf(), id);
+}
+
+// A divider in the cards view: its text (or a plain line) where it will show; dragged, selected, deleted on hover.
+function renderDivider(entry) {
+  const box = el("div", "divider" + (entry.id === selectedId ? " selected" : "") + " align-" + (entry.align || "left"));
+  box.draggable = true;
+  box.dataset.id = entry.id;
+  box.append(el("span", "rule-line"), el("span", "text", entry.divider || ""), el("span", "rule-line"));
+  if (!entry.divider) box.classList.add("plain");
+  const actions = el("div", "card-actions");
+  const x = el("button", "", "x");
+  x.title = "Delete this divider";
+  x.addEventListener("click", e => { e.stopPropagation(); if (M.deleteDivider(linesOf(), entry.id)) { if (selectedId === entry.id) selectedId = null; changed(); } });
+  actions.append(x);
+  box.append(actions);
+  box.addEventListener("click", e => { e.stopPropagation(); select(entry.id, -1); });
+  box.addEventListener("mouseover", e => {
+    e.stopPropagation();
+    for (const h of document.querySelectorAll(".hot")) if (h !== box) h.classList.remove("hot");
+    box.classList.add("hot");
+  });
+  box.addEventListener("mouseleave", () => box.classList.remove("hot"));
+  box.addEventListener("dragstart", e => { e.stopPropagation(); e.dataTransfer.setData("text/divider", entry.id); });
+  return box;
 }
 
 // A card just added gets the focus: selected, scrolled into view, its name ready to be typed over. After the frame, as
 // the renders of the change come first and each makes the panel's fields anew.
 function focusNew(id) {
   requestAnimationFrame(() => {
-    document.querySelector(`#cards .card[data-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
+    document.querySelector(`#cards [data-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
     const name = $("card").querySelector("input[type=text]");
     if (name) { name.focus(); name.select(); }
   });
@@ -116,14 +160,17 @@ function addAndFocus(card) { select(card.id, -1); changed(); focusNew(card.id); 
 function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
-    box.append(dropZone("gap", id => M.moveCard(linesOf(), id, parentId, index)));
+    box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index) : M.moveCard(linesOf(), id, parentId, index)));
+    if (entry.divider !== undefined) { box.append(renderDivider(entry)); return; }
     if (!entry.line) return;
     const row = el("div", "line");
     for (const card of entry.line) row.append(renderCard(card));
-    row.append(dropZone("line-end", id => M.moveCard(linesOf(), id, parentId, index, true)));
+    row.append(dropZone("line-end", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index + 1)
+      : M.moveCard(linesOf(), id, parentId, index, true)));
     box.append(row);
   });
-  box.append(dropZone("gap", id => M.moveCard(linesOf(), id, parentId, lines.length)));
+  box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, lines.length)
+    : M.moveCard(linesOf(), id, parentId, lines.length)));
   return box;
 }
 
@@ -165,7 +212,7 @@ function renderCard(card) {
       if (!card.menu && !M.isRemaining(card)) box.classList.add("over");
       return;
     }
-    box.classList.add(zoneClass(dropZoneOf(box, e)));
+    box.classList.add(zoneClass(dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"))));
   });
   box.addEventListener("dragleave", e => { e.stopPropagation(); box.classList.remove(...zones); });
   box.addEventListener("drop", e => {
@@ -179,8 +226,9 @@ function renderCard(card) {
       if (placed) { selectedId = card.id; selectedRule = card.rules.indexOf(placed); post({ type: "mark", cardId: card.id }); changed(); }
       return;
     }
-    const zone = dropZoneOf(box, e);
-    withDragged(e, id => zone === "onto" ? M.dropOnCard(layout, linesOf(), id, card.id) : M.moveCardNext(linesOf(), id, card.id, zone));
+    const zone = dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"));
+    withDragged(e, (id, isDiv) => isDiv ? M.moveDividerNext(linesOf(), id, card.id, zone)
+      : zone === "onto" ? M.dropOnCard(layout, linesOf(), id, card.id) : M.moveCardNext(linesOf(), id, card.id, zone));
   });
   return box;
 }
@@ -222,9 +270,10 @@ function startRuleDrag(e, card, index) {
 
 // Where on a card a drop lands: its top or bottom edge, a line of its own above or below the card's line; its left or
 // right edge, beside it in its line; else onto it (it becomes a card with a menu).
-function dropZoneOf(box, e) {
+function dropZoneOf(box, e, divider = false) {
   const r = box.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
+  if (divider) return y < r.height / 2 ? "above" : "below";   // a divider goes between lines only
   const edgeY = Math.min(10, r.height / 4), edgeX = Math.max(14, r.width / 5);
   if (y < edgeY) return "above";
   if (y > r.height - edgeY) return "below";
@@ -359,6 +408,21 @@ function ruleEditor(card, rule, index) {
 }
 
 function renderCardPane() {
+  const div = selectedId ? M.findDivider(linesOf(), selectedId) : null;
+  if (div) {
+    // a divider: its text and where the text goes; its look (height, colours) comes with the themes
+    $("cardHeading").textContent = "A divider";
+    const box = $("card");
+    box.replaceChildren(textField("Text", div.entry.divider, v => { div.entry.divider = v; changed(); }, "(none: a plain line)"));
+    const row = el("label", "field");
+    const align = el("select");
+    for (const a of ["left", "center", "right"]) { const o = el("option", "", a); o.value = a; align.append(o); }
+    align.value = div.entry.align || "left";
+    align.addEventListener("change", () => { if (align.value === "left") delete div.entry.align; else div.entry.align = align.value; changed(); });
+    row.append(el("span", "", "Text aligned"), align);
+    box.append(row);
+    return;
+  }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
   if (!at) {
     $("cardHeading").textContent = "Card";
@@ -577,6 +641,15 @@ $("saveAs").addEventListener("click", async () => {
 });
 $("activate").addEventListener("click", () => post({ type: "activate", name: $("layouts").value }));
 withIcon($("addTop"), "+ Card");
+$("addDivider").replaceChildren(dividerIcon(), document.createTextNode(" + Divider"));
+$("addDivider").addEventListener("click", () => {
+  if (!layout) return;
+  const d = M.addDivider(layout, linesOf(), null);
+  select(d.id, -1);
+  changed();
+  focusNew(d.id);
+});
+$("addDivider").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(layout, linesOf(), null)); });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("collapseAll").addEventListener("click", () => {

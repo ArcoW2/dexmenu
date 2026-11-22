@@ -40,6 +40,7 @@ type
     Rule: TRule;        // vkItem: the rule that found it; nil for the remaining card's items
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
+    Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
     function Title: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
@@ -220,22 +221,28 @@ begin
     Inc(Result, L.Cards.Count);
 end;
 
-// No separator at the start or the end of a level, never two in a row.
+// No Windows separator at the start or the end of a level, never two separators in a row: a Windows separator next to
+// another separator or a layout's divider goes; the layout's dividers stay where the user put them.
 procedure CleanSeparators(Level: TViewLevel);
 var
   I: Integer;
   function IsSep(I: Integer): Boolean;
   begin
-    Result := (Level.Lines[I].Cards.Count = 1) and (Level.Lines[I].Cards[0].Kind = vkSeparator);
+    Result := (I >= 0) and (I < Level.Lines.Count) and (Level.Lines[I].Cards.Count = 1) and
+      (Level.Lines[I].Cards[0].Kind = vkSeparator);
+  end;
+  function IsWindows(I: Integer): Boolean;
+  begin
+    Result := IsSep(I) and (Level.Lines[I].Cards[0].Divider = nil);
   end;
 begin
   I := 0;
   while I < Level.Lines.Count do
-    if IsSep(I) and ((I = 0) or IsSep(I - 1)) then
+    if IsWindows(I) and ((I = 0) or IsSep(I - 1) or (IsSep(I + 1) and not IsWindows(I + 1))) then
       Level.Lines.Delete(I)
     else
       Inc(I);
-  while (Level.Lines.Count > 0) and IsSep(Level.Lines.Count - 1) do
+  while (Level.Lines.Count > 0) and IsWindows(Level.Lines.Count - 1) do
     Level.Lines.Delete(Level.Lines.Count - 1);
 end;
 
@@ -473,6 +480,14 @@ begin
   for Line in Lines do
   begin
     Out := nil;
+    if Line.IsDivider then
+    begin
+      V := TViewCard.Create;
+      V.Kind := vkSeparator;
+      V.Divider := Line;
+      NewLine(Result).Cards.Add(V);
+      Continue;
+    end;
     for Card in Line.Cards do
       if Card.Hidden and not Card.IsRemaining then
         Continue

@@ -301,6 +301,14 @@ None.
   hint on hover after Windows' hover time, in Windows' tooltip, just below the card (`src/dll/Dexmenu.Tip.pas`).
   Tested: unit tests (the text and regex forms, a hint kept by a merge, read back by path and name); `--live` gave
   real hints (Cut, Copy, the view's items, TortoiseGit's). Not tested: the tooltip showing, by hand.
+- Dividers (plan 02 3.4; their look with step 6): `{ "divider": "<text>" or true, "align": "left|center|right" }`
+  between lines, at any level; drawn as a thin line in the theme's separator colour, the text (when there is one)
+  left, in the middle or right with the line on the rest. The layout's dividers stay where they are; a Windows
+  separator next to one goes. Editor: "+ Divider" (icon) beside "+ Card", clicked (at the end) or dragged (a gap, a
+  line's end, a card's top or bottom half); a divider in the cards view is dragged, selected (its text and
+  alignment in the panel) and deleted on hover. Tested: unit tests (dividers placed, with and without text; the
+  Windows separator next to one); the editor's self-test (added, moved between lines and into a card's menu, ids,
+  deleted); the preview with dividers drawn (its dump).
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the
   priority list with a rule's problem) and its preview.
 - Not yet: by hand in Explorer; the preview's hover / click selecting a card has no automated test.

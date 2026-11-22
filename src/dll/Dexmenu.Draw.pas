@@ -53,6 +53,7 @@ const
   OuterPad = 4;
   ItemHeight = 30;
   SeparatorHeight = 9;
+  DividerTextHeight = 24;   // a divider with a text
   TextLeft = 36;
   MarkWidth = 28;
   MinWidth = 200;
@@ -64,7 +65,7 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log;
+  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Layout;
 
 const
   RRF_RT_REG_DWORD = $00000010;
@@ -157,7 +158,9 @@ begin
   begin
     Need := 0;
     for V in Line.Cards do
-      if V.Kind <> vkSeparator then
+      if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
+        Need := Need + TextWidth(V.Divider.DividerText, NormalFormat) + 48
+      else if V.Kind <> vkSeparator then
       begin
         if V.IsDefault then
           Fmt := BoldFormat
@@ -177,7 +180,11 @@ begin
     if N = 0 then
       Continue;
     if (N = 1) and (Line.Cards[0].Kind = vkSeparator) then
-      H := SeparatorHeight
+    begin
+      H := SeparatorHeight;
+      if (Line.Cards[0].Divider <> nil) and (Line.Cards[0].Divider.DividerText <> '') then
+        H := DividerTextHeight;
+    end
     else
       H := ItemHeight;
     CardW := (W - 2 * OuterPad) / N;
@@ -227,6 +234,31 @@ begin
     X := X + Gap;
   end;
   T.PopAxisAlignedClip;
+end;
+
+// A divider with a text: the text left, in the middle or right, the line on the rest of the width.
+procedure DrawDividerText(T: ID2D1RenderTarget; D: TLine; const R: TD2D1RectF; Y: Single; Line, Text: ID2D1SolidColorBrush);
+const
+  Pad = 8;
+  Gap = 6;
+var
+  W, X: Single;
+  Label_: string;
+begin
+  Label_ := D.DividerText;
+  W := Min(TextWidth(Label_, NormalFormat), R.right - R.left - 4 * Pad);
+  case D.DividerAlign of
+    daCenter: X := (R.left + R.right - W) / 2;
+    daRight: X := R.right - Pad - W;
+  else
+    X := R.left + Pad;
+  end;
+  if X - Gap > R.left + Pad then
+    T.DrawLine(D2D1PointF(R.left + Pad, Y), D2D1PointF(X - Gap, Y), Line, 1);
+  if X + W + Gap < R.right - Pad then
+    T.DrawLine(D2D1PointF(X + W + Gap, Y), D2D1PointF(R.right - Pad, Y), Line, 1);
+  T.DrawText(PWideChar(Label_), Length(Label_), NormalFormat, D2D1RectF(X, R.top, X + W + 1, R.bottom), Text,
+    D2D1_DRAW_TEXT_OPTIONS_CLIP);
 end;
 
 procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer; ScrollY, VisibleHeight: Single;
@@ -279,7 +311,10 @@ begin
     if V.Kind = vkSeparator then
     begin
       Y := Round((R.top + R.bottom) / 2) + 0.5;
-      T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1);
+      if (V.Divider = nil) or (V.Divider.DividerText = '') then
+        T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1)
+      else
+        DrawDividerText(T, V.Divider, R, Y, Sep, Dim);
       Continue;
     end;
     if Editing and V.Sometimes then

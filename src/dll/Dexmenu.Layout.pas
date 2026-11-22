@@ -54,9 +54,16 @@ type
     function IsRemaining: Boolean;
   end;
 
+  TDividerAlign = (daLeft, daCenter, daRight);
+
+  // A line of cards, or a divider between lines ({ "divider": "<text>" or true, "align": "left|center|right" }): a
+  // thin line, with its text where it has one. Its look comes with the themes (plan 03 3.8).
   TLine = class
   public
     Cards: TObjectList<TCard>;
+    IsDivider: Boolean;
+    DividerText: string;
+    DividerAlign: TDividerAlign;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -287,9 +294,24 @@ begin
       Error := Where + ': a line must be an object';
       Exit;
     end;
+    if TJSONObject(Entry).GetValue('divider') <> nil then
+    begin
+      Line := TLine.Create;
+      Lines.Add(Line);
+      Line.IsDivider := True;
+      if TJSONObject(Entry).GetValue('divider') is TJSONString then
+        Line.DividerText := TJSONObject(Entry).GetValue('divider').Value;
+      Line.DividerAlign := daLeft;
+      if TJSONObject(Entry).GetValue('align') is TJSONString then
+        if TJSONObject(Entry).GetValue('align').Value = 'center' then
+          Line.DividerAlign := daCenter
+        else if TJSONObject(Entry).GetValue('align').Value = 'right' then
+          Line.DividerAlign := daRight;
+      Continue;
+    end;
     LineCards := TJSONObject(Entry).GetValue('line');
     if LineCards = nil then
-      Continue;   // other kinds of line (divider, row, ...) come with later steps
+      Continue;   // other kinds of line (row, ...) come with later steps
     if not (LineCards is TJSONArray) then
     begin
       Error := Where + ': "line" must be a list of cards';

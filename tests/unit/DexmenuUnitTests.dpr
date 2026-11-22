@@ -182,6 +182,7 @@ begin
       if Line <> '' then
         Line := Line + ' | ';
       case V.Kind of
+        vkSeparator: if V.Divider <> nil then Line := Line + 'D:' + V.Divider.DividerText else Line := Line + '-';
         vkItem: Line := Line + 'I:' + V.Title;
         vkMenu: Line := Line + 'M:' + V.Title;
       else
@@ -461,6 +462,13 @@ begin
     'a hidden card with a menu: the rules in it still take their items');
   Expect(Shows('[ { "line": [ { "card": "Rest", "hidden": true, "rules": [ "remaining" ] } ] } ]'), AllRest,
     'the remaining card cannot be hidden');
+  // dividers from the layout: kept where they are (also first); a Windows separator next to one goes
+  Expect(Shows('[ { "divider": "Programs", "align": "left" }, ' + Card('X', '{ "name": { "equals": "Cut" } }') +
+    ', { "divider": true }, ' + Card('Y', '{ "name": { "equals": "Copy" } }') + ' ]'), 'D:Programs / I:Cut / D: / I:Copy',
+    'dividers, with a text and without, where the layout has them');
+  Expect(Shows('[ ' + Card('X', '{ "name": { "equals": "Open" } }') + ', { "divider": "Rest" }, ' + Rest + ' ]'),
+    'I:Open / D:Rest / I:Open with / - / I:Edit in LexPen / I:View in LexPen / I:Disabled thing / I:7-Zip / - / I:Cut / I:Copy / I:Delete / I:Properties',
+    'a divider before the remaining items; no Windows separator right after it');
 end;
 
 // The seen items merged (Dexmenu.Seen): names, '*' for "sometimes", a submenu's items in [ ], '-' a separator.

@@ -40,9 +40,28 @@ const LayoutModel = (() => {
     return all;
   }
 
+  // Every divider entry of some lines, depth first: { entry, lines, index, parent }. A divider: { id, divider: "<text>"
+  // or "", align: "left" | "center" | "right" }, between lines of cards.
+  function* dividers(lines, parent = null) {
+    for (let i = 0; i < lines.length; i++) {
+      const entry = lines[i];
+      if (entry.divider !== undefined) yield { entry, lines, index: i, parent };
+      if (entry.line) for (const card of entry.line) if (card.menu) yield* dividers(card.menu, card);
+    }
+  }
+  function allDividers(layout) {
+    const all = [];
+    for (const kind of Object.keys(layout)) if (Array.isArray(layout[kind])) for (const d of dividers(layout[kind])) all.push(d.entry);
+    return all;
+  }
+  function findDivider(lines, id) {
+    for (const d of dividers(lines)) if (d.entry.id === id) return d;
+    return null;
+  }
+
   function newId(layout) {
     let max = 0;
-    for (const c of allCards(layout)) { const m = /^c(\d+)$/.exec(c.id || ""); if (m) max = Math.max(max, +m[1]); }
+    for (const c of [...allCards(layout), ...allDividers(layout)]) { const m = /^c(\d+)$/.exec(c.id || ""); if (m) max = Math.max(max, +m[1]); }
     return "c" + (max + 1);
   }
 
@@ -51,7 +70,7 @@ const LayoutModel = (() => {
   function ensureIds(layout) {
     let next = +newId(layout).slice(1);
     const seen = new Set();
-    for (const c of allCards(layout)) {
+    for (const c of [...allCards(layout), ...allDividers(layout)]) {
       if (!c.id || seen.has(c.id)) c.id = "c" + next++;
       seen.add(c.id);
     }
@@ -241,6 +260,44 @@ const LayoutModel = (() => {
     return true;
   }
 
+  // ---- dividers ---------------------------------------------------------------------------------------------------
+
+  function addDivider(layout, lines, parentId) {
+    const entry = { id: newId(layout), divider: "" };
+    const level = parentId ? find(lines, parentId).card.menu : lines;
+    level.push(entry);
+    return entry;
+  }
+
+  function deleteDivider(lines, id) {
+    const d = findDivider(lines, id);
+    if (!d) return false;
+    d.lines.splice(d.index, 1);
+    return true;
+  }
+
+  // A divider moved to a level (parentId: a card with a menu, or null for the top) before the entry at lineIndex
+  // (counted before it was taken out), or to the level's end.
+  function moveDivider(lines, id, parentId, lineIndex) {
+    const d = findDivider(lines, id);
+    if (!d) return false;
+    const level = parentId ? (find(lines, parentId) || {}).card?.menu : lines;
+    if (!level) return false;
+    const anchors = level.slice(lineIndex).filter(e => e !== d.entry);
+    d.lines.splice(d.index, 1);
+    const survivor = anchors.find(a => level.includes(a));
+    const at = survivor ? level.indexOf(survivor) : level.length;
+    level.splice(at, 0, d.entry);
+    return true;
+  }
+
+  // A divider dropped on a card's top or bottom edge: just above or below that card's line.
+  function moveDividerNext(lines, id, targetCardId, side) {
+    const target = find(lines, targetCardId);
+    if (!target) return false;
+    return moveDivider(lines, id, target.parent ? target.parent.id : null, target.lineIndex + (side === "below" ? 1 : 0));
+  }
+
   // Deleting a card: never the remaining card; the last card of a submenu gives its rules to its parent, which becomes
   // a card with rules again (the reverse of dropping a card onto a card).
   function deleteCard(lines, id) {
@@ -304,5 +361,6 @@ const LayoutModel = (() => {
   }
 
   return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
-    addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard, addCard, makeMenu, remainingCount, withoutComments };
+    addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
+    dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, addCard, makeMenu, remainingCount, withoutComments };
 })();
