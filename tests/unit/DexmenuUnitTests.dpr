@@ -623,8 +623,8 @@ begin
     Card('Nothing', '{ "name": { "equals": "No such item" } }') + ' ]'), 'M:R / I:Cut',
     'a divider left last because the card after it found nothing: not shown');
   Expect(Shows('[ ' + RestMenu + ', ' + Card('X', '{ "name": { "equals": "Cut" } }') + ', { "divider": "Gone" }, ' +
-    Card('H', '{ "name": { "equals": "Copy" } }', ', "hidden": true') + ', { "divider": true } ]'), 'M:R / I:Cut / D:Gone',
-    'a hidden card is not shown, so it is no item after a divider (the plain divider after it goes as the last)');
+    Card('H', '{ "name": { "equals": "Copy" } }', ', "hidden": true') + ', { "divider": true } ]'), 'M:R / I:Cut',
+    'a hidden card is not shown, so it is no item after a divider: both dividers end up last and go');
 end;
 
 // The seen items merged (Dexmenu.Seen): names, '*' for "sometimes", a submenu's items in [ ], '-' a separator.

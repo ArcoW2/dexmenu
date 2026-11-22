@@ -204,9 +204,9 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
     A card's own submenu template is a `template` inside that card (`submenuTemplate`).
   - `divider`: between lines, with an optional label; its look (label alignment, height, background, colours) is
     plan 03 3.8.
-    Shown only where it divides something: one without a label is left out at the top or bottom of a level and
-    right after another divider or separator; one with a label is left out when another with a label follows it at
-    once. This is decided on what is shown, after cards that found nothing are gone (the menu and the preview).
+    Shown only where it divides something: any divider is left out at the bottom of a level; one without a label
+    also at the top and right after another divider or separator; one with a label also when another with a label
+    follows it at once. This is decided on what is shown, after cards that found nothing are gone (the menu and the preview).
   - `row`: items as icons in one line, the text as tooltip (Windows 11's Cut / Copy / Paste row).
   - `mostUsed`: the row of the items chosen most (3.9).
   - `search`: a box that filters all items as you type (3.6).

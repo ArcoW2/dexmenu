@@ -282,8 +282,8 @@ begin
 end;
 
 // No Windows separator at the start or the end of a level, never two separators in a row: a Windows separator next to
-// another separator or a layout's divider goes. A layout's divider without text goes at the start or the end of a
-// level or right after another separator; one with text goes when another with text follows it at once.
+// another separator or a layout's divider goes. A layout's divider goes at the end of a level; one without text also
+// at the start or right after another separator; one with text also when another with text follows it at once.
 procedure CleanSeparators(Level: TViewLevel);
 var
   I, Before: Integer;
@@ -317,7 +317,8 @@ begin
       Level.Lines.Delete(Level.Lines.Count - 1);
     I := 0;
     while I < Level.Lines.Count do
-      if (IsPlain(I) and ((I = 0) or (I = Level.Lines.Count - 1) or IsSep(I - 1))) or (IsTexted(I) and IsTexted(I + 1)) then
+      if (IsSep(I) and (I = Level.Lines.Count - 1)) or (IsPlain(I) and ((I = 0) or IsSep(I - 1))) or
+        (IsTexted(I) and IsTexted(I + 1)) then
         Level.Lines.Delete(I)
       else
         Inc(I);
