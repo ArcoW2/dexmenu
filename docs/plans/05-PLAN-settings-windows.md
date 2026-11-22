@@ -275,7 +275,7 @@ None.
   WebView2's preferred colour scheme (the pages' CSS follows `prefers-color-scheme`), the title bar (DWM dark mode)
   and the preview (`DexmenuSetTheme` in the DLL) for every window at once.
 - The editor's page fills its window with four panes: the rules, the cards, the selected card and the preview, with
-  the same splitters between them (a splitter changes only the pane on its left; minimums 160, 260, 200 and 300 CSS
+  the same splitters between them (a splitter changes only the pane on its left; minimums 320, 520, 400 and 300 CSS
   pixels; the preview takes the rest). The preview's bar (the kind, the folder, the item(s), Last right-click, "not
   meant for this kind") is page controls; the app keeps its state. The DLL's preview window is placed over the
   pane's area (the page reports where it is), so nothing of the page may float there (the items list opens inside

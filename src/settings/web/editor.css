@@ -30,9 +30,9 @@ header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border
 html, body { height: 100%; }
 body { display: flex; flex-direction: column; }
 #panes { flex: 1; min-height: 0; display: flex; }
-#panes > .pane { border-bottom: none; overflow: auto; min-width: 160px; box-sizing: border-box; }
-#cardsPane { min-width: 260px; }
-#cardPane { min-width: 200px; }
+#panes > .pane { border-bottom: none; overflow: auto; min-width: 320px; box-sizing: border-box; }
+#cardsPane { min-width: 520px; }
+#cardPane { min-width: 400px; }
 #previewPane { min-width: 300px; flex: 1.2 1 0; display: flex; flex-direction: column; overflow: hidden; }
 #previewBar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
 #previewBar .folder { color: var(--dim); overflow-wrap: anywhere; }

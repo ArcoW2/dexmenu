@@ -684,7 +684,7 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
 // window is too narrow for the kept widths, they shrink in proportion for now; the kept widths stay for a wider one.
 (() => {
   const key = "dexmenu.paneWidths";
-  const min = { rulesPane: 160, cardsPane: 260, cardPane: 200, previewPane: 300 };
+  const min = { rulesPane: 320, cardsPane: 520, cardPane: 400, previewPane: 300 };
   let wish = {};
   try { wish = JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) { /* no storage: default widths */ }
   const left = ["rulesPane", "cardsPane", "cardPane"];
@@ -695,11 +695,23 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
   function apply() {
     const w = {};
     for (const id of left) w[id] = wish[id] > 0 ? Math.max(min[id], wish[id]) : null;
-    const total = left.reduce((n, id) => n + (w[id] || $(id).getBoundingClientRect().width), 0);
-    const r = room();
-    if (total > r && left.some(id => w[id]))
-      for (const id of left) if (w[id]) w[id] = Math.max(min[id], w[id] * r / total);
+    // too wide for the window: the excess taken from what each kept width has above its minimum, in proportion (so
+    // no pane goes below its minimum and the total fits; the preview keeps its minimum)
+    const kept = left.filter(id => w[id]);
+    const others = left.filter(id => !w[id]).reduce((n, id) => n + min[id], 0);   // the panes without a kept width
+    const excess = kept.reduce((n, id) => n + w[id], 0) + others - room();
+    if (excess > 0) {
+      const slack = kept.reduce((n, id) => n + (w[id] - min[id]), 0);
+      for (const id of kept) w[id] = slack > excess ? w[id] - excess * (w[id] - min[id]) / slack : min[id];
+    }
     for (const id of left) set(id, w[id]);
+    // what is still too wide when laid out (rounding, a pane's own content): taken off the kept widths too
+    const over = $("panes").scrollWidth - $("panes").clientWidth;
+    if (over > 0)
+      for (const id of kept) {
+        const take = Math.min(over, w[id] - min[id]);
+        if (take > 0) { set(id, w[id] - take); break; }
+      }
   }
 
   for (const splitter of document.querySelectorAll("#panes > .splitter")) {

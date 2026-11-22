@@ -128,7 +128,9 @@ static class Pages
 
     public static async Task Start(WebView2 web, string page, Action<string> received, Action loaded)
     {
-        var data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Dexmenu", "WebView2");
+        // DEXMENU_WEBVIEW_DATA: a WebView2 data folder of its own (the tests: no stored pane widths of the user's)
+        var data = Environment.GetEnvironmentVariable("DEXMENU_WEBVIEW_DATA") is { Length: > 0 } own ? own
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Dexmenu", "WebView2");
         environment ??= CoreWebView2Environment.CreateAsync(null, data);
         await web.EnsureCoreWebView2Async(await environment);
         WebFiles.Serve(web.CoreWebView2);

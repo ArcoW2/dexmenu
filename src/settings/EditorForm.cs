@@ -103,12 +103,12 @@ sealed class EditorForm : Form, IThemed
 
     async Task Start()
     {
-        // The window's minimum: the page's four panes at their minimum (rules 160, cards 260, the card's panel 200, the
+        // The window's minimum: the page's four panes at their minimum (rules 320, cards 520, the card's panel 400, the
         // preview 300 CSS pixels, with the splitters), in the display's scale; the starting size within the screen.
         var scale = DeviceDpi / 96.0;
-        MinimumSize = SizeFromClientSize(new Size((int)Math.Ceiling(940 * scale), (int)(520 * scale)));
+        MinimumSize = SizeFromClientSize(new Size((int)Math.Ceiling(1560 * scale), (int)(520 * scale)));
         var screen = Screen.FromControl(this).WorkingArea;
-        Size = new Size(Math.Min(screen.Width, Math.Max(MinimumSize.Width, (int)(1500 * scale))),
+        Size = new Size(Math.Min(screen.Width, Math.Max(MinimumSize.Width, (int)(1800 * scale))),
             Math.Min(screen.Height, Math.Max(MinimumSize.Height, (int)(820 * scale))));
         CenterToScreen();
         if (selftest is null)
