@@ -41,7 +41,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Main window | the panels General and Layouts, each with a minimum size: side by side, stacked or as tabs by what fits; the window not smaller than one panel | Kinds setting | 3.3 |
 | General panel | the registration line and buttons (Restart Explorer lit after a change); each kind of right-click with its layout (or none) | Main window | 3.4 |
 | Layouts panel | the list; New..., Edit, Copy, Rename, Delete | Main window | 3.5 |
-| Editor window | one layout: name, Save, Save as..., Close; the panes and preview of today | Layouts panel | 3.6 |
+| Editor window | one layout: name, Save, Save as..., Close (asks to save); the panes and preview; every kind in the preview, marked when not meant for it; several windows, cards and rules copied or moved between them | Layouts panel | 3.6 |
 | Tests | 3.7 | -- | 3.7 |
 
 ## 3. Details
@@ -63,7 +63,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   tests: one layout for every kind.
 - `"layout"` in settings.json (today's "Make active") goes; on first start it becomes `"kinds": { "default": ... }`.
 - The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
-  other (`default`). More kinds (by file type, or by the program showing the menu): Open question 7.
+  other (`default`). More kinds (by file type, or by the program showing the menu): Open question 5.
 - The desktop's empty part (`desktop`): the handler is registered for it too (`DesktopBackground`, by
   `Registration.cs` and `register.ps1`, removed with the others); the handler tells it from a folder's empty part
   by its folder being the desktop. Its seen items, last right-click and live preview as for the other kinds; the
@@ -115,26 +115,35 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - Edit: opens the selected layout's editor.
 - Copy: a copy under a new name ("First copy", the name asked), not used by any kind yet.
 - Rename: the file renamed; the kinds using it follow (settings.json changed with it).
-- Delete: the file removed (to the recycle bin); a layout in use: Open question 5.
+- Delete: the file removed (to the recycle bin); a layout in use: Open question 3.
 
 ### 3.6 The editor window
 
-- One layout. Its title names it: "Dexmenu - First".
-- At the top: the name (editable; a change renames on Save, as Rename does), Save, Save as... and Close. Close with
-  unsaved changes: Open question 4.
+- One layout. Its title names it: "Dexmenu - `layout name`".
+- At the top: the name (editable; a change renames on Save, as Rename does), Save, Save as... and Close.
+- Closing the window (Close, or the window's own close) with unsaved changes asks whether to save them: Yes (save,
+  then close), No (close without saving), Cancel (stay open).
 - Below: today's panes (rules, cards, the selected card) and the preview with its bar ("Right-click on", the folder,
-  the item, Last right-click). The kind chosen there is only what the preview shows; it starts on a kind that uses
-  this layout.
+  the item, Last right-click). A layout can serve several kinds, so the kind stays a choice there, and every kind
+  can be chosen: the kind is only what the preview shows. It starts on a kind that uses this layout. A kind this
+  layout is not set for in General shows a small text above the preview: "This layout is not meant for this kind".
 - Gone from the editor: the layout choice in its header, Make active, "This kind of right-click uses the default
   layout" and Give it its own.
-- Several editor windows at once: Open question 3.
+- Several editor windows at once, one per layout (Edit on a layout already open brings its window to the front), so
+  cards, dividers and rules can be copied or moved from one layout to another: dragged between the windows (a move;
+  with Shift a copy, as rules between cards now), and copied with Ctrl+C / Ctrl+V as a fallback. Whether WebView2
+  carries a drag with the editor's own data types from one window to another: [not yet checked]; if not, only
+  Ctrl+C / Ctrl+V (the item as JSON on the clipboard).
+- A card copied into another layout gets a new id there; a rule copied gets a place at the end of that layout's
+  priority list; the remaining card is never copied or moved (each layout has its own).
 
 ### 3.7 Tests
 
 - The DLL's unit tests: a right-click's layout from `kinds` (a listed kind, `default` for the rest, none);
   read again when settings.json changes.
 - The settings app: its self-test extended with the main page's operations (the kinds written, rename following,
-  copy, delete); the editor's self-test as now. The three arrangements of the panels seen by hand (a wide, a narrow
+  copy, delete); the editor's self-test as now, plus a card and a rule copied into another layout (new id, end of
+  the priority list) and the remaining card refused. The three arrangements of the panels seen by hand (a wide, a narrow
   and a narrow short window), and the window refusing to get smaller than a panel's minimum.
 - The suite: a right-click on a file and on a folder's empty part with two different layouts in `kinds`, each
   showing its own menu; the conversion of an old file (Open question 1); registration adds and removes the
@@ -147,11 +156,9 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
    others?
 2. A kind set to no layout: Windows' own menu for that kind (Dexmenu off for it)? Suggested: yes, so a kind can be
    left to Windows.
-3. May several layouts be open in editor windows at once, or one editor window at a time?
-4. Close with unsaved changes: ask Save / Discard / Cancel? Suggested: yes.
-5. Delete a layout that kinds use: refuse until no kind uses it, or set those kinds to none (Windows' menu)?
-6. Does the main window need anything of the editor (a preview, the last right-click), or is it only the two
+3. Delete a layout that kinds use: refuse until no kind uses it, or set those kinds to none (Windows' menu)?
+4. Does the main window need anything of the editor (a preview, the last right-click), or is it only the two
    panels? Suggested: only those.
-7. More kinds: a layout per file type (images, video, audio, text, documents, or one extension such as `.zip`), or
+5. More kinds: a layout per file type (images, video, audio, text, documents, or one extension such as `.zip`), or
    per program showing the menu (Explorer, an Open dialog, Foldex)? The handler knows both. When several fit (an
    image in an Open dialog), which wins?
