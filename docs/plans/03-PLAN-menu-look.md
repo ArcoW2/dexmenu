@@ -235,7 +235,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - **`<<`:** the first line of a `replace` submenu, with the path of the levels above it.
 - **Dexmenu's own cards** ("Edit menu...", "Windows' menu", plan 02 3.6, 3.11; later the command cards of plan 06):
   cards the layout places, with an icon of their own from the theme (a glyph each) where the layout gives none;
-  until then they show their first letter, as any card without an icon (plan 02 3.8).
+  until then they show no icon, as any card without one (plan 02 3.8).
 
 ### 3.9 Submenu panels
 

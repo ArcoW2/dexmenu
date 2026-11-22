@@ -78,6 +78,7 @@ const
   ChevronGlyph = #$E76C;   // Segoe MDL2 Assets: ChevronRight
   GlyphFont = 'Segoe MDL2 Assets';
   IconSize = 16;   // an icon's size (DIP), in the slot left of the text
+  ShortcutGap = 16;   // between a title and its shortcut
   TextFont = 'Segoe UI';
 
 function RegGetValueW(Key: HKEY; SubKey, Value: PWideChar; Flags: DWORD; ValueType: PDWORD; Data: Pointer;
@@ -89,7 +90,7 @@ var
   DWrite: IDWriteFactory;
   NormalFormat, BoldFormat, GlyphFormat: IDWriteTextFormat;
   IconFormat: IDWriteTextFormat;     // a layout card's glyph icon (Segoe Fluent Icons, else Segoe MDL2 Assets)
-  LetterFormat: IDWriteTextFormat;   // the first letter where an item has no icon
+  ShortcutFormat: IDWriteTextFormat; // an item's shortcut ("Ctrl+X"), at the right
   DrawScale: Single = 1;             // the scale of the level being drawn: a file's icon is read at its pixel size
   NoteFormat: IDWriteTextFormat;   // a note card's text: wraps, from the top (plan 02 3.3)
 
@@ -150,11 +151,11 @@ begin
 end;
 
 // The icon in the slot left of a card's text (plan 02 3.8), the first there is: the layout card's own (a glyph, or an
-// icon in a file), the item's own bitmap, else the title's first letter.
+// icon in a file), the item's own bitmap, in the preview the one kept for it; else none.
 procedure DrawIcon(T: ID2D1RenderTarget; V: TViewCard; const R: TD2D1RectF; Brush, Dim: ID2D1SolidColorBrush;
   Editing: Boolean);
 var
-  Spec, Glyph, Title: string;
+  Spec, Glyph: string;
   Pixels: TIconPixels;
   Slot: TD2D1RectF;
   CX, CY: Single;
@@ -184,9 +185,6 @@ begin
     DrawPixels(T, Pixels, CX, CY);
     Exit;
   end;
-  Title := Trim(V.Title);
-  if Title <> '' then
-    T.DrawText(PWideChar(UpperCase(Copy(Title, 1, 1))), 1, LetterFormat, Slot, Dim);
 end;
 
 function MakeFormat(const Family: string; Weight: DWRITE_FONT_WEIGHT; Size: Single; Center: Boolean): IDWriteTextFormat;
@@ -221,7 +219,8 @@ begin
     BoldFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_SEMI_BOLD, FontSize, False);
     GlyphFormat := MakeFormat(GlyphFont, DWRITE_FONT_WEIGHT_NORMAL, 10, True);
     IconFormat := MakeFormat(IconFont, DWRITE_FONT_WEIGHT_NORMAL, IconSize, True);
-    LetterFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_SEMI_BOLD, FontSize, True);
+    ShortcutFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, FontSize, False);
+    ShortcutFormat.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
     DWrite.CreateTextFormat(PWideChar(TextFont), nil, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
       DWRITE_FONT_STRETCH_NORMAL, FontSize, 'en-us', NoteFormat);
     NoteFormat.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
@@ -340,6 +339,8 @@ begin
         else
           Fmt := NormalFormat;
         Need := Need + TextLeft + TextWidth(V.Title, Fmt) + MarkWidth + 8;
+        if V.Shortcut <> '' then
+          Need := Need + TextWidth(V.Shortcut, ShortcutFormat) + ShortcutGap;
       end;
     W := Max(W, Need + 2 * OuterPad);
   end;
@@ -448,7 +449,11 @@ var
   NoteText: IDWriteTextLayout;
   Fmt: IDWriteTextFormat;
   Brush: ID2D1SolidColorBrush;
-  Y: Single;
+  Y, TitleRight: Single;
+  Shortcut: string;
+  Access: Integer;
+  TitleLayout: IDWriteTextLayout;
+  Range: TDwriteTextRange;
 begin
   if Look.Dark then
   begin
@@ -535,8 +540,27 @@ begin
     else
       Fmt := NormalFormat;
     Title := V.Title;
-    if Title <> '' then
-      T.DrawText(PWideChar(Title), Length(Title), Fmt, D2D1RectF(R.left + TextLeft, R.top, R.right - MarkWidth,
+    // the shortcut Windows' text gives ("Ctrl+X"), dim, at the right before the mark; the title stops short of it
+    TitleRight := R.right - MarkWidth;
+    Shortcut := V.Shortcut;
+    if Shortcut <> '' then
+    begin
+      T.DrawText(PWideChar(Shortcut), Length(Shortcut), ShortcutFormat, D2D1RectF(R.left + TextLeft, R.top,
+        R.right - MarkWidth, R.bottom), Dim, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      TitleRight := Max(R.left + TextLeft, TitleRight - TextWidth(Shortcut, ShortcutFormat) - ShortcutGap);
+    end;
+    // the access key (the letter Windows' text marks with "&") underlined: that key picks the item
+    Access := V.AccessIndex;
+    if (Title <> '') and (Access >= 0) and Succeeded(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt,
+      Max(1, TitleRight - R.left - TextLeft), R.bottom - R.top, TitleLayout)) then
+    begin
+      Range.startPosition := Access;
+      Range.length := 1;
+      TitleLayout.SetUnderline(True, Range);
+      T.DrawTextLayout(D2D1PointF(R.left + TextLeft, R.top), TitleLayout, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+    end
+    else if Title <> '' then
+      T.DrawText(PWideChar(Title), Length(Title), Fmt, D2D1RectF(R.left + TextLeft, R.top, TitleRight,
         R.bottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
   end;
   T.PopAxisAlignedClip;
@@ -633,7 +657,7 @@ finalization
   Pointer(BoldFormat) := nil;
   Pointer(GlyphFormat) := nil;
   Pointer(IconFormat) := nil;
-  Pointer(LetterFormat) := nil;
+  Pointer(ShortcutFormat) := nil;
   Pointer(NoteFormat) := nil;
   Pointer(DWrite) := nil;
   Pointer(D2D) := nil;

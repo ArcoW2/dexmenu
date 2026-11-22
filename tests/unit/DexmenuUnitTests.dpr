@@ -265,7 +265,7 @@ begin
   Add(Result, '7-Zip', False, Zip);
   Add(Result, '-');
   Add(Result, 'Cu&t');
-  Add(Result, '&Copy');
+  Add(Result, '&Copy'#9'Ctrl+C');
   Add(Result, '&Delete');
   Add(Result, 'P&roperties');
 end;
@@ -664,6 +664,53 @@ begin
   end;
 end;
 
+// The access key and the shortcut of an item (plan 02 3.6): "Cu&t" underlines its t; a text after a tab is shown.
+procedure TestAccessAndShortcut;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  N: TNode;
+  V: TViewCard;
+  C: TCard;
+  CutIndex, CopyIndex: Integer;
+  CopyShortcut, CutShortcut: string;
+begin
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  V := TViewCard.Create;
+  C := TCard.Create;
+  try
+    V.Kind := vkItem;
+    CutIndex := -2;
+    CopyIndex := -2;
+    for N in Top do
+    begin
+      V.Node := N;
+      if N.Name = 'Cut' then
+      begin
+        CutIndex := V.AccessIndex;
+        CutShortcut := V.Shortcut;
+      end;
+      if N.Name = 'Copy' then
+      begin
+        CopyIndex := V.AccessIndex;
+        CopyShortcut := V.Shortcut;
+      end;
+    end;
+    Check((CutIndex = 2) and (CutShortcut = ''), 'Cu&t: its t is the access key, no shortcut');
+    Check((CopyIndex = 0) and (CopyShortcut = 'Ctrl+C'), '&Copy<tab>Ctrl+C: C the access key, Ctrl+C the shortcut');
+    C.ShownTitle := 'Duplicate';
+    V.Card := C;
+    Check(V.AccessIndex = -1, 'a title of the layout''s own: no access key underlined');
+  finally
+    V.Card := nil;
+    C.Free;
+    V.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 procedure TestSubmenuModes;
 var
   C: TCard;
@@ -1016,6 +1063,7 @@ begin
   TestUsage;
   TestIcons;
   TestKeptIcons;
+  TestAccessAndShortcut;
   TestSubmenuModes;
   TestSeen;
   if Failures = 0 then

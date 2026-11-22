@@ -51,6 +51,11 @@ type
     // The layout card's own icon ("icon") where it is this card's: a card with a menu, or the items a card places
     // (not the remaining card's: each its own); '' otherwise.
     function IconSpec: string;
+    // The access key in the title: the index (0-based) of the letter Windows' text marks with "&", when the title is
+    // the item's own text; -1 otherwise.
+    function AccessIndex: Integer;
+    // The shortcut Windows' text gives after a tab ("Ctrl+X"); '' for none.
+    function Shortcut: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
     function Checked: Boolean;
@@ -167,6 +172,52 @@ begin
 end;
 
 // ---- the view ------------------------------------------------------------------------------------------------------
+
+function TViewCard.AccessIndex: Integer;
+var
+  T, Name: string;
+  I, At: Integer;
+begin
+  Result := -1;
+  if (Kind <> vkItem) or (Node = nil) or not Node.Item.HasText or (Title <> Node.Name) then
+    Exit;
+  T := Node.Item.Text;
+  Name := '';
+  At := -1;
+  I := 1;
+  while (I <= Length(T)) and (T[I] <> #9) do
+  begin
+    if (T[I] = '&') and (I < Length(T)) and (T[I + 1] <> '&') then
+    begin
+      if At < 0 then
+        At := Length(Name);
+      Inc(I);
+      Continue;
+    end;
+    if T[I] = '&' then
+      Inc(I);
+    if I <= Length(T) then
+      Name := Name + T[I];
+    Inc(I);
+  end;
+  if At < 0 then
+    Exit;
+  At := At - (Length(Name) - Length(TrimLeft(Name)));   // the name is trimmed (Dexmenu.Menus.NameOf)
+  if (At >= 0) and (At < Length(Title)) then
+    Result := At;
+end;
+
+function TViewCard.Shortcut: string;
+var
+  P: Integer;
+begin
+  Result := '';
+  if (Kind <> vkItem) or (Node = nil) or not Node.Item.HasText then
+    Exit;
+  P := Pos(#9, Node.Item.Text);
+  if P > 0 then
+    Result := Trim(Copy(Node.Item.Text, P + 1, MaxInt));
+end;
 
 function TViewCard.IconSpec: string;
 begin
