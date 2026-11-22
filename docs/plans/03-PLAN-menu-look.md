@@ -47,6 +47,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
 | Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
 | Other elements | icon row, search box, most used row, `<<` | Card | 3.8 |
+| Own cards' icons | an icon of their own for Dexmenu's own cards ("Edit menu...", "Windows' menu", command cards) where the layout gives none | Theme files | 3.8 |
 | Submenu panels | next, under, replace: where they appear and how they look | Card; plan 02 Submenus | 3.9 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window; Card | 3.4 |
 | Preview marks | striped unavailable items, new | Card; plan 02 Preview | 3.10 |
@@ -220,7 +221,9 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - **Search box:** a text field at the top (or where the layout puts it), shown when typing starts if the layout has
   none (plan 02 3.6); matches marked in the titles.
 - **`<<`:** the first line of a `replace` submenu, with the path of the levels above it.
-- **"Edit menu..." and "Windows' menu":** plain items at the end, as the layout and settings say (plan 02 3.6, 3.11).
+- **Dexmenu's own cards** ("Edit menu...", "Windows' menu", plan 02 3.6, 3.11; later the command cards of plan 06):
+  cards the layout places, with an icon of their own from the theme (a glyph each) where the layout gives none;
+  until then they show their first letter, as any card without an icon (plan 02 3.8).
 
 ### 3.9 Submenu panels
 
