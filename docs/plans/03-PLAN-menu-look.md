@@ -36,6 +36,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 
 | Part | What | Reference |
 |---|---|---|
+| Engine | Direct2D and DirectWrite in the DLL (`Dexmenu.Draw`): solid and gradient brushes, rounded boxes, text and text layouts, bitmaps (icons), stripes; drawing into a layered window (the menu) or an image in memory (the preview, the screenshots); image files come with Menu window | 3.1 |
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
@@ -44,7 +45,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Engine | Direct2D and DirectWrite in the DLL: brushes, rounded rectangles, text, images, stripes; drawing into a window or an image | plan 01 Delphi DLL | 3.1 |
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
 | Menu window | popup, corners, shadow, border, background image, placement, scrolling | Engine | 3.4 |
 | Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
