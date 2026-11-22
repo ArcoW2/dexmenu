@@ -12,6 +12,7 @@ uses
   Dexmenu.Layout in 'Dexmenu.Layout.pas',
   Dexmenu.Tree in 'Dexmenu.Tree.pas',
   Dexmenu.Place in 'Dexmenu.Place.pas',
+  Dexmenu.Icons in 'Dexmenu.Icons.pas',
   Dexmenu.Draw in 'Dexmenu.Draw.pas',
   Dexmenu.Seen in 'Dexmenu.Seen.pas',
   Dexmenu.Usage in 'Dexmenu.Usage.pas',

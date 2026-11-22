@@ -12,6 +12,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: use counts and the most used row.
 - 2026-11-22: partly executed: the text size (Ctrl+scroll).
 - 2026-11-22: partly executed: the use counts in the editor.
+- 2026-11-22: partly executed: icons (the layout's, the item's own bitmap, the first letter).
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -56,6 +57,7 @@ the preview is the result.
 | Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, "Windows' menu" and "Edit menu..." at the end, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
 | Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider; in the editor every card's count in the cards view's gutter (a card with a menu: the sum of what is in it); none on the preview | 3.9 |
 | Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
+| Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else the title's first letter; set in the editor's card panel | 3.8 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -63,7 +65,8 @@ the preview is the result.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | -- | 3.8 |
+| Icons in the preview | every right-click saves the icons of the items it shows (PNG files next to the seen items), the preview draws them | Icons | 3.8 |
+| Explorer's own icons | Explorer asked to draw its owner-drawn items into Dexmenu's memory, the icon cut out; first a probe in Explorer | Icons | 3.8 |
 | Default layouts | the suggested layouts shipped, A the default | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
@@ -308,13 +311,18 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   accent colour. A right-click needs no other process.
 - A window of Dexmenu's own replaces the show call: the hook runs its own message loop until a choice or close, so
   the program waits as it does for Windows' menu.
-- Icons, the first one there is:
-  - the layout's own icon for the card (a file and index, or a glyph of Segoe Fluent Icons);
+- Icons, in a slot left of the text, the first one there is:
+  - the layout's own icon for the card, `"icon"`: a glyph of Segoe Fluent Icons by its code point in hex (`"E8C8"`;
+    Segoe MDL2 Assets where Fluent is missing) or an icon in a file (`"%SystemRoot%\\System32\\shell32.dll,4"` in the JSON); on a
+    card with a menu and on every item a card places, not on the remaining card's items;
   - the item's own bitmap where Windows' menu has one (most extensions' items outside Explorer);
   - in Explorer's full menu, where Explorer draws every item itself (plan 01 6.2) and there is no bitmap to read:
     Explorer asked to draw the item into Dexmenu's memory (`WM_MEASUREITEM` / `WM_DRAWITEM` to the owner window) and
     the icon cut out of it: [not yet checked] whether it works;
-  - otherwise the first letter.
+  - otherwise the first letter of its title.
+  A checked item shows its check mark in the slot instead.
+- The preview draws the items' own icons too: every right-click saves the icons of the items it shows, as PNG files
+  next to the seen items, keyed by the item's path and text (as the use counts, 3.9); the preview reads them.
 - One drawing engine for the menu and its preview. The settings app (plan 01 3.7, .NET 10 and WebView2) loads the same
   DLL and gives it a window of its own next to the editor; the DLL draws the menu there from the seen items (plan 01
   3.6) and the layout being edited, and draws it again on every change. The preview is the real window, live: hover,

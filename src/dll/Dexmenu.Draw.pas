@@ -70,13 +70,14 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log;
+  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Icons;
 
 const
   RRF_RT_REG_DWORD = $00000010;
   CheckGlyph = #$E73E;     // Segoe MDL2 Assets: CheckMark
   ChevronGlyph = #$E76C;   // Segoe MDL2 Assets: ChevronRight
   GlyphFont = 'Segoe MDL2 Assets';
+  IconSize = 16;   // an icon's size (DIP), in the slot left of the text
   TextFont = 'Segoe UI';
 
 function RegGetValueW(Key: HKEY; SubKey, Value: PWideChar; Flags: DWORD; ValueType: PDWORD; Data: Pointer;
@@ -87,6 +88,9 @@ var
   D2D: ID2D1Factory;
   DWrite: IDWriteFactory;
   NormalFormat, BoldFormat, GlyphFormat: IDWriteTextFormat;
+  IconFormat: IDWriteTextFormat;     // a layout card's glyph icon (Segoe Fluent Icons, else Segoe MDL2 Assets)
+  LetterFormat: IDWriteTextFormat;   // the first letter where an item has no icon
+  DrawScale: Single = 1;             // the scale of the level being drawn: a file's icon is read at its pixel size
   NoteFormat: IDWriteTextFormat;   // a note card's text: wraps, from the top (plan 02 3.3)
 
 var
@@ -111,6 +115,71 @@ begin
   RegGetValueW(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',
     'AppsUseLightTheme', RRF_RT_REG_DWORD, nil, @Value, @Size);
   Result.Dark := Value = 0;
+end;
+
+// Segoe Fluent Icons (Windows 11) when it is there, else Segoe MDL2 Assets (Windows 10): mostly the same code points.
+function IconFont: string;
+var
+  Fonts: IDWriteFontCollection;
+  Index: UINT32;
+  Exists: BOOL;
+begin
+  Result := 'Segoe MDL2 Assets';
+  if Succeeded(DWrite.GetSystemFontCollection(Fonts, False)) and
+    Succeeded(Fonts.FindFamilyName('Segoe Fluent Icons', Index, Exists)) and Exists then
+    Result := 'Segoe Fluent Icons';
+end;
+
+// Pixels drawn into a box (DIP), centred, at most IconSize.
+procedure DrawPixels(T: ID2D1RenderTarget; const Pixels: TIconPixels; CX, CY: Single);
+var
+  Bitmap: ID2D1Bitmap;
+  Props: TD2D1BitmapProperties;
+  W, H: Single;
+  Dest: TD2D1RectF;
+begin
+  Props.pixelFormat := D2D1PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+  Props.dpiX := 96 * DrawScale;
+  Props.dpiY := 96 * DrawScale;
+  if Failed(T.CreateBitmap(D2D1SizeU(Pixels.Width, Pixels.Height), @Pixels.Bits[0], Pixels.Width * 4, Props, Bitmap)) then
+    Exit;
+  W := Min(IconSize, Pixels.Width / DrawScale);
+  H := Min(IconSize, Pixels.Height / DrawScale);
+  Dest := D2D1RectF(CX - W / 2, CY - H / 2, CX + W / 2, CY + H / 2);
+  T.DrawBitmap(Bitmap, @Dest, 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, nil);
+end;
+
+// The icon in the slot left of a card's text (plan 02 3.8), the first there is: the layout card's own (a glyph, or an
+// icon in a file), the item's own bitmap, else the title's first letter.
+procedure DrawIcon(T: ID2D1RenderTarget; V: TViewCard; const R: TD2D1RectF; Brush, Dim: ID2D1SolidColorBrush);
+var
+  Spec, Glyph, Title: string;
+  Pixels: TIconPixels;
+  Slot: TD2D1RectF;
+  CX, CY: Single;
+begin
+  Slot := D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom);
+  CX := (Slot.left + Slot.right) / 2;
+  CY := (Slot.top + Slot.bottom) / 2;
+  Spec := V.IconSpec;
+  if IsGlyph(Spec, Glyph) then
+  begin
+    T.DrawText(PWideChar(Glyph), Length(Glyph), IconFormat, Slot, Brush);
+    Exit;
+  end;
+  if (Spec <> '') and FileIconPixels(Spec, Ceil(IconSize * DrawScale), Pixels) then
+  begin
+    DrawPixels(T, Pixels, CX, CY);
+    Exit;
+  end;
+  if (V.Kind = vkItem) and (V.Node <> nil) and BitmapPixels(V.Node.Item.Info.hbmpItem, Pixels) then
+  begin
+    DrawPixels(T, Pixels, CX, CY);
+    Exit;
+  end;
+  Title := Trim(V.Title);
+  if Title <> '' then
+    T.DrawText(PWideChar(UpperCase(Copy(Title, 1, 1))), 1, LetterFormat, Slot, Dim);
 end;
 
 function MakeFormat(const Family: string; Weight: DWRITE_FONT_WEIGHT; Size: Single; Center: Boolean): IDWriteTextFormat;
@@ -144,6 +213,8 @@ begin
     NormalFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, FontSize, False);
     BoldFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_SEMI_BOLD, FontSize, False);
     GlyphFormat := MakeFormat(GlyphFont, DWRITE_FONT_WEIGHT_NORMAL, 10, True);
+    IconFormat := MakeFormat(IconFont, DWRITE_FONT_WEIGHT_NORMAL, IconSize, True);
+    LetterFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_SEMI_BOLD, FontSize, True);
     DWrite.CreateTextFormat(PWideChar(TextFont), nil, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
       DWRITE_FONT_STRETCH_NORMAL, FontSize, 'en-us', NoteFormat);
     NoteFormat.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
@@ -439,7 +510,9 @@ begin
       Brush := Dim;
     if V.Checked then
       T.DrawText(PWideChar(CheckGlyph), 1, GlyphFormat, D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom),
-        Brush);
+        Brush)
+    else if V.Kind in [vkItem, vkMenu, vkCommand] then
+      DrawIcon(T, V, R, Brush, Dim);
     // the marks (the global settings): a submenu's (the chevron unless one is set), an action's (none unless set)
     if V.HasSubmenu and (SubmenuMark = '') then
       T.DrawText(PWideChar(ChevronGlyph), 1, GlyphFormat, D2D1RectF(R.right - MarkWidth, R.top, R.right - 6, R.bottom),
@@ -492,6 +565,7 @@ begin
   begin
     Rect := System.Types.Rect(0, 0, Result.Width, Result.Height);
     Target.BindDC(Result.DC, Rect);
+    DrawScale := Scale;
     Target.BeginDraw;
     DrawLevel(Target, G, Selected, ScrollY, VisibleHeight, TLook.Current, Marked, Editing);
     Target.EndDraw;
@@ -551,6 +625,8 @@ finalization
   Pointer(NormalFormat) := nil;
   Pointer(BoldFormat) := nil;
   Pointer(GlyphFormat) := nil;
+  Pointer(IconFormat) := nil;
+  Pointer(LetterFormat) := nil;
   Pointer(NoteFormat) := nil;
   Pointer(DWrite) := nil;
   Pointer(D2D) := nil;

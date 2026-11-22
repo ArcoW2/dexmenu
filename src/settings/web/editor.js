@@ -509,6 +509,9 @@ function renderCardPane() {
   box.append(textField("Name", card.card, v => { card.card = v || "Card"; changed(); }));
   box.append(textField("Title", card.title, v => { if (v) card.title = v; else delete card.title; changed(); },
     card.menu ? "(its name)" : "(the item's own text for one item)"));
+  // its icon (plan 02 3.8): a glyph of Segoe Fluent Icons by its code point, or an icon in a file; else the item's own
+  if (!M.isRemaining(card)) box.append(textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); },
+    "(the item's own) e.g. E8C8, or shell32.dll,4"));
   box.append(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
     "(shown with the look, step 6)"));
   // the hint on hover: a text in place of the item's own hint, or a regex on it (so it can be added to)

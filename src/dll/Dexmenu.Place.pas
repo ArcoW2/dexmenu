@@ -48,6 +48,9 @@ type
     BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand: its text
     Command: TCommand;  // vkCommand: which
     function Title: string;
+    // The layout card's own icon ("icon") where it is this card's: a card with a menu, or the items a card places
+    // (not the remaining card's: each its own); '' otherwise.
+    function IconSpec: string;
     function Enabled: Boolean;
     function HasSubmenu: Boolean;
     function Checked: Boolean;
@@ -182,6 +185,15 @@ begin
 end;
 
 // ---- the view ------------------------------------------------------------------------------------------------------
+
+function TViewCard.IconSpec: string;
+begin
+  Result := '';
+  if Card = nil then
+    Exit;
+  if (Kind = vkMenu) or ((Kind = vkItem) and not Card.IsRemaining) then
+    Result := Card.Icon;
+end;
 
 function TViewCard.Title: string;
 begin

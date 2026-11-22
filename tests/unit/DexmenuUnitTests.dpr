@@ -17,6 +17,7 @@ uses
   Dexmenu.Place in '..\..\src\dll\Dexmenu.Place.pas',
   Dexmenu.Seen in '..\..\src\dll\Dexmenu.Seen.pas',
   Dexmenu.Usage in '..\..\src\dll\Dexmenu.Usage.pas',
+  Dexmenu.Icons in '..\..\src\dll\Dexmenu.Icons.pas',
   System.JSON;
 
 var
@@ -555,6 +556,52 @@ begin
   end;
 end;
 
+// Icons (plan 02 3.8): a glyph by its code point, an icon in a file, a menu item's bitmap.
+procedure TestIcons;
+var
+  Glyph: string;
+  P: TIconPixels;
+  BMI: TBitmapInfo;
+  Bits: Pointer;
+  Bmp: HBITMAP;
+  I: Integer;
+  AnyClear, AnyShown: Boolean;
+begin
+  Check(IsGlyph('E70F', Glyph) and (Glyph = #$E70F), 'a glyph by its code point in hex');
+  Check(not IsGlyph('shell32.dll,4', Glyph) and not IsGlyph('', Glyph), 'a file and nothing are no glyph');
+  Check(FileIconPixels('%SystemRoot%\System32\shell32.dll,4', 16, P) and (P.Width = 16) and (P.Height = 16),
+    'an icon in a file, %variables% expanded, at the size asked');
+  AnyClear := False;
+  AnyShown := False;
+  I := 3;
+  while I < Length(P.Bits) do
+  begin
+    if P.Bits[I] = 0 then AnyClear := True;
+    if P.Bits[I] = 255 then AnyShown := True;
+    Inc(I, 4);
+  end;
+  Check(AnyClear and AnyShown, '... with its transparency');
+  Check(not FileIconPixels('C:\no such file.dll,0', 16, P), 'a file that is not there: no icon');
+  Check(not BitmapPixels(HBITMAP(-1), P) and not BitmapPixels(HBITMAP(8), P), 'HBMMENU_ values are no bitmap');
+  FillChar(BMI, SizeOf(BMI), 0);
+  BMI.bmiHeader.biSize := SizeOf(BMI.bmiHeader);
+  BMI.bmiHeader.biWidth := 4;
+  BMI.bmiHeader.biHeight := -4;
+  BMI.bmiHeader.biPlanes := 1;
+  BMI.bmiHeader.biBitCount := 32;
+  Bmp := CreateDIBSection(0, BMI, DIB_RGB_COLORS, Bits, 0, 0);
+  try
+    FillChar(Bits^, 4 * 4 * 4, $80);
+    for I := 0 to 15 do
+      PByte(NativeUInt(Bits) + NativeUInt(I * 4 + 3))^ := 0;   // no alpha at all
+    AnyShown := BitmapPixels(Bmp, P);
+    Check(AnyShown and (P.Width = 4) and (P.Bits[3] = 255) and (P.Bits[0] = $80),
+      'a bitmap without alpha: opaque, its colours kept');
+  finally
+    DeleteObject(Bmp);
+  end;
+end;
+
 procedure TestSubmenuModes;
 var
   C: TCard;
@@ -910,6 +957,7 @@ begin
   TestHints;
   TestDuplicates;
   TestUsage;
+  TestIcons;
   TestSubmenuModes;
   TestSeen;
   if Failures = 0 then

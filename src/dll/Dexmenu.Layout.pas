@@ -67,6 +67,7 @@ type
     Id: string;            // "id", or made up (c1, c2, ...) when the layout has none
     Title: string;         // "card": its name in the editor, and its title when it holds several items
     ShownTitle: string;    // "title": its title also when it holds one item ('' : the item's own text)
+    Icon: string;          // "icon": a glyph's code point in hex ("E8C8") or an icon in a file ("path,index"); '' none
     RenameFrom, RenameTo: string;   // "rename": { "regex": ..., "replace": ... } on the item's text
     Parent: TCard;         // the card with a menu it sits in; nil at the top
     Hidden: Boolean;       // "hidden": shows nothing; its rules still take their items, so they show nowhere
@@ -292,6 +293,8 @@ begin
       Card.Id := 'c' + IntToStr(NextCardId);
     if Obj.GetValue('title') is TJSONString then
       Card.ShownTitle := Obj.GetValue('title').Value;
+    if Obj.GetValue('icon') is TJSONString then
+      Card.Icon := Trim(Obj.GetValue('icon').Value);
     if Obj.GetValue('hint') is TJSONString then
       Card.HintText := Obj.GetValue('hint').Value
     else if (Obj.GetValue('hint') is TJSONObject) and (TJSONObject(Obj.GetValue('hint')).GetValue('regex') <> nil) then
