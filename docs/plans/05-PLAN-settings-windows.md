@@ -67,7 +67,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - The DLL (`Dexmenu.Layout.CurrentLayout`) takes the right-click's kind (as now, from the handler), looks it up in
   `kinds`, and reads that layout file (read again when it changes, as now). `DEXMENU_LAYOUT_FILE` stays for the
   tests: one layout for every kind.
-- `"layout"` in settings.json (today's "Make active") goes; on first start it becomes `"kinds": { "default": ... }`.
+- `"layout"` in settings.json (today's "Make active") goes; on first start the layout it names is set for `default`
+  (`"kinds": [ ..., { "kind": "default", "layout": "<that name>" } ]`), else the Default layout (3.1).
 - The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
   other (`default`). No kinds by file type: one menu per type has no use seen.
 - An Open or Save dialog (`dialog`): a right-click there may want another menu than in Explorer (no "Open in new
