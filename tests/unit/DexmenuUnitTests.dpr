@@ -18,6 +18,7 @@ uses
   Dexmenu.Seen in '..\..\src\dll\Dexmenu.Seen.pas',
   Dexmenu.Usage in '..\..\src\dll\Dexmenu.Usage.pas',
   Dexmenu.Icons in '..\..\src\dll\Dexmenu.Icons.pas',
+  Dexmenu.Theme in '..\..\src\dll\Dexmenu.Theme.pas',
   System.JSON;
 
 var
@@ -753,6 +754,85 @@ begin
   end;
 end;
 
+// Themes (plan 03 3.2, 3.3): colours, the intensity mix, a theme on a base, the theme chosen in the settings.
+procedure TestThemes;
+var
+  C: TRGBA;
+  T: TTheme;
+  Error, Data: string;
+  Lookup: TFunc<string, string>;
+
+  function Near(const A: TRGBA; R, G, B: Integer; Alpha: Single = 1): Boolean;
+  begin
+    Result := (Abs(A.R * 255 - R) <= 1) and (Abs(A.G * 255 - G) <= 1) and (Abs(A.B * 255 - B) <= 1) and
+      (Abs(A.A - Alpha) < 0.01);
+  end;
+
+begin
+  Check(ParseColor('#f00', C) and Near(C, 255, 0, 0), '#rgb');
+  Check(ParseColor('#161c27', C) and Near(C, $16, $1C, $27), '#rrggbb');
+  Check(ParseColor('#ff000080', C) and Near(C, 255, 0, 0, 128 / 255), '#rrggbbaa');
+  Check(ParseColor('rgba(106, 168, 255, .18)', C) and Near(C, 106, 168, 255, 0.18), 'rgba()');
+  Check(not ParseColor('surface', C) and not ParseColor('#12345', C), 'a name or a bad colour is no colour');
+  Check(Near(Intensity(RGBA(0, 0, 0), RGBA($C0, $20, $20), 0), 0, 0, 0) and
+    Near(Intensity(RGBA(0, 0, 0), RGBA($C0, $20, $20), 100), $C0, $20, $20) and
+    Near(Intensity(RGBA(0, 0, 0), RGBA($C0, $20, $20), 150), 224, 144, 144) and
+    Near(Intensity(RGBA(0, 0, 0), RGBA($C0, $20, $20), 200), 255, 255, 255),
+    'intensity on black: 0 black, 100 the colour, 150 rose, 200 white (the base inverted)');
+  Check(Near(Intensity(RGBA(255, 255, 255), RGBA($20, $60, $C0), 200), 0, 0, 0) and
+    Near(Intensity(RGBA(255, 255, 255), RGBA(0, 0, 0), 50), 128, 128, 128),
+    'intensity on white: 200 black, 50 halfway');
+  Lookup := function(Name: string): string
+    begin
+      if Name = 'dark' then
+        Result := '{ "name": "dark", "palette": { "basecolor": "#000000", "text": "#ffffff", "accent": "#0000ff" }, ' +
+          '"card": { "normal": { "foreground": "text", "radius": 4 }, "hover": { "background": "accent" } } }'
+      else
+        Result := '';
+    end;
+  T := ThemeFromText('// on dark' + #10 + '{ "name": "Red", "base": "dark", "palette": { "text": "#ff0000" }, ' +
+    '"card": { "normal": { "background": { "color": "text", "intensity": 150, "opacity": 40 } }, ' +
+    '"disabled": { "foreground": "nosuch" } } }', Lookup, Error);
+  try
+    Check((T <> nil) and (T.Name = 'Red'), 'a theme on a base read: ' + Error);
+    if T <> nil then
+    begin
+      Check(Near(T.Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), 255, 0, 0),
+        'a palette change recolours what uses it (the base''s foreground: text, now red)');
+      Check(Near(T.Color('card', 'hover', 'background', RGBA(0, 0, 0)), 0, 0, 255), 'the base''s own value kept');
+      Check(Near(T.Color('card', 'normal', 'background', RGBA(0, 0, 0)), 255, 128, 128, 0.4),
+        'intensity 150 over black and opacity 40: rose, 40% see-through');
+      Check(Near(T.Color('card', 'focused', 'foreground', RGBA(1, 2, 3)), 255, 0, 0), 'a state not given: normal''s');
+      Check(Near(T.Color('card', 'disabled', 'foreground', RGBA(1, 2, 3)), 1, 2, 3) and (Pos('nosuch', T.Problems) > 0),
+        'an unknown palette name: the default used, the problem noted');
+      Check(T.Number('card', 'hover', 'radius', 0) = 4, 'a number from normal');
+    end;
+  finally
+    T.Free;
+  end;
+  // the theme the settings name, from the user's themes folder
+  Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-themes');
+  if TDirectory.Exists(Data) then
+    TDirectory.Delete(Data, True);
+  TDirectory.CreateDirectory(TPath.Combine(Data, 'themes'));
+  SetEnvironmentVariable('DEXMENU_DATA', PChar(Data));
+  try
+    TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeDark": "Mine" } }');
+    TFile.WriteAllText(TPath.Combine(TPath.Combine(Data, 'themes'), 'Mine.json'),
+      '{ "name": "Mine", "base": "dark", "palette": { "text": "#00ff00" } }');
+    Check(Near(CurrentTheme(True).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), 0, 255, 0),
+      'the dark theme the settings name, from the user''s themes folder, on the built-in dark');
+    Check(Near(CurrentTheme(False).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), $1B, $1B, $1B),
+      'light not named: the built-in light');
+    TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeDark": "Gone" } }');
+    Check(Near(CurrentTheme(True).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), 255, 255, 255),
+      'a theme that is not there: the built-in dark');
+  finally
+    TDirectory.Delete(Data, True);
+    SetEnvironmentVariable('DEXMENU_DATA', nil);
+  end;
+end;
+
 procedure TestSubmenuModes;
 var
   C: TCard;
@@ -1107,6 +1187,7 @@ begin
   TestKeptIcons;
   TestAccessAndShortcut;
   TestSearch;
+  TestThemes;
   TestSubmenuModes;
   TestSeen;
   if Failures = 0 then

@@ -56,6 +56,7 @@ type
     States: TStates;          // the states a rule takes when it does not say
     MostUsed: Integer;        // how many items the most used row shows (plan 02 3.9)
     TextSize: Single;         // the menu's size, 1 as drawn; Ctrl+scroll in the menu changes it (plan 02 3.4)
+    ThemeLight, ThemeDark: string;   // the themes for Windows' light and dark mode (plan 03 3.3)
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
   end;
@@ -598,6 +599,8 @@ begin
   Result.Widths := nil;
   Result.MostUsed := 3;
   Result.TextSize := 1;
+  Result.ThemeLight := 'light';
+  Result.ThemeDark := 'dark';
   Result.States := [stEnabled, stDisabled];
   if not ReadTextFile(DataFolder + '\settings.json', Text) then
     Exit;
@@ -616,6 +619,10 @@ begin
       Result.OnClickOnly := TJSONBool(TJSONObject(Menu).GetValue('onClickOnly')).AsBoolean;
     if TJSONObject(Menu).GetValue('mostUsed') is TJSONNumber then
       Result.MostUsed := Max(1, Min(10, TJSONNumber(TJSONObject(Menu).GetValue('mostUsed')).AsInt));
+    if (TJSONObject(Menu).GetValue('themeLight') is TJSONString) and (TJSONObject(Menu).GetValue('themeLight').Value <> '') then
+      Result.ThemeLight := TJSONObject(Menu).GetValue('themeLight').Value;
+    if (TJSONObject(Menu).GetValue('themeDark') is TJSONString) and (TJSONObject(Menu).GetValue('themeDark').Value <> '') then
+      Result.ThemeDark := TJSONObject(Menu).GetValue('themeDark').Value;
     if TJSONObject(Menu).GetValue('textSize') is TJSONNumber then
       Result.TextSize := ClampTextSize(TJSONNumber(TJSONObject(Menu).GetValue('textSize')).AsDouble);
     if TJSONObject(Menu).GetValue('submenuMark') is TJSONString then

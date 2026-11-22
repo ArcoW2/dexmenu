@@ -70,7 +70,7 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Icons, Dexmenu.Usage;
+  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Icons, Dexmenu.Usage, Dexmenu.Theme;
 
 const
   RRF_RT_REG_DWORD = $00000010;
@@ -391,9 +391,9 @@ begin
   Result := -1;
 end;
 
-function Color(R, G, B: Byte; A: Single = 1): TD2D1ColorF;
+function ToD2D(const C: TRGBA): TD2D1ColorF;
 begin
-  Result := D2D1ColorF(R / 255, G / 255, B / 255, A);
+  Result := D2D1ColorF(C.R, C.G, C.B, C.A);
 end;
 
 // Diagonal stripes over a box: an item not always there (the preview only).
@@ -441,7 +441,9 @@ end;
 procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer; ScrollY, VisibleHeight: Single;
   const Look: TLook; const Marked: string; Editing: Boolean);
 var
-  Bg, Border, Text, Dim, Hover, Sep, Accent, Stripe: ID2D1SolidColorBrush;
+  Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
+  Theme: TTheme;
+  MenuRadius, CardRadius: Single;
   I: Integer;
   R: TD2D1RectF;
   V: TViewCard;
@@ -455,32 +457,24 @@ var
   TitleLayout: IDWriteTextLayout;
   Range: TDwriteTextRange;
 begin
-  if Look.Dark then
-  begin
-    T.CreateSolidColorBrush(Color($2B, $2B, $2B), nil, Bg);
-    T.CreateSolidColorBrush(Color($45, $45, $45), nil, Border);
-    T.CreateSolidColorBrush(Color($FF, $FF, $FF), nil, Text);
-    T.CreateSolidColorBrush(Color($80, $80, $80), nil, Dim);
-    T.CreateSolidColorBrush(Color($FF, $FF, $FF, 0.08), nil, Hover);
-    T.CreateSolidColorBrush(Color($45, $45, $45), nil, Sep);
-    T.CreateSolidColorBrush(Color($6A, $A8, $FF), nil, Accent);
-    T.CreateSolidColorBrush(Color($FF, $FF, $FF, 0.10), nil, Stripe);
-  end
-  else
-  begin
-    T.CreateSolidColorBrush(Color($F9, $F9, $F9), nil, Bg);
-    T.CreateSolidColorBrush(Color($D0, $D0, $D0), nil, Border);
-    T.CreateSolidColorBrush(Color($1B, $1B, $1B), nil, Text);
-    T.CreateSolidColorBrush(Color($A0, $A0, $A0), nil, Dim);
-    T.CreateSolidColorBrush(Color($00, $00, $00, 0.06), nil, Hover);
-    T.CreateSolidColorBrush(Color($E0, $E0, $E0), nil, Sep);
-    T.CreateSolidColorBrush(Color($2F, $6F, $D6), nil, Accent);
-    T.CreateSolidColorBrush(Color($00, $00, $00, 0.09), nil, Stripe);
-  end;
+  // every colour and radius from the theme for light or dark (plan 03 3.2; Dexmenu.Theme)
+  Theme := CurrentTheme(Look.Dark);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('menu', 'normal', 'background', RGBA($F9, $F9, $F9))), nil, Bg);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('menu', 'normal', 'border', RGBA($D0, $D0, $D0))), nil, Border);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'foreground', RGBA($1B, $1B, $1B))), nil, Text);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'disabled', 'foreground', RGBA($A0, $A0, $A0))), nil, Dim);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'extra', RGBA($A0, $A0, $A0))), nil, Extra);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'hover', 'background', RGBA(0, 0, 0, 0.06))), nil, Hover);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'border', RGBA($E0, $E0, $E0))), nil, Sep);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0))), nil, LabelBrush);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'focused', 'border', RGBA($2F, $6F, $D6))), nil, Accent);
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'unavailable', 'background', RGBA(0, 0, 0, 0.09))), nil, Stripe);
+  MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius);
+  CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius);
   T.Clear(D2D1ColorF(0, 0, 0, 0));
   R := D2D1RectF(0.5, 0.5, G.Width - 0.5, VisibleHeight - 0.5);
-  T.FillRoundedRectangle(D2D1RoundedRect(R, WindowRadius, WindowRadius), Bg);
-  T.DrawRoundedRectangle(D2D1RoundedRect(R, WindowRadius, WindowRadius), Border, 1);
+  T.FillRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Bg);
+  T.DrawRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Border, 1);
   T.PushAxisAlignedClip(D2D1RectF(1, OuterPad, G.Width - 1, VisibleHeight - OuterPad), D2D1_ANTIALIAS_MODE_ALIASED);
   for I := 0 to High(G.Boxes) do
   begin
@@ -495,7 +489,7 @@ begin
       // a note: its text in the dim colour, aligned as the layout says; no button (no hover, no mark)
       NoteText := NoteLayout(V, R.right - R.left);
       if NoteText <> nil then
-        T.DrawTextLayout(D2D1PointF(R.left + NoteLeft(V), R.top + NotePad), NoteText, Dim, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        T.DrawTextLayout(D2D1PointF(R.left + NoteLeft(V), R.top + NotePad), NoteText, Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       Continue;
     end;
     if V.Kind = vkSeparator then
@@ -504,7 +498,7 @@ begin
       if (V.Divider = nil) or (V.Divider.DividerText = '') then
         T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1)
       else
-        DrawDividerText(T, V.Divider, R, Y, Sep, Dim);
+        DrawDividerText(T, V.Divider, R, Y, Sep, LabelBrush);
       Continue;
     end;
     if Editing and V.Sometimes then
@@ -512,10 +506,10 @@ begin
     // the items of the card selected in the settings app's editor (the preview only)
     if (Marked <> '') and (V.CardId = Marked) then
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
-        ItemRadius, ItemRadius), Accent, 1.5);
+        CardRadius, CardRadius), Accent, 1.5);
     if (I = Selected) and V.Enabled then
       T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
-        ItemRadius, ItemRadius), Hover);
+        CardRadius, CardRadius), Hover);
     if V.Enabled then
       Brush := Text
     else
@@ -546,7 +540,7 @@ begin
     if Shortcut <> '' then
     begin
       T.DrawText(PWideChar(Shortcut), Length(Shortcut), ShortcutFormat, D2D1RectF(R.left + TextLeft, R.top,
-        R.right - MarkWidth, R.bottom), Dim, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        R.right - MarkWidth, R.bottom), Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       TitleRight := Max(R.left + TextLeft, TitleRight - TextWidth(Shortcut, ShortcutFormat) - ShortcutGap);
     end;
     // the access key (the letter Windows' text marks with "&") underlined: that key picks the item

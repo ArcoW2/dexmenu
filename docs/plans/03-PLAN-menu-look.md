@@ -1,8 +1,9 @@
 # Plan 03: The menu's look: what the Delphi DLL draws, and themes made for it
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-21: draft.
+- 2026-11-22: partly executed: theme files.
 
 Plan 02 (`02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -35,13 +36,13 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 
 | Part | What | Reference |
 |---|---|---|
+| Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Engine | Direct2D and DirectWrite in the DLL: brushes, rounded rectangles, text, images, stripes; drawing into a window or an image | plan 01 Delphi DLL | 3.1 |
-| Theme files | per element and state; base and differences; JSON with comments; light and dark roots | -- | 3.2; 3.3 |
 | Shipped themes | light and dark, and three pairs from LexPen's colours (parchment, sky / ocean, seafoam / forest) | Theme files | 3.3 |
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
 | Menu window | popup, corners, shadow, border, background colour / gradient / image, placement, scrolling | Engine | 3.4 |
@@ -295,3 +296,20 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 Theme files
+
+- The engine's colours today come from the theme: the menu's background, border and radius; a card's foreground, its
+  disabled foreground, its extra colour (notes, shortcuts), its hover and unavailable backgrounds, its radius and its
+  focused border (the editor's mark); a divider's line (`border`) and label (`foreground`). The built-in `light` and
+  `dark` hold exactly the colours drawn before, so nothing changes until a theme is chosen.
+- A state that does not give a property takes `normal`'s; a property the theme does not give takes the engine's own
+  value. An unknown palette name or colour, or an intensity outside 0 - 200, is noted in the theme's problems and the
+  default used; a theme that cannot be read is logged and the built-in one used.
+- Backgrounds are colours only for now; gradients and images come with Menu window (3.4).
+- Tested: unit tests for every colour form, the intensity on black and on white, a theme on a base (a palette change
+  recolouring what uses it, the base's values kept, intensity and opacity, a state falling back to normal, an
+  unknown name), and the theme the settings name read from the user's folder or falling back to the built-in. By
+  hand: a "Dark ocean" theme in the editor's preview, and the main window's choice.

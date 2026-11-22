@@ -87,6 +87,9 @@ static class DataFolder
             // the menu's size (1 as drawn; Ctrl+scroll in the menu sets it too)
             ["textSize"] = m?["textSize"] is System.Text.Json.Nodes.JsonValue t && t.TryGetValue<double>(out var size)
                 ? Math.Clamp(Math.Round(size, 1), 0.6, 2.5) : 1.0,
+            // the menu's themes for Windows' light and dark mode (plan 03 3.3)
+            ["themeLight"] = m?["themeLight"]?.GetValue<string>() is { Length: > 0 } light ? light : "light",
+            ["themeDark"] = m?["themeDark"]?.GetValue<string>() is { Length: > 0 } dark ? dark : "dark",
             ["submenuMark"] = m?["submenuMark"]?.GetValue<string>() ?? "",
             ["actionMark"] = m?["actionMark"]?.GetValue<string>() ?? "",
             ["states"] = m?["states"]?.GetValue<string>() is "enabled" or "disabled" ? m!["states"]!.GetValue<string>() : "both",
@@ -97,6 +100,19 @@ static class DataFolder
                     new System.Text.Json.Nodes.JsonObject { ["min"] = 200, ["max"] = 480 },
                     new System.Text.Json.Nodes.JsonObject { ["min"] = 200, ["max"] = 480 }),
         };
+    }
+
+    /// <summary>The menu's themes (plan 03 3.2): the built-in light and dark, and every theme file in the user's
+    /// themes folder and the one next to the app, by name.</summary>
+    public static List<string> ThemeNames()
+    {
+        var names = new List<string> { "light", "dark" };
+        foreach (var folder in new[] { Path.Combine(Root, "themes"), Path.Combine(AppContext.BaseDirectory, "themes") })
+            if (Directory.Exists(folder))
+                foreach (var file in Directory.GetFiles(folder, "*.json"))
+                    if (Path.GetFileNameWithoutExtension(file) is { } n && !names.Contains(n, StringComparer.OrdinalIgnoreCase))
+                        names.Add(n);
+        return names;
     }
 
     /// <summary>One global menu setting changed (a name of Menu()), the others kept.</summary>
