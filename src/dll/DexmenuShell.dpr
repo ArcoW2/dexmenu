@@ -14,6 +14,7 @@ uses
   Dexmenu.Place in 'Dexmenu.Place.pas',
   Dexmenu.Draw in 'Dexmenu.Draw.pas',
   Dexmenu.Seen in 'Dexmenu.Seen.pas',
+  Dexmenu.Usage in 'Dexmenu.Usage.pas',
   Dexmenu.Tip in 'Dexmenu.Tip.pas',
   Dexmenu.Menu in 'Dexmenu.Menu.pas',
   Dexmenu.Preview in 'Dexmenu.Preview.pas',

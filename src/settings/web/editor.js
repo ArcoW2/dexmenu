@@ -130,8 +130,9 @@ function withDragged(e, place) {
   const isDivider = e.dataTransfer.types.includes("text/divider");
   let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
   if (!id) return;
-  const isNew = id === "new" || id === "newnote";   // "+ Card", "+ Divider" or "+ Note" dragged
+  const isNew = id === "new" || id === "newnote" || id === "newmostused";   // "+ Card", "+ Divider", "+ Note", "+ Most used"
   if (id === "newnote") id = M.addNote(layout, linesOf()).id;
+  else if (id === "newmostused") id = M.addMostUsed(layout, linesOf()).id;
   else if (isNew) id = isDivider ? M.addDivider(layout, linesOf(), null).id : M.addCard(layout, linesOf(), null).id;
   if (place(id, isDivider)) {
     if (isNew) select(id, -1);
@@ -145,11 +146,16 @@ function renderDivider(entry) {
   const box = el("div", "divider" + (entry.id === selectedId ? " selected" : "") + " align-" + (entry.align || "left"));
   box.draggable = true;
   box.dataset.id = entry.id;
-  box.append(el("span", "rule-line"), el("span", "text", entry.divider || ""), el("span", "rule-line"));
-  if (!entry.divider) box.classList.add("plain");
+  if (entry.mostUsed) {
+    box.classList.add("mostused");
+    box.append(el("span", "text", "Most used row: the items chosen most, side by side"));
+  } else {
+    box.append(el("span", "rule-line"), el("span", "text", entry.divider || ""), el("span", "rule-line"));
+    if (!entry.divider) box.classList.add("plain");
+  }
   const actions = el("div", "card-actions");
   const x = el("button", "", "x");
-  x.title = "Delete this divider";
+  x.title = entry.mostUsed ? "Delete the most used row" : "Delete this divider";
   x.addEventListener("click", e => { e.stopPropagation(); if (M.deleteDivider(linesOf(), entry.id)) { if (selectedId === entry.id) selectedId = null; changed(); } });
   actions.append(x);
   box.append(actions);
@@ -179,7 +185,7 @@ function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
     box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index) : M.moveCard(linesOf(), id, parentId, index)));
-    if (entry.divider !== undefined) { box.append(renderDivider(entry)); return; }
+    if (entry.divider !== undefined || entry.mostUsed) { box.append(renderDivider(entry)); return; }
     if (!entry.line) return;
     const row = el("div", "line");
     for (const card of entry.line) row.append(renderCard(card));
@@ -445,6 +451,12 @@ function ruleEditor(card, rule, index) {
 
 function renderCardPane() {
   const div = selectedId ? M.findDivider(linesOf(), selectedId) : null;
+  if (div && div.entry.mostUsed) {
+    $("cardHeading").textContent = "The most used row";
+    $("card").replaceChildren(el("p", "hint", "The items chosen most in this kind of right-click, side by side, most " +
+      "first; also items inside submenus. How many: in the main window. Empty until items have been chosen."));
+    return;
+  }
   if (div) {
     // a divider: its text and where the text goes; its look (height, colours) comes with the themes
     $("cardHeading").textContent = "A divider";
@@ -730,6 +742,14 @@ $("addDivider").addEventListener("click", () => {
   changed();
   focusNew(d.id);
 });
+$("addMostUsed").addEventListener("click", () => {
+  if (!layout) return;
+  const d = M.addMostUsed(layout, linesOf());
+  select(d.id, -1);
+  changed();
+  focusNew(d.id);
+});
+$("addMostUsed").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "newmostused"); e.dataTransfer.effectAllowed = "copy"; });
 $("addDivider").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(layout, linesOf(), null)); });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });

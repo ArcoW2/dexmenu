@@ -132,6 +132,8 @@ sealed class HomeForm : Form, IThemed
                     else if (name is "onClickOnly" or "windowsMenu" or "editMenu")
                         DataFolder.SetMenu(name, m.TryGetProperty("value", out var on) && on.ValueKind == JsonValueKind.True);
                     else if (name is "submenuMark" or "actionMark") DataFolder.SetMenu(name, Str("value"));
+                    else if (name == "mostUsed" && m.TryGetProperty("value", out var count) && count.TryGetInt32(out var n))
+                        DataFolder.SetMenu(name, Math.Clamp(n, 1, 10));
                     else if (name == "states") DataFolder.SetMenu(name, Str("value") is "enabled" or "disabled" ? Str("value") : "both");
                     else if (name == "widths" && m.TryGetProperty("value", out var widths) && widths.ValueKind == JsonValueKind.Array)
                         DataFolder.SetMenu(name, System.Text.Json.Nodes.JsonNode.Parse(widths.GetRawText())!);

@@ -85,6 +85,7 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .divider .rule-line { flex: 1; border-top: 1px solid var(--line); }
 .divider.align-left .rule-line:first-child, .divider.align-right .rule-line:nth-child(3) { flex: 0 0 8px; }
 .divider.plain .text { display: none; }
+.divider.mostused { border: 1px dashed var(--line); border-radius: 4px; padding: 4px 8px; color: var(--dim); }
 .divider.selected { box-shadow: 0 0 0 1px var(--accent); }
 .divider.hot { background: var(--hover); }
 h2 .grow { flex: 1; }

@@ -16,6 +16,7 @@ uses
   Dexmenu.Tree in '..\..\src\dll\Dexmenu.Tree.pas',
   Dexmenu.Place in '..\..\src\dll\Dexmenu.Place.pas',
   Dexmenu.Seen in '..\..\src\dll\Dexmenu.Seen.pas',
+  Dexmenu.Usage in '..\..\src\dll\Dexmenu.Usage.pas',
   System.JSON;
 
 var
@@ -464,6 +465,75 @@ end;
 
 // How a submenu opens (plan 02 3.7): a card's own "submenus" before the global setting; "<<" on top of a replacing
 // level.
+// The use counts and the most used row (plan 02 3.9).
+procedure TestUsage;
+var
+  Data, Error: string;
+  I: Integer;
+  U: TDictionary<string, Integer>;
+  Layout: ILayout;
+  Menu: HMENU;
+  Top: TNodes;
+  P: TPlacement;
+  Level: TViewLevel;
+begin
+  Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-usage');
+  if TDirectory.Exists(Data) then
+    TDirectory.Delete(Data, True);
+  SetEnvironmentVariable('DEXMENU_DATA', PChar(Data));
+  for I := 1 to 3 do
+    CountChoice('file', 'Copy');
+  for I := 1 to 2 do
+    CountChoice('file', '7-Zip > Add to archive...');
+  CountChoice('file', 'Delete');
+  CountChoice('file', 'Cut');
+  for I := 1 to 9 do
+    CountChoice('file', 'Disabled thing');
+  for I := 1 to 5 do
+    CountChoice('folder', 'Cut');
+  U := ReadUsage('file');
+  Layout := nil;
+  P := nil;
+  Top := nil;
+  Menu := 0;
+  try
+    Check((U.Count = 5) and (U['Copy'] = 3) and (U['7-Zip > Add to archive...'] = 2) and (U['Cut'] = 1),
+      'choices counted per item and kind of right-click');
+    Check(ReadUsage('none-such').Count = 0, 'a kind without counts: none');
+    Layout := ParseLayout('{ "default": [ { "mostUsed": true }, { "divider": true }, ' +
+      '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+    Menu := TestMenu;
+    Top := ReadLevel(Menu, '');
+    P := TPlacement.Create(Layout, 'default', Top);
+    P.Usage := U;
+    P.MostUsedCount := 3;
+    Level := P.TopLevel;
+    try
+      Check(Copy(Describe(Level), 1, Length('I:Copy | I:Add to archive... | I:Cut / D: / I:Open')) =
+        'I:Copy | I:Add to archive... | I:Cut / D: / I:Open',
+        'the most used row: side by side, most first, a submenu''s item too, a disabled one left out, ties by name');
+    finally
+      Level.Free;
+    end;
+    P.Usage := nil;
+    Level := P.TopLevel;
+    try
+      Check(Copy(Describe(Level), 1, Length('I:Open')) = 'I:Open', 'no counts: no row, and its divider not shown first');
+    finally
+      Level.Free;
+    end;
+    Check(HasMostUsed(Layout, 'default') and UsageGoesDeeper(U), 'a most used row in the layout; a count inside a submenu');
+  finally
+    P.Free;
+    Top.Free;
+    if Menu <> 0 then
+      DestroyMenu(Menu);
+    U.Free;
+    TDirectory.Delete(Data, True);
+    SetEnvironmentVariable('DEXMENU_DATA', nil);
+  end;
+end;
+
 procedure TestSubmenuModes;
 var
   C: TCard;
@@ -818,6 +888,7 @@ begin
   TestEmptyMenuCard;
   TestHints;
   TestDuplicates;
+  TestUsage;
   TestSubmenuModes;
   TestSeen;
   if Failures = 0 then

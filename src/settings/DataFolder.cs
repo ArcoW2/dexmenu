@@ -83,6 +83,8 @@ static class DataFolder
             ["onClickOnly"] = m?["onClickOnly"]?.GetValue<bool>() == true,
             ["windowsMenu"] = m?["windowsMenu"]?.GetValue<bool>() != false,
             ["editMenu"] = m?["editMenu"]?.GetValue<bool>() != false,
+            ["mostUsed"] = m?["mostUsed"] is System.Text.Json.Nodes.JsonValue n && n.TryGetValue<int>(out var count)
+                ? Math.Clamp(count, 1, 10) : 3,
             ["submenuMark"] = m?["submenuMark"]?.GetValue<string>() ?? "",
             ["actionMark"] = m?["actionMark"]?.GetValue<string>() ?? "",
             ["states"] = m?["states"]?.GetValue<string>() is "enabled" or "disabled" ? m!["states"]!.GetValue<string>() : "both",

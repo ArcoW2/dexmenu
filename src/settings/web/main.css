@@ -43,6 +43,7 @@ h3 { font-size: 13px; margin: 12px 0 6px; }
 /* every menu's settings */
 .settings { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
 .settings input[type=text] { width: 4em; text-align: center; }
+#mostUsed { width: 4em; }
 .settings .hint { flex-basis: 100%; }
 .settings .widthsLabel { flex-basis: 100%; margin-top: 4px; }
 #widths { border-collapse: collapse; margin-top: 4px; }

@@ -9,6 +9,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: note cards; how submenus open.
 - 2026-11-22: partly executed: "Edit menu..." and Windows' menu (Shift, the item).
 - 2026-11-22: partly executed: the global settings (marks, widths per level, a rule's default states).
+- 2026-11-22: partly executed: use counts and the most used row.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -51,6 +52,7 @@ the preview is the result.
 | Edit menu | "Edit menu..." at the end of every menu (on or off in the main window): the menu closes, the last right-click is written, the settings app starts on the layout in use (its editor, the preview on this right-click) | 3.6 |
 | Windows' menu | Shift held while right-clicking shows Windows' own menu (in Explorer its extended menu); "Windows' menu" at the end of every menu (on or off) closes Dexmenu's and shows Windows' at the same place; a layout that cannot be read: Windows' menu | 3.11 |
 | Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, "Windows' menu" and "Edit menu..." at the end, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
+| Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider | 3.9 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -59,7 +61,8 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Icons | the layout's, the item's own, cut from Explorer's drawing, or the first letter | -- | 3.8 |
-| Use counts | every choice counted per item; the most used row; counts shown while editing | -- | 3.9 |
+| Counts while editing | the use count on every item in the preview and in the editor's items list | -- | 3.9 |
+| Text size | Ctrl+scroll in the open menu makes its text (and so its cards) larger or smaller; kept in the global settings for every next menu | -- | 3.4 |
 | Default layouts | the suggested layouts shipped, A the default | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
@@ -178,7 +181,9 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   maximum width per level. The cards on one line share that width; a line whose cards do not fit makes the level
   wider, up to the maximum, before its cards wrap (plan 03 3.5).
 - **States taken:** the default set of a rule, enabled, disabled or both (3.3).
-- **Most used:** the row on or off and how many items it shows (3.9).
+- **Most used:** how many items the row shows (3.9); a layout has the row where it puts `{ "mostUsed": true }`.
+- **Text size:** Ctrl+scroll while the menu is open makes its text larger or smaller, the cards and levels with it;
+  the size is kept for every next menu.
 - **The active layout:** which named layout is used (3.5).
 - **Light and dark:** follow Windows' mode, or fixed to light or to dark; a theme for light and one for dark
   (`themeLight`, `themeDark`; plan 03 3.3).
@@ -336,6 +341,9 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
   the DLL after the menu has closed, so the choice is not slowed.
 - `mostUsed` in a layout: a row of the items chosen most, for this kind of right-click, as many as the global setting
   says; only items present in this menu.
+- An item may show both in the most used row and at its own place: the row is a shortcut.
+- Items inside a submenu count too (their key is their path and text, `7-Zip > Add to archive...`); the submenus
+  that fill only when opened are opened early when the row may need them.
 - While editing: the count shown on every item in the preview and in the editor's item list, so the user sees what
   matters most and places it.
 

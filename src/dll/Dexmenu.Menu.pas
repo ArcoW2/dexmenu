@@ -54,6 +54,8 @@ type
     FEarly: TList<HMENU>;    // submenus opened before the user opened them (FindEmpty): open until the menu closes
     FDeep: Boolean;          // the layout's rules look inside submenus (RulesLookDeeper)
     FHints: TDictionary<string, string>;   // the items' own hints, from the seen items (Dexmenu.Seen.HintsOf)
+    FUsage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage), for the most used row
+    FChosenKey: string;                    // the chosen item's use count key; '' when none was chosen
     FTip: TTip;
     FTipLevel: TLevelWindow; // the level and box a hint waits for (TipTimer) or shows for
     FTipBox: Integer;
@@ -95,6 +97,8 @@ type
     property Original: HMENU read FOriginal;
     // Dexmenu's own item chosen, when one was (the menu then returned no choice)
     property Command: TCommand read FCommand;
+    // The chosen item's use count key (Dexmenu.Usage.UsageKey); '' when no item was chosen
+    property ChosenKey: string read FChosenKey;
   end;
 
 threadvar
@@ -103,7 +107,7 @@ threadvar
 implementation
 
 uses
-  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen;
+  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage;
 
 const
   MenuClassName = 'DexmenuMenu';
@@ -196,6 +200,7 @@ begin
   FEarly.Free;
   FTip.Free;
   FHints.Free;
+  FUsage.Free;
   inherited;
 end;
 
@@ -313,11 +318,16 @@ begin
   FSettings := MenuSettings;
   SetMenuLook(FSettings);
   FHints := HintsOf(ReadSeenText(FKind));
-  FDeep := RulesLookDeeper(FLayout, FKind);
+  FUsage := ReadUsage(FKind);
+  // the rules look inside submenus, or the most used row may hold an item of one: those filled only when opened are
+  // opened now
+  FDeep := RulesLookDeeper(FLayout, FKind) or (HasMostUsed(FLayout, FKind) and UsageGoesDeeper(FUsage));
   FindEmpty(FTop);
   FPlacement := TPlacement.Create(FLayout, FKind, FTop);
   FPlacement.Empty := FEmpty;
   FPlacement.AtRightClick := True;
+  FPlacement.Usage := FUsage;
+  FPlacement.MostUsedCount := FSettings.MostUsed;
 
   L := TLevelWindow.Create;
   L.Session := Self;
@@ -428,6 +438,7 @@ begin
   if (V = nil) or (V.Kind <> vkItem) or not V.Enabled or V.HasSubmenu then
     Exit;
   FChosen := V.Node.Id;
+  FChosenKey := UsageKey(V.Node);
   FDone := True;
 end;
 
@@ -781,6 +792,8 @@ begin
   NewPlacement := TPlacement.Create(FLayout, FKind, NewTop);
   NewPlacement.Empty := FEmpty;
   NewPlacement.AtRightClick := True;
+  NewPlacement.Usage := FUsage;
+  NewPlacement.MostUsedCount := FSettings.MostUsed;
   OldViews := TObjectList<TViewLevel>.Create;
   try
     for I := 0 to FLevels.Count - 1 do

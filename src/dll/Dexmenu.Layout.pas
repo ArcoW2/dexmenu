@@ -54,6 +54,7 @@ type
     ActionMark: string;       // the mark on an item without one; '' none
     Widths: TArray<TLevelWidth>;   // per level: the top, a first submenu, ...; the last for every deeper one
     States: TStates;          // the states a rule takes when it does not say
+    MostUsed: Integer;        // how many items the most used row shows (plan 02 3.9)
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
     WindowsMenu: Boolean;     // "Windows' menu" at the end of every menu (plan 02 3.11)
@@ -99,6 +100,7 @@ type
     IsDivider: Boolean;
     DividerText: string;
     DividerAlign: TDividerAlign;
+    IsMostUsed: Boolean;   // { "mostUsed": true }: the items chosen most, side by side (plan 02 3.9)
     constructor Create;
     destructor Destroy; override;
   end;
@@ -387,6 +389,13 @@ begin
           Line.DividerAlign := daRight;
       Continue;
     end;
+    if TJSONObject(Entry).GetValue('mostUsed') is TJSONTrue then
+    begin
+      Line := TLine.Create;
+      Lines.Add(Line);
+      Line.IsMostUsed := True;
+      Continue;
+    end;
     LineCards := TJSONObject(Entry).GetValue('line');
     if LineCards = nil then
       Continue;   // other kinds of line (row, ...) come with later steps
@@ -510,6 +519,7 @@ begin
   Result.SubmenuMark := '';
   Result.ActionMark := '';
   Result.Widths := nil;
+  Result.MostUsed := 3;
   Result.States := [stEnabled, stDisabled];
   if not ReadTextFile(DataFolder + '\settings.json', Text) then
     Exit;
@@ -530,6 +540,8 @@ begin
       Result.WindowsMenu := TJSONBool(TJSONObject(Menu).GetValue('windowsMenu')).AsBoolean;
     if TJSONObject(Menu).GetValue('editMenu') is TJSONBool then
       Result.EditMenu := TJSONBool(TJSONObject(Menu).GetValue('editMenu')).AsBoolean;
+    if TJSONObject(Menu).GetValue('mostUsed') is TJSONNumber then
+      Result.MostUsed := Max(1, Min(10, TJSONNumber(TJSONObject(Menu).GetValue('mostUsed')).AsInt));
     if TJSONObject(Menu).GetValue('submenuMark') is TJSONString then
       Result.SubmenuMark := TJSONObject(Menu).GetValue('submenuMark').Value;
     if TJSONObject(Menu).GetValue('actionMark') is TJSONString then

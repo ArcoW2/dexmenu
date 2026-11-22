@@ -43,11 +43,12 @@ const LayoutModel = (() => {
   }
 
   // Every divider entry of some lines, depth first: { entry, lines, index, parent }. A divider: { id, divider: "<text>"
-  // or "", align: "left" | "center" | "right" }, between lines of cards.
+  // or "", align: "left" | "center" | "right" }, between lines of cards. The most used row ({ id, mostUsed: true },
+  // plan 02 3.9) stands between lines as a divider does, so it is handled as one: moved, deleted, copied.
   function* dividers(lines, parent = null) {
     for (let i = 0; i < lines.length; i++) {
       const entry = lines[i];
-      if (entry.divider !== undefined) yield { entry, lines, index: i, parent };
+      if (entry.divider !== undefined || entry.mostUsed) yield { entry, lines, index: i, parent };
       if (entry.line) for (const card of entry.line) if (card.menu) yield* dividers(card.menu, card);
     }
   }
@@ -271,6 +272,12 @@ const LayoutModel = (() => {
     return entry;
   }
 
+  function addMostUsed(layout, lines) {
+    const entry = { id: newId(layout), mostUsed: true };
+    lines.push(entry);
+    return entry;
+  }
+
   function deleteDivider(lines, id) {
     const d = findDivider(lines, id);
     if (!d) return false;
@@ -423,5 +430,5 @@ const LayoutModel = (() => {
 
   return { matchKinds, isRemaining, isNote, addNote, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
-    dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
+    dividers, findDivider, addDivider, addMostUsed, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

@@ -21,7 +21,7 @@ implementation
 
 uses
   System.SysUtils, System.StrUtils, System.SyncObjs, System.Generics.Collections, DDetours, Dexmenu.Log,
-  Winapi.ShellAPI, Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen, Dexmenu.Place;
+  Winapi.ShellAPI, Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen, Dexmenu.Place, Dexmenu.Usage;
 
 const
   GET_MODULE_HANDLE_EX_FLAG_PIN = $00000001;
@@ -192,8 +192,10 @@ var
   Kind, Where, LayoutKind: string;
   ToWindows: Boolean;
   Command: TCommand;
+  ChosenKey: string;
 begin
   Command := ccNone;
+  ChosenKey := '';
   Result := False;
   Shown := False;
   if not TakeNoted(Menu, Kind, Where) or not Enabled or (ActiveSession <> nil) then
@@ -232,11 +234,14 @@ begin
     Shown := True;
     Result := Session.Run(X, Y, Params);
     Command := Session.Command;
+    ChosenKey := Session.ChosenKey;
   finally
     Session.Free;
   end;
   if Where <> '' then
     WriteLastRightClick(Where);   // the settings app's preview starts on it
+  if ChosenKey <> '' then
+    CountChoice(Kind, ChosenKey);   // the use counts (plan 02 3.9), once the menu has closed
   case Command of
     ccWindowsMenu:
       Shown := False;   // the hook shows Windows' own menu now, at the same place

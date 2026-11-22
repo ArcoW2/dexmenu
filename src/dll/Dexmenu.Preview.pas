@@ -42,7 +42,7 @@ implementation
 
 uses
   Winapi.Messages, Winapi.D2D1, System.SysUtils, System.Math, System.Classes, System.Generics.Collections, System.JSON,
-  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip;
+  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip, Dexmenu.Usage;
 
 const
   PreviewClassName = 'DexmenuPreview';
@@ -78,6 +78,7 @@ type
     Marked: string;
     Settings: TMenuSettings;   // how submenus open (settings.json "menu"), read at each rebuild
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
+    Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): the most used row
     Tip: TTip;
     TipLevel, TipBox: Integer;
     function Hidden(Index: Integer): Boolean;
@@ -114,6 +115,7 @@ begin
   Clear;
   Tip.Free;
   Hints.Free;
+  Usage.Free;
   Levels.Free;
   inherited;
 end;
@@ -151,6 +153,10 @@ begin
     Exit;
   Top := ReadLevel(Menu, '');
   Placement := TPlacement.Create(Layout, Kind, Top);
+  FreeAndNil(Usage);
+  Usage := ReadUsage(Kind);
+  Placement.Usage := Usage;
+  Placement.MostUsedCount := Settings.MostUsed;
   L := TPreviewLevel.Create;
   L.View := Placement.TopLevel;
   AddCommandLines(L.View, Settings);
