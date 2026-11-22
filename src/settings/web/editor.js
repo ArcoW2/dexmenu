@@ -194,6 +194,13 @@ function renderCard(card) {
     el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
   if (card.menu && !folded) box.append(renderLines(card.menu, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
+  // a double click on a card with a menu (its own space, not a card in it or a button) folds or unfolds it
+  box.addEventListener("dblclick", e => {
+    e.stopPropagation();
+    if (!card.menu || e.target.closest("button")) return;
+    collapsed.has(card.id) ? collapsed.delete(card.id) : collapsed.add(card.id);
+    render();
+  });
   // its actions show for the innermost card under the mouse only (CSS :hover would show the outer cards' too)
   box.addEventListener("mouseover", e => {
     e.stopPropagation();
