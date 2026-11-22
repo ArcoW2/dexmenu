@@ -9,6 +9,8 @@ interface
 
 function Enabled: Boolean;
 function Tracing: Boolean;
+// The probe of Explorer's own icons (plan 02 3.8): HKCU Software Dexmenu, ProbeIcons = 1; off unless set.
+function ProbingIcons: Boolean;
 procedure Log(const Text: string);
 function LocalAppData: string;
 function RoamingAppData: string;
@@ -51,6 +53,11 @@ end;
 function Tracing: Boolean;
 begin
   Result := SettingDword('Trace') = 1;
+end;
+
+function ProbingIcons: Boolean;
+begin
+  Result := SettingDword('ProbeIcons') = 1;
 end;
 
 function KnownFolder(const Id: TGUID): string;

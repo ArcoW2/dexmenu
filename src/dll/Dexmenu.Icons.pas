@@ -31,11 +31,17 @@ function KeptIconPixels(const Key: string; out Pixels: TIconPixels): Boolean;
 procedure ForgetKeptIcons;
 function IconsFolder: string;
 
+// The probe of Explorer's own icons (plan 02 3.8; only with ProbingIcons): every owner-drawn item of a level that has
+// no bitmap is drawn by its owner window into Dexmenu's memory, on black and on white (their difference is the
+// alpha); the whole drawing and the icon cut from its left part are written to %LOCALAPPDATA%\Dexmenu\probe, the
+// icon also kept for the preview (KeptIconPixels). What it found is logged.
+procedure ProbeOwnerDrawn(Owner: HWND; Nodes: TNodes);
+
 implementation
 
 uses
   System.Generics.Collections, System.SyncObjs, System.Classes, System.Hash, System.Math, System.IOUtils,
-  Winapi.ShellAPI, Winapi.ActiveX,
+  Winapi.Messages, Winapi.ShellAPI, Winapi.ActiveX,
   Winapi.Wincodec, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage;
 
 const
@@ -426,6 +432,205 @@ begin
     Kept.AddOrSetValue(Key, Pixels);
   finally
     CacheLock.Leave;
+  end;
+end;
+
+// ---- the probe of Explorer's own icons ----------------------------------------------------------------------------
+
+// One drawing of an item by its owner window on a background (0: black, $FFFFFF: white), as 32-bit BGRA.
+function DrawnItem(Owner: HWND; N: TNode; W, H: Integer; Background: COLORREF; out Bits: TBytes): Boolean;
+var
+  BMI: TBitmapInfo;
+  Mem: Pointer;
+  DC: HDC;
+  Bmp, Old: HBITMAP;
+  Brush: HBRUSH;
+  R: TRect;
+  DI: TDrawItemStruct;
+begin
+  Result := False;
+  FillChar(BMI, SizeOf(BMI), 0);
+  BMI.bmiHeader.biSize := SizeOf(BMI.bmiHeader);
+  BMI.bmiHeader.biWidth := W;
+  BMI.bmiHeader.biHeight := -H;
+  BMI.bmiHeader.biPlanes := 1;
+  BMI.bmiHeader.biBitCount := 32;
+  DC := CreateCompatibleDC(0);
+  Bmp := CreateDIBSection(DC, BMI, DIB_RGB_COLORS, Mem, 0, 0);
+  if Bmp = 0 then
+  begin
+    DeleteDC(DC);
+    Exit;
+  end;
+  Old := SelectObject(DC, Bmp);
+  try
+    R := Rect(0, 0, W, H);
+    Brush := CreateSolidBrush(Background);
+    FillRect(DC, R, Brush);
+    DeleteObject(Brush);
+    FillChar(DI, SizeOf(DI), 0);
+    DI.CtlType := ODT_MENU;
+    DI.itemID := N.Id;
+    DI.itemAction := ODA_DRAWENTIRE;
+    DI.itemState := 0;
+    DI.hwndItem := HWND(N.Menu);
+    DI.hDC := DC;
+    DI.rcItem := R;
+    DI.itemData := N.Item.Info.dwItemData;
+    SendMessage(Owner, WM_DRAWITEM, 0, LPARAM(@DI));
+    GdiFlush;
+    SetLength(Bits, W * H * 4);
+    Move(Mem^, Bits[0], Length(Bits));
+    Result := True;
+  finally
+    SelectObject(DC, Old);
+    DeleteObject(Bmp);
+    DeleteDC(DC);
+  end;
+end;
+
+procedure ProbeOwnerDrawn(Owner: HWND; Nodes: TNodes);
+var
+  WIC: IWICImagingFactory;
+  Initialized: Boolean;
+  Folder: string;
+
+  procedure Save(const Name: string; const Pixels: TIconPixels);
+  var
+    Png: TBytes;
+  begin
+    Png := EncodePng(WIC, Pixels);
+    if Png <> nil then
+      TFile.WriteAllBytes(Folder + '\' + Name + '.png', Png);
+  end;
+
+  procedure Probe(N: TNode);
+  var
+    MI: TMeasureItemStruct;
+    W, H, I, X, Y, Left, Right, Top, Bottom, Gap, A: Integer;
+    Black, White: TBytes;
+    Full, Icon: TIconPixels;
+    Name: string;
+    Used: Boolean;
+  begin
+    FillChar(MI, SizeOf(MI), 0);
+    MI.CtlType := ODT_MENU;
+    MI.itemID := N.Id;
+    MI.itemData := N.Item.Info.dwItemData;
+    SendMessage(Owner, WM_MEASUREITEM, 0, LPARAM(@MI));
+    W := Min(Integer(MI.itemWidth) + 40, 800);   // the width measured is the text's: room for the check and icon
+    H := Min(Integer(MI.itemHeight), 128);
+    if (MI.itemWidth = 0) or (H <= 0) then
+    begin
+      Log(Format('probe "%s": measured nothing', [N.Name]));
+      Exit;
+    end;
+    if not DrawnItem(Owner, N, W, H, 0, Black) or not DrawnItem(Owner, N, W, H, $FFFFFF, White) then
+      Exit;
+    // alpha from the two drawings: what shows the background is clear; the colour on black is premultiplied
+    Full.Width := W;
+    Full.Height := H;
+    SetLength(Full.Bits, W * H * 4);
+    I := 0;
+    while I < Length(Full.Bits) do
+    begin
+      A := 255 - Max(White[I] - Black[I], Max(White[I + 1] - Black[I + 1], White[I + 2] - Black[I + 2]));
+      A := Max(0, Min(255, A));
+      Full.Bits[I] := Min(Black[I], A);
+      Full.Bits[I + 1] := Min(Black[I + 1], A);
+      Full.Bits[I + 2] := Min(Black[I + 2], A);
+      Full.Bits[I + 3] := A;
+      Inc(I, 4);
+    end;
+    Name := THashMD5.GetHashString(UsageKey(N)).Substring(0, 8) + ' ' + N.Name.Replace('\', '_').Replace('/', '_')
+      .Replace(':', '_').Replace('*', '_').Replace('?', '_').Replace('"', '_').Replace('<', '_').Replace('>', '_')
+      .Replace('|', '_');
+    Save(Name + ' (whole)', Full);
+    // the icon: the first run of columns from the left with anything drawn, ended by a gap of 3 empty columns,
+    // within the first 2 heights of the item
+    Left := -1;
+    Right := -1;
+    Gap := 0;
+    for X := 0 to Min(W, 2 * H) - 1 do
+    begin
+      Used := False;
+      for Y := 0 to H - 1 do
+        if Full.Bits[(Y * W + X) * 4 + 3] > 0 then
+          Used := True;
+      if Used then
+      begin
+        if Left < 0 then
+          Left := X;
+        Right := X;
+        Gap := 0;
+      end
+      else if Left >= 0 then
+      begin
+        Inc(Gap);
+        if Gap >= 3 then
+          Break;
+      end;
+    end;
+    if Left < 0 then
+    begin
+      Log(Format('probe "%s": %dx%d drawn, nothing at its left', [N.Name, W, H]));
+      Exit;
+    end;
+    Top := H;
+    Bottom := -1;
+    for Y := 0 to H - 1 do
+      for X := Left to Right do
+        if Full.Bits[(Y * W + X) * 4 + 3] > 0 then
+        begin
+          Top := Min(Top, Y);
+          Bottom := Max(Bottom, Y);
+        end;
+    Icon.Width := Right - Left + 1;
+    Icon.Height := Bottom - Top + 1;
+    SetLength(Icon.Bits, Icon.Width * Icon.Height * 4);
+    for Y := 0 to Icon.Height - 1 do
+      Move(Full.Bits[((Top + Y) * W + Left) * 4], Icon.Bits[Y * Icon.Width * 4], Icon.Width * 4);
+    Save(Name + ' (icon)', Icon);
+    Log(Format('probe "%s": %dx%d drawn, icon %dx%d at %d,%d', [N.Name, W, H, Icon.Width, Icon.Height, Left, Top]));
+    if (Icon.Width <= 48) and (Icon.Height <= 48) then
+    begin
+      ForceDirectories(IconsFolder);
+      TFile.WriteAllBytes(IconFile(UsageKey(N)), EncodePng(WIC, Icon));
+      CacheLock.Enter;
+      try
+        Kept.Remove(UsageKey(N));
+      finally
+        CacheLock.Leave;
+      end;
+    end;
+  end;
+
+var
+  N: TNode;
+  Dummy: TIconPixels;
+begin
+  if (Nodes = nil) or (Owner = 0) then
+    Exit;
+  Folder := LocalAppData + '\Dexmenu\probe';
+  Initialized := Succeeded(CoInitializeEx(nil, COINIT_APARTMENTTHREADED));
+  try
+    try
+      ForceDirectories(Folder);
+      WIC := Factory;
+      if WIC = nil then
+        Exit;
+      for N in Nodes do
+        if (N.Item.Info.fType and MFT_OWNERDRAW <> 0) and not N.IsSeparator and (N.Name <> '') and
+          not BitmapPixels(N.Item.Info.hbmpItem, Dummy) then
+          Probe(N);
+    except
+      on E: Exception do
+        Log('probe: ' + E.Message);
+    end;
+    WIC := nil;
+  finally
+    if Initialized then
+      CoUninitialize;
   end;
 end;
 

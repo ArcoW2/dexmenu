@@ -62,6 +62,7 @@ the preview is the result.
 | Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else the title's first letter; set in the editor's card panel | 3.8 |
 | Shipped layouts | "Default A", "Default C" (by task) and "Default D" (minimal, without its search box yet), each written once into the layouts folder (settings.json `shipped`); every other kind on Default A at a first start; each ends with a note, "Edit menu..." and "Windows' menu" | 3.10 |
 | Icons in the preview | the items' own bitmaps kept as PNG files in the seen folder's `icons` (by a hash of the item's path and text), by every right-click and by the settings app's real menu of a folder; the preview draws them; an icon this process kept with the same pixels is not encoded again | 3.8 |
+| Icon probe | opt-in (HKCU Software Dexmenu, ProbeIcons = 1): at a right-click every owner-drawn item without a bitmap drawn by its owner window into Dexmenu's memory on black and on white, the icon cut from its left part; the drawings written to %LOCALAPPDATA%\Dexmenu\probe, the icon kept for the preview, the result logged; not yet run in Explorer | 3.8 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 
@@ -69,7 +70,7 @@ the preview is the result.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Explorer's own icons | Explorer asked to draw its owner-drawn items into Dexmenu's memory, the icon cut out; first a probe in Explorer | Icons | 3.8 |
+| Explorer's own icons | Explorer's owner-drawn items' icons read at a right-click and used in the menu and the preview | the probe's result | 3.8 |
 | Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | items as buttons in a card; the search box | 3.10 |
 | Search box in Default D | Default D's search box | the search box (3.6) | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |

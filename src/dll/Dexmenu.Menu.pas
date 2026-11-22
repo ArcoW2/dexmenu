@@ -330,6 +330,8 @@ begin
   // opened now
   FDeep := RulesLookDeeper(FLayout, FKind) or (HasMostUsed(FLayout, FKind) and UsageGoesDeeper(FUsage));
   FindEmpty(FTop);
+  if Notify and ProbingIcons then
+    ProbeOwnerDrawn(FOwner, FTop);   // Explorer's own icons: the probe (plan 02 3.8), off unless switched on
   FPlacement := TPlacement.Create(FLayout, FKind, FTop);
   FPlacement.Empty := FEmpty;
   FPlacement.AtRightClick := True;
