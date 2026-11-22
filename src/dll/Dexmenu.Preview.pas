@@ -146,6 +146,7 @@ begin
   FreeAndNil(Placement);
   FreeAndNil(Top);
   Settings := MenuSettings;
+  SetMenuLook(Settings);
   if (Menu = 0) or (Layout = nil) then
     Exit;
   Top := ReadLevel(Menu, '');
@@ -201,7 +202,7 @@ begin
   L.Replaces := Mode = smReplace;
   if L.Replaces then
     AddBackLine(L.View, V);
-  L.Geometry := Measure(L.View);
+  L.Geometry := Measure(L.View, Levels.Count);
   R := Parent.Geometry.Boxes[Box].Rect;
   case Mode of
     smUnder:

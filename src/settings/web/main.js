@@ -139,6 +139,13 @@ $("delete").addEventListener("click", async () => { if (selected && await confir
 $("submenus").addEventListener("change", () => post({ type: "setMenu", name: "submenus", value: $("submenus").value }));
 for (const id of ["onClickOnly", "windowsMenu", "editMenu"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).checked }));
+for (const id of ["submenuMark", "actionMark", "states"])
+  $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).value }));
+$("widths").addEventListener("change", () => post({ type: "setMenu", name: "widths",
+  value: [...$("widths").querySelectorAll("tr")].slice(1).map(tr => {
+    const [lo, hi] = [...tr.querySelectorAll("input")].map(i => Math.max(100, +i.value || 200));
+    return { min: lo, max: Math.max(lo, hi) };
+  }) }));
 $("register").addEventListener("click", () => post({ type: "register" }));
 $("unregister").addEventListener("click", () => post({ type: "unregister" }));
 $("restart").addEventListener("click", () => post({ type: "restart" }));
@@ -186,6 +193,15 @@ chrome.webview.addEventListener("message", e => {
     $("onClickOnly").checked = m.menu.onClickOnly;
     $("windowsMenu").checked = m.menu.windowsMenu;
     $("editMenu").checked = m.menu.editMenu;
+    for (const id of ["submenuMark", "actionMark"]) if (document.activeElement !== $(id)) $(id).value = m.menu[id];
+    $("states").value = m.menu.states;
+    const rows = [...$("widths").querySelectorAll("tr")].slice(1);
+    rows.forEach((tr, i) => {
+      const w = m.menu.widths[Math.min(i, m.menu.widths.length - 1)] || { min: 200, max: 480 };
+      const [lo, hi] = tr.querySelectorAll("input");
+      if (document.activeElement !== lo) lo.value = w.min;
+      if (document.activeElement !== hi) hi.value = w.max;
+    });
     $("onClickOnly").disabled = m.menu.submenus === "replace";   // in place of the menu: always on a click
     renderKinds();
     renderLayouts();

@@ -8,7 +8,7 @@ unit Dexmenu.Draw;
 interface
 
 uses
-  Winapi.Windows, Winapi.D2D1, System.Types, Dexmenu.Place;
+  Winapi.Windows, Winapi.D2D1, System.Types, Dexmenu.Place, Dexmenu.Layout;
 
 type
   TBox = record
@@ -35,8 +35,10 @@ type
     procedure Free;
   end;
 
-// The level laid out: every card's box.
-function Measure(Level: TViewLevel): TGeometry;
+// The level laid out: every card's box. Depth: 0 the top, 1 a first submenu, ... (its width from the global settings).
+function Measure(Level: TViewLevel; Depth: Integer = 0): TGeometry;
+// The global settings' look for the levels drawn next (plan 02 3.4): the marks and the widths per level.
+procedure SetMenuLook(const Settings: TMenuSettings);
 // The level drawn and shown in a layered window at a screen position (pixels); Selected: a box index or -1;
 // ScrollY: DIP scrolled down; Scale: the monitor's DPI / 96. The window's size is set to the picture's.
 procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Selected: Integer; ScrollY, Scale: Single;
@@ -68,7 +70,7 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Layout;
+  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log;
 
 const
   RRF_RT_REG_DWORD = $00000010;
@@ -214,8 +216,20 @@ begin
   Result := Result + 2 * NotePad;
 end;
 
-function Measure(Level: TViewLevel): TGeometry;
 var
+  SubmenuMark, ActionMark: string;   // '' : the chevron glyph; none
+  LevelWidths: TArray<TLevelWidth>;
+
+procedure SetMenuLook(const Settings: TMenuSettings);
+begin
+  SubmenuMark := Settings.SubmenuMark;
+  ActionMark := Settings.ActionMark;
+  LevelWidths := Settings.Widths;
+end;
+
+function Measure(Level: TViewLevel; Depth: Integer): TGeometry;
+var
+  LevelMin, LevelMax: Single;
   Line: TViewLine;
   V: TViewCard;
   W, Y, H, X, CardW, Need: Single;
@@ -225,7 +239,14 @@ var
 begin
   EnsureFactories;
   // The width: the widest line's need, between the minimum and the maximum.
-  W := MinWidth;
+  LevelMin := MinWidth;
+  LevelMax := MaxWidth;
+  if Length(LevelWidths) > 0 then
+  begin
+    LevelMin := LevelWidths[Min(Depth, High(LevelWidths))].MinW;
+    LevelMax := LevelWidths[Min(Depth, High(LevelWidths))].MaxW;
+  end;
+  W := LevelMin;
   for Line in Level.Lines do
   begin
     Need := 0;
@@ -244,7 +265,7 @@ begin
       end;
     W := Max(W, Need + 2 * OuterPad);
   end;
-  W := Min(W, MaxWidth);
+  W := Min(W, LevelMax);
 
   Result.Boxes := nil;
   Y := OuterPad;
@@ -419,9 +440,16 @@ begin
     if V.Checked then
       T.DrawText(PWideChar(CheckGlyph), 1, GlyphFormat, D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom),
         Brush);
-    if V.HasSubmenu then
+    // the marks (the global settings): a submenu's (the chevron unless one is set), an action's (none unless set)
+    if V.HasSubmenu and (SubmenuMark = '') then
       T.DrawText(PWideChar(ChevronGlyph), 1, GlyphFormat, D2D1RectF(R.right - MarkWidth, R.top, R.right - 6, R.bottom),
-        Brush);
+        Brush)
+    else if V.HasSubmenu then
+      T.DrawText(PWideChar(SubmenuMark), Length(SubmenuMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
+        R.right - 4, R.bottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP)
+    else if (ActionMark <> '') and (V.Kind in [vkItem, vkCommand]) then
+      T.DrawText(PWideChar(ActionMark), Length(ActionMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
+        R.right - 4, R.bottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
     if V.IsDefault then
       Fmt := BoldFormat
     else

@@ -179,6 +179,22 @@ begin
   Check((MenuSettings.Submenus = smReplace) and MenuSettings.OnClickOnly, 'the menu settings read: replace, on a click only');
   TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ }');
   Check((MenuSettings.Submenus = smNext) and not MenuSettings.OnClickOnly, 'no menu settings: next to the card, on hover');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "submenuMark": ">", "actionMark": "-", "states": "enabled", ' +
+    '"widths": [ { "min": 240, "max": 520 }, { "min": 180, "max": 360 } ] } }');
+  with MenuSettings do
+    Check((SubmenuMark = '>') and (ActionMark = '-') and (States = [stEnabled]) and (Length(Widths) = 2) and
+      (Widths[0].MinW = 240) and (Widths[1].MaxW = 360), 'marks, a rule''s default states and the widths per level read');
+  L := CurrentLayout('file', ToWindows, Error);
+  TFile.WriteAllText(TPath.Combine(Layouts, 'Rules.json'), '{ "format": 1, "lines": [ { "line": [ { "card": "A", "rules": [ ' +
+    '{ "name": { "equals": "x" } } ] } ] }, { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "kinds": [ { "kind": "default", "layout": "Rules" } ], ' +
+    '"menu": { "states": "enabled" } }');
+  L := CurrentLayout('file', ToWindows, Error);
+  Check((L <> nil) and (L.Lines('')[0].Cards[0].Rules[0].Spec.States = [stEnabled]), 'a rule without states takes the default (enabled)');
+  TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "kinds": [ { "kind": "default", "layout": "Rules" } ] }');
+  L := CurrentLayout('file', ToWindows, Error);
+  Check((L <> nil) and (L.Lines('')[0].Cards[0].Rules[0].Spec.States = [stEnabled, stDisabled]),
+    'the default changed: the layout read again (both)');
   TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "layout": "Files" }');
   Check(Title('folder') = 'Files', 'the older setting ("layout"): that layout for every kind');
   TDirectory.Delete(Data, True);

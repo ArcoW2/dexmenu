@@ -50,6 +50,11 @@ type
 
 function ParseRule(Obj: TJSONObject): TRuleSpec;
 
+var
+  // The states a rule takes when it does not say (the global settings' "states", plan 02 3.4; set by
+  // Dexmenu.Layout.CurrentLayout before a layout is read)
+  DefaultStates: TStates = [stEnabled, stDisabled];
+
 implementation
 
 uses
@@ -154,7 +159,7 @@ var
 begin
   Result := Default(TRuleSpec);
   Result.Priority := -1;
-  Result.States := [stEnabled, stDisabled];
+  Result.States := DefaultStates;
   Result.Scope := scTop;
   if Obj.GetValue('verb') <> nil then
   begin

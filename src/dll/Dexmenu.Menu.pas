@@ -311,6 +311,7 @@ begin
   end;
   FTop := ReadLevel(FOriginal, '');
   FSettings := MenuSettings;
+  SetMenuLook(FSettings);
   FHints := HintsOf(ReadSeenText(FKind));
   FDeep := RulesLookDeeper(FLayout, FKind);
   FindEmpty(FTop);
@@ -501,7 +502,7 @@ begin
   if Dpi = 0 then
     Dpi := 96;
   L.Scale := Dpi / 96;
-  L.Geometry := Measure(L.View);
+  L.Geometry := Measure(L.View, L.Index);
   FitOnScreen(L, X, Y, False, False, Parent.Pos.X + Round(R.left * Parent.Scale) + 2);
   if L.Replaces then
     ShowWindow(Parent.Wnd, SW_HIDE);
@@ -833,7 +834,7 @@ begin
             AddBackLine(L.View, Found);
         end;
       end;
-      L.Geometry := Measure(L.View);
+      L.Geometry := Measure(L.View, I);
       L.Selected := -1;
       if SelectedId <> 0 then
         for B := 0 to High(L.Geometry.Boxes) do

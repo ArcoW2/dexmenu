@@ -43,8 +43,17 @@ type
   // in place of the menu (with "<<" back)
   TSubmenuMode = (smDefault, smNext, smUnder, smReplace);
 
+  // A level's width (DIP): from its minimum, grown by its lines up to its maximum (plan 02 3.4).
+  TLevelWidth = record
+    MinW, MaxW: Single;
+  end;
+
   // The global settings for every menu (settings.json "menu"; plan 02 3.4).
   TMenuSettings = record
+    SubmenuMark: string;      // the mark on a card with a submenu; '' the built-in chevron
+    ActionMark: string;       // the mark on an item without one; '' none
+    Widths: TArray<TLevelWidth>;   // per level: the top, a first submenu, ...; the last for every deeper one
+    States: TStates;          // the states a rule takes when it does not say
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
     WindowsMenu: Boolean;     // "Windows' menu" at the end of every menu (plan 02 3.11)
@@ -125,7 +134,7 @@ const
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, System.SyncObjs, Dexmenu.Json, Dexmenu.Log;
+  Winapi.Windows, System.SysUtils, System.SyncObjs, System.Math, Dexmenu.Json, Dexmenu.Log;
 
 type
   TLayout = class(TInterfacedObject, ILayout)
@@ -491,12 +500,17 @@ var
 function MenuSettings: TMenuSettings;
 var
   Text, Error: string;
-  Settings, Menu: TJSONValue;
+  Settings, Menu, W: TJSONValue;
+  Width: TLevelWidth;
 begin
   Result.Submenus := smNext;
   Result.OnClickOnly := False;
   Result.WindowsMenu := True;
   Result.EditMenu := True;
+  Result.SubmenuMark := '';
+  Result.ActionMark := '';
+  Result.Widths := nil;
+  Result.States := [stEnabled, stDisabled];
   if not ReadTextFile(DataFolder + '\settings.json', Text) then
     Exit;
   Settings := ParseWithComments(Text, Error);
@@ -516,6 +530,23 @@ begin
       Result.WindowsMenu := TJSONBool(TJSONObject(Menu).GetValue('windowsMenu')).AsBoolean;
     if TJSONObject(Menu).GetValue('editMenu') is TJSONBool then
       Result.EditMenu := TJSONBool(TJSONObject(Menu).GetValue('editMenu')).AsBoolean;
+    if TJSONObject(Menu).GetValue('submenuMark') is TJSONString then
+      Result.SubmenuMark := TJSONObject(Menu).GetValue('submenuMark').Value;
+    if TJSONObject(Menu).GetValue('actionMark') is TJSONString then
+      Result.ActionMark := TJSONObject(Menu).GetValue('actionMark').Value;
+    if TJSONObject(Menu).GetValue('states') is TJSONString then
+      if TJSONObject(Menu).GetValue('states').Value = 'enabled' then
+        Result.States := [stEnabled]
+      else if TJSONObject(Menu).GetValue('states').Value = 'disabled' then
+        Result.States := [stDisabled];
+    if TJSONObject(Menu).GetValue('widths') is TJSONArray then
+      for W in TJSONArray(TJSONObject(Menu).GetValue('widths')) do
+        if (W is TJSONObject) and (TJSONObject(W).GetValue('min') is TJSONNumber) and (TJSONObject(W).GetValue('max') is TJSONNumber) then
+        begin
+          Width.MinW := Max(100, TJSONNumber(TJSONObject(W).GetValue('min')).AsDouble);
+          Width.MaxW := Max(Width.MinW, TJSONNumber(TJSONObject(W).GetValue('max')).AsDouble);
+          Result.Widths := Result.Widths + [Width];
+        end;
   finally
     Settings.Free;
   end;
@@ -584,6 +615,7 @@ function WarningLayout(const Path: string): ILayout; forward;
 
 function CurrentLayout(const Kind: string; out ToWindows: Boolean; out Error: string): ILayout;
 var
+  States: TStates;
   Path, Text: string;
   Data: TWin32FileAttributeData;
   C: TCached;
@@ -593,8 +625,16 @@ begin
   Path := LayoutFile(Kind, ToWindows);
   if ToWindows then
     Exit;
+  States := MenuSettings.States;
   Lock.Enter;
   try
+    // a rule's default states changed (the global settings): every layout read again
+    if States <> DefaultStates then
+    begin
+      DefaultStates := States;
+      Cache.Clear;
+      Base := nil;
+    end;
     if (Path = '') or not GetFileAttributesEx(PChar(Path), GetFileExInfoStandard, @Data) then
     begin
       if Base = nil then

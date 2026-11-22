@@ -83,6 +83,15 @@ static class DataFolder
             ["onClickOnly"] = m?["onClickOnly"]?.GetValue<bool>() == true,
             ["windowsMenu"] = m?["windowsMenu"]?.GetValue<bool>() != false,
             ["editMenu"] = m?["editMenu"]?.GetValue<bool>() != false,
+            ["submenuMark"] = m?["submenuMark"]?.GetValue<string>() ?? "",
+            ["actionMark"] = m?["actionMark"]?.GetValue<string>() ?? "",
+            ["states"] = m?["states"]?.GetValue<string>() is "enabled" or "disabled" ? m!["states"]!.GetValue<string>() : "both",
+            // per level: the top, a first submenu, deeper ones (DIP); the DLL's own when none
+            ["widths"] = m?["widths"] is System.Text.Json.Nodes.JsonArray w ? w.DeepClone()
+                : new System.Text.Json.Nodes.JsonArray(
+                    new System.Text.Json.Nodes.JsonObject { ["min"] = 200, ["max"] = 480 },
+                    new System.Text.Json.Nodes.JsonObject { ["min"] = 200, ["max"] = 480 },
+                    new System.Text.Json.Nodes.JsonObject { ["min"] = 200, ["max"] = 480 }),
         };
     }
 
