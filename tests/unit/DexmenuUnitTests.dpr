@@ -72,6 +72,14 @@ begin
   Check(ErrorOf('{ "default": [ ') <> '', 'broken JSON: invalid');
   Check(Valid('// a comment'#10'{ "default": [ { "line": [ ' + Remaining + ' ] } ] } // and one more'),
     'comments in a layout');
+  // the current form: one menu, "lines" (plan 05 3.1)
+  Check(Valid('{ "format": 1, "lines": [ { "line": [ ' + Remaining + ' ] } ] }'), 'format 1: one menu in "lines"');
+  Check(Pos('"lines" is missing', ErrorOf('{ "format": 1, "default": [ { "line": [ ' + Remaining + ' ] } ] }')) > 0,
+    'format 1 without "lines": invalid');
+  Check(Pos('newer form', ErrorOf('{ "format": 99, "lines": [ { "line": [ ' + Remaining + ' ] } ] }')) > 0,
+    'a newer format than the DLL knows: not used, the reason says so');
+  Check(Valid('{ "default": [ { "line": [ ' + Remaining + ' ] } ], "folder": [ { "line": [ { "card": "Broken" } ] } ] }'),
+    'the older form: read by its default menu, its other kinds'' sections ignored');
 end;
 
 procedure TestCurrent;

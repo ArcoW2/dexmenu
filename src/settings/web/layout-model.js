@@ -338,6 +338,15 @@ const LayoutModel = (() => {
     return true;
   }
 
+  // The layout in the current form (plan 05 3.1.1): { format, lines } - one menu. An older file (no "format": a
+  // section per kind of right-click) brought to it: its "default" section becomes the menu, its other sections go.
+  // Whether it changed, so the editor shows it as not saved.
+  const formatVersion = 1;
+  function upToDate(layout) {
+    if (layout.format === formatVersion && Array.isArray(layout.lines)) return { layout, changed: false };
+    return { layout: { format: formatVersion, lines: Array.isArray(layout.default) ? layout.default : [] }, changed: true };
+  }
+
   function remainingCount(lines) {
     let n = 0;
     for (const at of cards(lines)) if (isRemaining(at.card)) n++;
@@ -362,5 +371,5 @@ const LayoutModel = (() => {
 
   return { matchKinds, isRemaining, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
-    dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, addCard, makeMenu, remainingCount, withoutComments };
+    dividers, findDivider, addDivider, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, addCard, makeMenu, remainingCount, withoutComments };
 })();

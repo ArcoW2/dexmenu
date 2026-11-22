@@ -1,13 +1,17 @@
 unit Dexmenu.Layout;
 
-// The layout file (docs/plans/02-PLAN-own-menu.md 3.3, 3.5; plan 00 step 2): JSON with comments. Each kind of
-// right-click is a key (for now only "default"); its value is a list of lines, top to bottom; a line holds cards. A
-// card has a title and either rules or a menu (lines again, one level down). Every kind has exactly one card with the
-// rule "remaining", which takes every top-level item no other rule took and places each, with its subitems, at its
-// own place.
+// The layout file (docs/plans/02-PLAN-own-menu.md 3.3, 3.5; plan 05 3.1): JSON with comments, one menu: "lines", a
+// list of lines, top to bottom; a line holds cards (or is a divider). A card has a title and either rules or a menu
+// (lines again, one level down). The menu has exactly one card with the rule "remaining", which takes every top-level
+// item no other rule took and places each, with its subitems, at its own place. "format" says which form the file
+// has (FormatVersion now); a newer one than this DLL knows is not used.
 //
 //   // the base layout: Windows' menu as cards
-//   { "default": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }
+//   { "format": 1, "lines": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }
+//
+// A file of the older form (no "format": a section per kind of right-click, "default" among them) is read by its
+// "default" section; its other sections are ignored (plan 05 3.1). Which layout a kind of right-click gets is
+// settings.json's (plan 05 3.2), not the layout's.
 //
 // Which file: DEXMENU_LAYOUT_FILE (the tests), else %APPDATA%\Dexmenu\settings.json's "layout" (a name) as
 // %APPDATA%\Dexmenu\layouts\<name>.json; no settings or no file: the built-in base layout. Read again when the file
@@ -75,7 +79,7 @@ type
 
   ILayout = interface
     ['{6B0B6E2C-3E0B-4E8E-9C61-2D0E54D7A0A1}']
-    // The lines of a kind of right-click; the default kind's when that kind has none.
+    // The layout's menu (one for every kind of right-click that uses the layout; Kind is not looked at).
     function Lines(const Kind: string): TLines;
     function Source: string;   // the file it came from, or '(built in)'
   end;
@@ -88,8 +92,9 @@ function CurrentLayout(out Error: string): ILayout;
 function LayoutFile: string;
 
 const
+  FormatVersion = 1;   // the layout files' form this DLL writes and reads; older forms are read too
   BaseLayout = '// the base layout: Windows'' menu as cards'#10 +
-    '{ "default": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }';
+    '{ "format": 1, "lines": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }';
 
 implementation
 
@@ -164,8 +169,7 @@ end;
 
 function TLayout.Lines(const Kind: string): TLines;
 begin
-  if not FKinds.TryGetValue(Kind, Result) then
-    Result := FKinds['default'];
+  Result := FKinds['default'];
 end;
 
 function TLayout.Source: string;
@@ -352,11 +356,10 @@ end;
 
 function ParseLayout(const Text, Source: string; out Error: string): ILayout;
 var
-  Root: TJSONValue;
-  Pair: TJSONPair;
+  Root, Menu: TJSONValue;
   Layout: TLayout;
   Lines: TLines;
-  N: Integer;
+  N, Version: Integer;
 begin
   Result := nil;
   Root := ParseWithComments(Text, Error);
@@ -369,28 +372,38 @@ begin
   try
     if not (Root is TJSONObject) then
     begin
-      Error := Source + ': the layout must be an object, a kind of right-click per key';
+      Error := Source + ': the layout must be an object';
       Exit;
     end;
     NextCardId := 0;
-    for Pair in TJSONObject(Root) do
+    Version := 0;
+    if TJSONObject(Root).GetValue('format') is TJSONNumber then
+      Version := TJSONNumber(TJSONObject(Root).GetValue('format')).AsInt;
+    if Version > FormatVersion then
     begin
-      if Pair.JsonString.Value = 'template' then
-        Continue;   // the template card's look: plan 03, step 6
-      Lines := TLines.Create;
-      Layout.FKinds.Add(Pair.JsonString.Value, Lines);
-      if not ParseLines(Pair.JsonValue, Source + ' ' + Pair.JsonString.Value, nil, Lines, Error) then
-        Exit;
-      N := CountRemaining(Lines);
-      if N <> 1 then
-      begin
-        Error := Format('%s %s: exactly one remaining card needed, found %d', [Source, Pair.JsonString.Value, N]);
-        Exit;
-      end;
+      Error := Format('%s: a newer form of layout (format %d; this Dexmenu knows %d)', [Source, Version, FormatVersion]);
+      Exit;
     end;
-    if not Layout.FKinds.ContainsKey('default') then
+    if Version >= 1 then
+      Menu := TJSONObject(Root).GetValue('lines')
+    else
+      Menu := TJSONObject(Root).GetValue('default');   // the older form: its "default" section, the others ignored
+    if Menu = nil then
     begin
-      Error := Source + ': the kind "default" is missing';
+      if Version >= 1 then
+        Error := Source + ': "lines" is missing'
+      else
+        Error := Source + ': the kind "default" is missing';
+      Exit;
+    end;
+    Lines := TLines.Create;
+    Layout.FKinds.Add('default', Lines);
+    if not ParseLines(Menu, Source, nil, Lines, Error) then
+      Exit;
+    N := CountRemaining(Lines);
+    if N <> 1 then
+    begin
+      Error := Format('%s: exactly one remaining card needed, found %d', [Source, N]);
       Exit;
     end;
     Result := Layout;

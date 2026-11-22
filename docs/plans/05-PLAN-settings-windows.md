@@ -1,8 +1,9 @@
 # Plan 05: The settings app as a main window and an editor window per layout
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-22: draft.
+- 2026-11-22: partly executed: the layout format.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md` 3.7, 3.9: the settings app, registration) and plan 02 (`02-PLAN-own-menu.md`
 3.4, 3.5: layouts, the editor). Changes how layouts are chosen per kind of right-click and where they are edited.
@@ -30,12 +31,12 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 
 | Part | What | Reference |
 |---|---|---|
+| Layout format | a layout is one menu (`format`, `lines`); an older file read by its default menu, brought to the current form by the editor | 3.1; 6.1 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Layout format | a layout is one menu (its lines); the Default layout; the user's layouts kept, an old file read by its default menu | -- | 3.1 |
 | Layout versions | a format number in each layout; the editor updates an older file when it opens it; the DLL shows a warning (a note card) and the remaining card for a file it cannot use | Layout format; plan 02 Note card | 3.1.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
 | Open dialog | a right-click in an Open or Save dialog as kinds of their own (a file, a folder, several, an empty part, a drive in a dialog) | Kinds setting | 3.2 |
@@ -199,3 +200,20 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 The layout format
+
+- The DLL (`src/dll/Dexmenu.Layout.pas`): `FormatVersion` 1; a file with `"format": 1` is read by its `lines`; one
+  without `format` by its `default` section, its other sections ignored (not checked either); a newer format is not
+  used, the reason naming both numbers (Windows' menu until the warning card, 3.1.1). `ILayout.Lines(Kind)` gives
+  the one menu for every kind. The built-in base layout is in the new form.
+- The editor (`layout-model.js` `upToDate`, `editor.js`): it edits `lines`; an older file opened is brought to the
+  new form (its `default` section as `lines`) and shown as not saved, written with the next Save. The banner "This
+  kind of right-click uses the default layout" and "Give it its own" are gone.
+- Not yet: the Default layout file made on first start (with the kinds setting, 3.2), the warning card (3.1.1).
+- Tested: unit tests (format 1 read; without `lines` refused; a newer format refused with its reason; the older
+  form read by its default menu, a broken other section ignored); the editor's self-test (an older file brought to
+  the current form and marked changed, a current one unchanged); the settings app started on a format-1 layout: the
+  preview showed it (its dump).

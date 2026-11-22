@@ -189,6 +189,13 @@
   const zip = [...M.cards(L.default)].find(a => a.card.card === "Zip" && a.card.menu).card;
   check(zip && zip.menu[0].line[0].rules[0].name.startsWith === "7", "made a menu: its rules in the first card");
 
+  // the current form (plan 05 3.1): an older file brought to it by its default menu; a current one left as it is
+  const old = M.upToDate({ default: [ { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ], folder: [ { line: [] } ] });
+  check(old.changed && old.layout.format === M.formatVersion && old.layout.lines[0].line[0].card === "Rest" && !old.layout.folder,
+    "an older file: its default menu as the layout's lines, the other kinds gone, marked changed");
+  const cur = M.upToDate({ format: M.formatVersion, lines: [] });
+  check(!cur.changed, "a current file: unchanged");
+
   // comments
   check(M.withoutComments('{ "r": "a//b" } // c') === '{ "r": "a//b" } \n', "// inside a string kept, after it a comment");
 

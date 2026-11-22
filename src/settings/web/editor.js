@@ -67,7 +67,8 @@ function el(tag, cls, text) {
 }
 
 // The lines of the kind being edited: its own, or the default's.
-function linesOf() { return Array.isArray(layout[kind]) ? layout[kind] : layout.default; }
+// The menu being edited: a layout is one menu (plan 05 3.1), whatever kind of right-click the preview shows.
+function linesOf() { return layout.lines; }
 
 function changed() {
   dirty = true;
@@ -573,7 +574,6 @@ function renderRules() {
 
 function render() {
   if (!layout) return;
-  $("ownKind").hidden = Array.isArray(layout[kind]) || kind === "default";
   $("cards").replaceChildren(renderLines(linesOf(), null));
   placeToggles();
   renderCardPane();
@@ -620,8 +620,11 @@ function load(state) {
   $("error").textContent = state.error || "";
   if (state.layout === loadedText && layout) { render(); return; }   // the same file again (after a save)
   loadedText = state.layout;
+  let older = false;
   try {
-    layout = M.ensureIds(JSON.parse(M.withoutComments(state.layout)));
+    const current = M.upToDate(JSON.parse(M.withoutComments(state.layout)));
+    layout = M.ensureIds(current.layout);
+    older = current.changed;
   } catch (e) {
     layout = null;
     $("cards").replaceChildren(el("div", "problem", "The layout is not valid JSON: " + e.message));
@@ -630,6 +633,13 @@ function load(state) {
   dirty = false;
   $("dirty").hidden = true;
   lastSent = JSON.stringify(layout, null, 2);
+  if (older) {
+    // an older file brought to the current form: a change, written with the next Save (nothing else rewrites it)
+    lastSent = "";
+    if (selectedId && !M.find(linesOf(), selectedId)) selectedId = null;
+    changed();
+    return;
+  }
   if (lastSent !== state.layout.trim()) post({ type: "edit", layout: lastSent, quiet: true });   // ids added: the preview knows them
   if (selectedId && !M.find(linesOf(), selectedId)) selectedId = null;
   render();
@@ -719,7 +729,6 @@ $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); })
     });
   }
 })();
-$("makeOwn").addEventListener("click", () => { layout[kind] = JSON.parse(JSON.stringify(layout.default)); M.ensureIds(layout); changed(); });
 document.addEventListener("keydown", e => {
   if (e.key === "Delete" && selectedId && document.activeElement.tagName !== "INPUT" && M.deleteCard(linesOf(), selectedId)) {
     selectedId = null;
