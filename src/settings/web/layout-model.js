@@ -46,10 +46,15 @@ const LayoutModel = (() => {
     return "c" + (max + 1);
   }
 
-  // Ids on every card and a priority on every rule, so the editor, the file and the DLL name the same things.
+  // Ids on every card, each once, and a priority on every rule, so the editor, the file and the DLL name the same
+  // things. A card whose id an earlier card has already gets a new one (a layout saved with a duplicate).
   function ensureIds(layout) {
     let next = +newId(layout).slice(1);
-    for (const c of allCards(layout)) if (!c.id) c.id = "c" + next++;
+    const seen = new Set();
+    for (const c of allCards(layout)) {
+      if (!c.id || seen.has(c.id)) c.id = "c" + next++;
+      seen.add(c.id);
+    }
     for (const kind of Object.keys(layout)) if (Array.isArray(layout[kind])) renumber(layout[kind]);
     return layout;
   }
@@ -182,11 +187,12 @@ const LayoutModel = (() => {
     if (draggedId === targetId) return false;
     const dragged = find(lines, draggedId), target = find(lines, targetId);
     if (!dragged || !target || contains(dragged.card, targetId)) return false;
+    const firstId = newId(layout);   // before the dragged card is taken out: else its id counts as free
     const card = takeOut(lines, draggedId);
     const t = find(lines, targetId).card;
     if (t.menu) t.menu.push({ line: [card] });
     else {
-      const first = { id: newId(layout), card: t.card, rules: t.rules || [] };
+      const first = { id: firstId, card: t.card, rules: t.rules || [] };
       for (const k of ["title", "rename"]) if (t[k] !== undefined) { first[k] = t[k]; delete t[k]; }
       delete t.rules;
       t.menu = [{ line: [first] }, { line: [card] }];

@@ -33,6 +33,17 @@
   const clip = [...M.cards(L.default)].find(a => a.card.card === "Clip" && a.card.menu).card;
   check(!clip.rules && JSON.stringify(clip.menu[0].line[0].rules) === clipRules, "Clip's rules moved to the first card in its menu, not lost");
 
+  // the newest card dropped onto a card: the card made first in the menu gets an id of its own, not the dropped one's
+  L = sample();
+  const fresh = M.addCard(L, L.default, null);
+  check(M.dropOnCard(L, L.default, fresh.id, id(L, "Zip")), "a new card dropped onto Zip");
+  const ids = [...M.cards(L.default)].map(a => a.card.id);
+  check(new Set(ids).size === ids.length, "every card's id once: " + ids.join());
+  // a layout saved with a duplicate id: the later card gets a new one when opened
+  L = M.ensureIds({ default: [ { line: [ { id: "c2", card: "A", menu: [ { line: [ { id: "c3", card: "B", rules: [] } ] } ] } ] },
+    { line: [ { id: "c2", card: "Rest", rules: [ "remaining" ] } ] } ] });
+  check(L.default[0].line[0].id === "c2" && L.default[1].line[0].id === "c4", "a duplicate id made unique: " + L.default[1].line[0].id);
+
   // onto a card with a menu: a new line at its end
   L = sample();
   M.dropOnCard(L, L.default, id(L, "Zip"), id(L, "Tools"));
