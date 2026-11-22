@@ -3,10 +3,10 @@
 :root {
   --bg: #f3f3f3; --fg: #1b1b1b; --dim: #6b6b6b; --line: #d0d0d0; --card: #ffffff; --accent: #2f6fd6; --bad: #c42b1c;
   --hover: rgba(47, 111, 214, .12); --on-accent: #ffffff;
-  /* each panel's minimum (plan 05 3.3): a list shows at least three rows */
+  /* each panel's minimum (plan 05 3.3): a list shows at least three rows; the heights are measured by main.js */
   --general-min-w: 440px; --general-min-h: 380px;
   --layouts-min-w: 380px; --layouts-min-h: 300px;
-  --margin: 12px; --header-h: 40px; --tabs-h: 34px;
+  --margin: 12px; --tabs-h: 38px;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -22,13 +22,11 @@ button:disabled { opacity: .5; cursor: default; }
 button.lit { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
 .grow { flex: 1; }
 .hint { color: var(--dim); font-weight: normal; font-size: 12px; }
-header { flex: 0 0 var(--header-h); box-sizing: border-box; display: flex; align-items: center; padding: 0 var(--margin); border-bottom: 1px solid var(--line); }
-header .app { font-weight: 600; }
-/* the light / dark button (theme.js): a sun or a moon */
-button.theme { padding: 2px 6px; line-height: 0; }
+/* the light / dark button (theme.js): a sun or a moon, at the right of the tabs line */
+#tabs button.theme { margin-left: auto; align-self: center; padding: 2px 6px; line-height: 0; border-bottom: 1px solid var(--line); border-radius: 4px; }
 
-/* the panels: side by side, above each other, or as tabs (main.js chooses by what fits) */
-#tabs { display: none; flex: 0 0 var(--tabs-h); box-sizing: border-box; gap: 4px; padding: 4px var(--margin) 0; border-bottom: 1px solid var(--line); }
+/* the panels: as tabs, one shown at a time */
+#tabs { display: flex; align-items: flex-end; flex: 0 0 var(--tabs-h); box-sizing: border-box; gap: 4px; padding: 4px var(--margin) 0; border-bottom: 1px solid var(--line); }
 #tabs button { border-bottom: none; border-radius: 4px 4px 0 0; }
 #tabs button.on { background: var(--card); font-weight: 600; }
 #panels { flex: 1; min-height: 0; display: flex; gap: var(--margin); padding: var(--margin); box-sizing: border-box; overflow: auto; }
@@ -36,9 +34,6 @@ button.theme { padding: 2px 6px; line-height: 0; }
   padding: 8px 12px 12px; box-sizing: border-box; }
 #general { min-width: var(--general-min-w); min-height: var(--general-min-h); flex: 1.2 1 0; }
 #layouts { min-width: var(--layouts-min-w); min-height: var(--layouts-min-h); flex: 1 1 0; }
-body.stack #panels { flex-direction: column; }
-body.stack .panel { flex: 1 0 auto; }
-body.tabs #tabs { display: flex; }
 body.tabs .panel { flex: 1 1 0; }
 body.tabs .panel:not(.shown) { display: none; }
 h2 { font-size: 14px; margin: 2px 0 8px; }

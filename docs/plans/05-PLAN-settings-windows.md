@@ -23,8 +23,7 @@ folder's empty part gets is hidden inside one layout file and hard to see.
 The app opens a main window with two panels. "General" holds the registration (a line saying whether Dexmenu is
 registered, and Register, Unregister and Restart Explorer buttons) and every kind of right-click, the desktop's empty
 part among them, each with the layout it uses. "Layouts" lists the layouts with New..., Edit, Copy, Rename and
-Delete. Each panel has a minimum size; the panels stand next to each other or above each other when both fit at
-that size, and become tabs when they do not. The window never gets smaller than one panel's minimum. Edit and New open an editor window for one layout, named in its title: its
+Delete. The panels are tabs, one shown at a time. The window never gets smaller than one panel's minimum. Edit and New open an editor window for one layout, named in its title: its
 name at the top (changeable), Save, Save as... and Close, and below it today's panes and preview. A layout is one
 menu; which kinds use it is set in General, not inside the layout. "Make active" and "Give it its own" go.
 
@@ -38,7 +37,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Kinds setting | settings.json's ordered `kinds`; the DLL takes the first that fits; none: Windows' menu; first start makes the list and the Default layout | 3.2; 6.2 |
 | Open dialog | the dialog kinds, the layout chosen by them inside an Open or Save dialog | 3.2; 6.2 |
 | Desktop kind | `desktop`: registered for, told apart from a folder's empty part | 3.2; 6.2 |
-| Main window | `HomeForm`, `web/main.*`: the panels General and Layouts, side by side, stacked or as tabs by what fits; the window's minimum from the page | 3.3; 6.3 |
+| Main window | `HomeForm`, `web/main.*`: the panels General and Layouts as tabs; the window's minimum from the page | 3.3; 6.3 |
 | General panel | the registration (Restart Explorer lit until Explorer restarted); each kind with its layout, None or Not set, dragged to reorder, Edit | 3.4; 6.3 |
 | Layouts panel | New..., Edit, Copy..., Rename... (kinds follow), Delete (asks, names its kinds, sets them to None; recycle bin) | 3.5; 6.3 |
 | Editor window | `EditorForm`: one layout per window, several at once; name, Save, Save as..., Close (asks to save); every kind in the preview, marked when not meant for it; Ctrl+C / Ctrl+X / Ctrl+V of cards, dividers and rules between windows | 3.6; 6.3 |
@@ -121,18 +120,12 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - Two panels, General and Layouts. Each has a minimum width and height, set by Dexmenu: what its content needs, a
   list or table at least three rows (General: the registration and three kinds; Layouts: its buttons and three
   layouts). The sizes themselves: [not yet calculated]; measured from the panels when built.
-- Placed by what fits, in this order:
-  - next to each other (General left), when the window is at least both minimum widths wide and the higher of the
-    minimum heights high;
-  - else above each other (General on top), when it is at least the wider minimum width wide and both minimum
-    heights high;
-  - else tabs, one panel at a time.
-  Within a placement the panels share the room the window has (more than their minimum when there is).
+- The panels are tabs, one shown at a time, filling the room the window has.
 - The window's minimum size is set for its inside (its client area; WinForms `MinimumSize` from it plus the frame):
   - width: the largest of the panels' minimum widths, plus the page's margins at the sides;
   - height: the largest of the panels' minimum heights, plus the page's margins at the top and bottom, plus the
-    tabs' height (the smallest window shows tabs).
-  So the smallest window holds one panel at its minimum, as a tab.
+    tabs' height.
+  So the smallest window holds either panel at its minimum.
 - A screen smaller than that minimum (not expected: a 640x480 window should hold it): the window does not fit, and
   the page's content scrolls.
 - The editor window (3.6) is much larger and has its own minimum, from its panes and the preview.
@@ -254,9 +247,11 @@ None.
   editor; `--kind`, `--selftest` or `DEXMENU_LAYOUT_FILE` (the tests) an editor on the layout in use, as before. All
   windows in one process; it ends when the last closes. Edit on a layout already open brings its window forward; a
   rename in the main window or by an editor's Save reaches the open editors.
-- The main window's page measures nothing: each panel's minimum is set in CSS (General 440 x 380, Layouts 380 x 300
-  CSS pixels; the lists show at least three rows), `main.js` chooses side by side, stacked or tabs from them and sends
-  the window's minimum (the larger panel, margins, header and tabs), which `HomeForm` turns into `MinimumSize`.
+- The main window: each panel's minimum width is set in CSS (General 440, Layouts 380 CSS pixels); its minimum
+  height is measured by `main.js` at that width when the page loads (everything in the panel at its own height, the
+  list at its minimum of three rows), so it follows what the panel holds. `main.js` sends the window's minimum (the
+  larger panel, margins and tabs), which `HomeForm` turns into `MinimumSize`. The panels are always tabs; the
+  tabs line holds the light / dark button at its right, there is no line above it.
 - The layouts' operations (`LayoutFiles.cs`): names checked (empty, a bad character, `none`, existing refused);
   Delete to the recycle bin, its kinds set to `none`. Tested by `DexmenuSettings.exe --selftest-files <file>` on a
   data folder of the test's own (`DEXMENU_DATA`): first start, names, New, Copy, Rename following, Delete setting

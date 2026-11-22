@@ -154,33 +154,63 @@ $("restart").addEventListener("click", () => post({ type: "restart" }));
 
 const px = name => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
 
-// Side by side when both fit at their minimum, else above each other when they fit so, else tabs.
+// A list's minimum: its first three rows as they wrap now, or its CSS minimum when it has fewer.
+function listMinimum(list) {
+  const cs = getComputedStyle(list), rows = [...list.children].slice(0, 3);
+  const h = rows.reduce((t, r) => t + r.offsetHeight, 0) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  return Math.max(parseFloat(cs.minHeight), rows.length === 3 ? h : 0);
+}
+
+// Each panel's minimum height, measured at its minimum width: everything in it at its own height, a list at its
+// minimum (three rows). Set as --general-min-h and --layouts-min-h, so the panels' arrangement and the window's
+// minimum follow what the panel holds.
+function measureMinimums() {
+  for (const id of ["general", "layouts"]) {
+    const panel = $(id), saved = panel.getAttribute("style");
+    panel.style.display = "flex";
+    panel.style.flex = "none";
+    panel.style.width = px(`--${id}-min-w`) + "px";
+    const cs = getComputedStyle(panel);
+    let h = ["paddingTop", "paddingBottom", "borderTopWidth", "borderBottomWidth"].reduce((t, k) => t + parseFloat(cs[k]), 0);
+    for (const c of panel.children) {
+      const ccs = getComputedStyle(c);
+      if (ccs.display === "none") continue;
+      h += (c.classList.contains("list") ? listMinimum(c) : c.offsetHeight) + parseFloat(ccs.marginTop) + parseFloat(ccs.marginBottom);
+    }
+    if (saved === null) panel.removeAttribute("style"); else panel.setAttribute("style", saved);
+    document.documentElement.style.setProperty(`--${id}-min-h`, Math.ceil(h) + "px");
+  }
+}
+
+// The panels as tabs, one shown at a time (plan 05 3.3).
 function arrange() {
-  const m = px("--margin"), w = window.innerWidth, h = window.innerHeight - px("--header-h");
-  const gw = px("--general-min-w"), gh = px("--general-min-h"), lw = px("--layouts-min-w"), lh = px("--layouts-min-h");
-  let mode = "tabs";
-  if (w >= gw + lw + 3 * m && h >= Math.max(gh, lh) + 2 * m) mode = "side";
-  else if (w >= Math.max(gw, lw) + 2 * m && h >= gh + lh + 3 * m) mode = "stack";
-  document.body.className = mode;
-  for (const p of document.querySelectorAll(".panel")) p.classList.toggle("shown", mode !== "tabs" || p.id === shownTab);
+  document.body.className = "tabs";
+  for (const p of document.querySelectorAll(".panel")) p.classList.toggle("shown", p.id === shownTab);
   for (const b of document.querySelectorAll("#tabs button")) b.classList.toggle("on", b.dataset.panel === shownTab);
 }
 
-// The window's minimum: one panel at its minimum, as a tab (the largest of both), with the margins, the header and
+// The window's minimum: one panel at its minimum, as a tab (the largest of both), with the margins and
 // the tabs.
 function minimumSize() {
   const m = px("--margin");
   return {
     w: Math.max(px("--general-min-w"), px("--layouts-min-w")) + 2 * m,
-    h: Math.max(px("--general-min-h"), px("--layouts-min-h")) + 2 * m + px("--header-h") + px("--tabs-h"),
+    h: Math.max(px("--general-min-h"), px("--layouts-min-h")) + 2 * m + px("--tabs-h"),
   };
 }
 
 for (const b of document.querySelectorAll("#tabs button"))
   b.addEventListener("click", () => { shownTab = b.dataset.panel; arrange(); });
-window.addEventListener("resize", arrange);
+// Measured again whenever the page changes (a state fills the lists and the registration line); the window's minimum
+// sent when it changed.
+let sentMin = "";
+function postMinimum() {
+  measureMinimums();
+  const m = minimumSize(), key = `${m.w}x${m.h}`;
+  if (key !== sentMin) { sentMin = key; post({ type: "minsize", ...m }); }
+}
 arrange();
-post({ type: "minsize", ...minimumSize() });
+postMinimum();
 
 chrome.webview.addEventListener("message", e => {
   const m = e.data;
@@ -205,6 +235,7 @@ chrome.webview.addEventListener("message", e => {
     $("onClickOnly").disabled = m.menu.submenus === "replace";   // in place of the menu: always on a click
     renderKinds();
     renderLayouts();
+    postMinimum();
   } else if (m.type === "problem") {
     $("problem").hidden = false;
     $("problem").textContent = m.text;
