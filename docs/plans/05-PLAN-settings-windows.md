@@ -61,8 +61,8 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 
 ### 3.2 Which layout a right-click gets
 
-- `%APPDATA%\Dexmenu\settings.json`: `"kinds": { "file": "First", "folder": "Folders", "background": "Empty part",
-  "default": "First" }`. `default` is used for every kind not listed. A kind set to `none` gets Windows' own menu: Dexmenu leaves that kind to
+- `%APPDATA%\Dexmenu\settings.json` sets a layout per kind (the order and the form: below). `default` is used for
+  every kind not set. A kind set to `none` gets Windows' own menu: Dexmenu leaves that kind to
   Windows.
 - The DLL (`Dexmenu.Layout.CurrentLayout`) takes the right-click's kind (as now, from the handler), looks it up in
   `kinds`, and reads that layout file (read again when it changes, as now). `DEXMENU_LAYOUT_FILE` stays for the
@@ -71,9 +71,14 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - The kinds: a file, a folder, several items, a folder's empty part, the desktop's empty part, a drive, and every
   other (`default`). No kinds by file type: one menu per type has no use seen.
 - An Open or Save dialog (`dialog`): a right-click there may want another menu than in Explorer (no "Open in new
-  window", fewer programs). In settings.json `"dialog"`, a layout (or `none`) used for every right-click inside an
-  Open or Save dialog, before the kinds; not set: the kinds as in Explorer. Per kind inside a dialog: Open
-  question 1. The handler tells a dialog by the window that shows the menu: its top window is a file dialog
+  window", fewer programs): a kind of its own, fitting every right-click inside an Open or Save dialog. Per kind
+  inside a dialog: Open question 1.
+- The kinds are in an order, and a right-click gets the layout of the first kind that fits it: a right-click on a
+  file in an Open dialog fits both `dialog` and `file`, and whichever is first wins. In settings.json the order is
+  kept: `"kinds": [ { "kind": "dialog", "layout": "Dialog" }, { "kind": "file", "layout": "First" }, ...,
+  { "kind": "default", "layout": "Default" } ]`. A kind without a layout set is skipped (the next that fits
+  decides); one set to `none` decides: Windows' own menu. `default` fits every right-click and is always last. The
+  starting order: dialog, file, folder, several, background, desktop, drive, default. The handler tells a dialog by the window that shows the menu: its top window is a file dialog
   (class `#32770` holding a shell view): [not yet checked] that this holds for every program's dialog.
 - The desktop's empty part (`desktop`): the handler is registered for it too (`DesktopBackground`, by
   `Registration.cs` and `register.ps1`, removed with the others); the handler tells it from a folder's empty part
@@ -119,8 +124,9 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 - After Register or Unregister, Restart Explorer gets the focus and is lit (drawn as the main button, in the accent
   colour), with the line saying the change takes effect in Explorer after a restart. It stays lit until Explorer has
   restarted (from this button, or Explorer started again otherwise, which the app sees by Explorer's process).
-- Below it, one row per kind of right-click (3.2), each with a choice of the layouts and None (Windows' own menu),
-  then a row "In an Open or Save dialog" with the layouts, None, and "as in Explorer" (not set).
+- Below it, one row per kind of right-click (3.2), "In an Open or Save dialog" among them, each with a choice of the
+  layouts, None (Windows' own menu) and Not set (the next kind that fits decides). The rows are in the order the
+  kinds are tried, dragged to sort them; "Every other" (`default`) stays last and has no Not set.
 - A change is written to settings.json at once (no Save here); the DLL reads it at the next right-click.
 - Beside each row, Edit opens that layout's editor (3.6).
 
