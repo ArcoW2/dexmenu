@@ -3,7 +3,7 @@
 Status: partly executed; see Status.
 
 - 2026-11-21: draft.
-- 2026-11-22: partly executed: theme files.
+- 2026-11-22: partly executed: theme files; the shipped themes.
 
 Plan 02 (`02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -36,6 +36,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 
 | Part | What | Reference |
 |---|---|---|
+| Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
 ### Not yet built
@@ -43,7 +44,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Engine | Direct2D and DirectWrite in the DLL: brushes, rounded rectangles, text, images, stripes; drawing into a window or an image | plan 01 Delphi DLL | 3.1 |
-| Shipped themes | light and dark, and three pairs from LexPen's colours (parchment, sky / ocean, seafoam / forest) | Theme files | 3.3 |
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
 | Menu window | popup, corners, shadow, border, background colour / gradient / image, placement, scrolling | Engine | 3.4 |
 | Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
@@ -313,3 +313,12 @@ None.
   recolouring what uses it, the base's values kept, intensity and opacity, a state falling back to normal, an
   unknown name), and the theme the settings name read from the user's folder or falling back to the built-in. By
   hand: a "Dark ocean" theme in the editor's preview, and the main window's choice.
+
+### 6.2 Shipped themes
+
+- Built into the DLL, as `light` and `dark` are, so they work wherever it is installed; a file of the user's with the
+  same name wins. Their palette: `basecolor` and `surface` LexPen's `bg`, `side` its `bgSide` (a card's
+  background), `bar` its `bgBar`, `text` its `fg`, `dim` its `fgDim`, `border` and `line` its `border`, `accent`,
+  `active` (a pressed card's background) and, for the light ones, `hover`.
+- A card's own background is drawn only where a theme gives one; the built-in light and dark give none.
+- Tested: each read without problems and with its cards' background; `dark-forest` seen in the editor's preview.

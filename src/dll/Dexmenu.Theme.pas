@@ -82,6 +82,52 @@ const
     '            "unavailable": { "background": { "color": "text", "opacity": 10 } } },' +
     '  "divider": { "normal": { "border": "line", "foreground": "dim" } } }';
 
+  // light-parchment: LexPen's colours (plan 03 3.3)
+  LightParchmentText =
+    '{ "name": "light-parchment", "base": "light", "palette": { "basecolor": "#fbf6e6", ' +
+    '"surface": "#fbf6e6", "side": "#f4edd6", "bar": "#efe6c9", "text": "#2b2618", ' +
+    '"dim": "#6a614a", "border": "#ddd1ad", "line": "#ddd1ad", "accent": "#8a5c00", ' +
+    '"active": "rgba(138, 92, 0, .13)", "hover": "rgba(0, 0, 0, .06)" }, ' +
+    '"card": { "normal": { "background": "side" }, "pressed": { "background": "active" }, ' +
+    '"hover": { "background": "hover" } } }';
+  // dark-parchment: LexPen's colours (plan 03 3.3)
+  DarkParchmentText =
+    '{ "name": "dark-parchment", "base": "dark", "palette": { "basecolor": "#221e14", ' +
+    '"surface": "#221e14", "side": "#29241a", "bar": "#2f291d", "text": "#ece3cc", ' +
+    '"dim": "#a99f86", "border": "#463d2a", "line": "#463d2a", "accent": "#e0b84a", ' +
+    '"active": "rgba(224, 184, 74, .18)" }, "card": { "normal": { "background": "side" }, ' +
+    '"pressed": { "background": "active" } } }';
+  // light-sky: LexPen's colours (plan 03 3.3)
+  LightSkyText =
+    '{ "name": "light-sky", "base": "light", "palette": { "basecolor": "#f2f6fc", ' +
+    '"surface": "#f2f6fc", "side": "#e8eff9", "bar": "#dfe8f5", "text": "#17212e", ' +
+    '"dim": "#546277", "border": "#c8d5e8", "line": "#c8d5e8", "accent": "#1f5fbf", ' +
+    '"active": "rgba(31, 95, 191, .12)", "hover": "rgba(0, 0, 0, .06)" }, ' +
+    '"card": { "normal": { "background": "side" }, "pressed": { "background": "active" }, ' +
+    '"hover": { "background": "hover" } } }';
+  // dark-ocean: LexPen's colours (plan 03 3.3)
+  DarkOceanText =
+    '{ "name": "dark-ocean", "base": "dark", "palette": { "basecolor": "#161c27", ' +
+    '"surface": "#161c27", "side": "#1b2230", "bar": "#202839", "text": "#d8e0ee", ' +
+    '"dim": "#909cb0", "border": "#2e3a50", "line": "#2e3a50", "accent": "#6aa8ff", ' +
+    '"active": "rgba(106, 168, 255, .18)" }, "card": { "normal": { "background": "side" }, ' +
+    '"pressed": { "background": "active" } } }';
+  // light-seafoam: LexPen's colours (plan 03 3.3)
+  LightSeafoamText =
+    '{ "name": "light-seafoam", "base": "light", "palette": { "basecolor": "#f1f8f3", ' +
+    '"surface": "#f1f8f3", "side": "#e6f2ea", "bar": "#dcecdf", "text": "#172a1d", ' +
+    '"dim": "#52685a", "border": "#c3dccb", "line": "#c3dccb", "accent": "#1e7a43", ' +
+    '"active": "rgba(30, 122, 67, .12)", "hover": "rgba(0, 0, 0, .06)" }, ' +
+    '"card": { "normal": { "background": "side" }, "pressed": { "background": "active" }, ' +
+    '"hover": { "background": "hover" } } }';
+  // dark-forest: LexPen's colours (plan 03 3.3)
+  DarkForestText =
+    '{ "name": "dark-forest", "base": "dark", "palette": { "basecolor": "#15201a", ' +
+    '"surface": "#15201a", "side": "#1a2820", "bar": "#1f2e25", "text": "#d6e8d9", ' +
+    '"dim": "#90a898", "border": "#2f4436", "line": "#2f4436", "accent": "#5fd38d", ' +
+    '"active": "rgba(95, 211, 141, .18)" }, "card": { "normal": { "background": "side" }, ' +
+    '"pressed": { "background": "active" } } }';
+
 function RGBA(R, G, B: Byte; A: Single): TRGBA;
 begin
   Result.R := R / 255;
@@ -354,7 +400,19 @@ begin
   if SameText(Name, BuiltInLight) then
     Result := LightText
   else if SameText(Name, BuiltInDark) then
-    Result := DarkText;
+    Result := DarkText
+  else if SameText(Name, 'light-parchment') then
+    Result := LightParchmentText
+  else if SameText(Name, 'dark-parchment') then
+    Result := DarkParchmentText
+  else if SameText(Name, 'light-sky') then
+    Result := LightSkyText
+  else if SameText(Name, 'dark-ocean') then
+    Result := DarkOceanText
+  else if SameText(Name, 'light-seafoam') then
+    Result := LightSeafoamText
+  else if SameText(Name, 'dark-forest') then
+    Result := DarkForestText;
 end;
 
 // What a theme's files are now (their times), so a change reads it again.

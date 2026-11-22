@@ -824,6 +824,13 @@ begin
       'the dark theme the settings name, from the user''s themes folder, on the built-in dark');
     Check(Near(CurrentTheme(False).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), $1B, $1B, $1B),
       'light not named: the built-in light');
+    for var Shipped in ['light-parchment', 'dark-parchment', 'light-sky', 'dark-ocean', 'light-seafoam', 'dark-forest'] do
+    begin
+      TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeLight": "' + Shipped + '" } }');
+      Check((CurrentTheme(False).Name = Shipped) and (CurrentTheme(False).Problems = '') and
+        (CurrentTheme(False).Color('card', 'normal', 'background', RGBA(0, 0, 0, 0)).A = 1),
+        'the shipped theme ' + Shipped + ': read without problems, its cards with a background');
+    end;
     TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeDark": "Gone" } }');
     Check(Near(CurrentTheme(True).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), 255, 255, 255),
       'a theme that is not there: the built-in dark');

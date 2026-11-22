@@ -441,7 +441,8 @@ end;
 procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer; ScrollY, VisibleHeight: Single;
   const Look: TLook; const Marked: string; Editing: Boolean);
 var
-  Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
+  Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe, CardBg: ID2D1SolidColorBrush;
+  CardBgColor: TRGBA;
   Theme: TTheme;
   MenuRadius, CardRadius: Single;
   I: Integer;
@@ -469,6 +470,9 @@ begin
   T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0))), nil, LabelBrush);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'focused', 'border', RGBA($2F, $6F, $D6))), nil, Accent);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'unavailable', 'background', RGBA(0, 0, 0, 0.09))), nil, Stripe);
+  // a card's own background, where the theme gives one (none in the built-in light and dark)
+  CardBgColor := Theme.Color('card', 'normal', 'background', RGBA(0, 0, 0, 0));
+  T.CreateSolidColorBrush(ToD2D(CardBgColor), nil, CardBg);
   MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius);
   CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius);
   T.Clear(D2D1ColorF(0, 0, 0, 0));
@@ -501,6 +505,9 @@ begin
         DrawDividerText(T, V.Divider, R, Y, Sep, LabelBrush);
       Continue;
     end;
+    if (V.Kind in [vkItem, vkMenu, vkCommand]) and (CardBgColor.A > 0) then
+      T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
+        CardRadius, CardRadius), CardBg);
     if Editing and V.Sometimes then
       DrawStripes(T, D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1), Stripe);
     // the items of the card selected in the settings app's editor (the preview only)
