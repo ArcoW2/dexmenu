@@ -36,7 +36,7 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Layout format | a layout is one menu (its lines); the Default layout; the user's layouts kept, an old file read by its default menu | -- | 3.1 |
-| Layout versions | a format number in each layout; the editor updates an older file when it opens it; the DLL shows a warning card and the remaining card for a file it cannot use | Layout format | 3.1.1 |
+| Layout versions | a format number in each layout; the editor updates an older file when it opens it; the DLL shows a warning (a note card) and the remaining card for a file it cannot use | Layout format; plan 02 Note card | 3.1.1 |
 | Kinds setting | settings.json maps each kind of right-click to a layout; the DLL takes a right-click's layout from it | Layout format | 3.2 |
 | Open dialog | a right-click in an Open or Save dialog as kinds of their own (a file, a folder, several, an empty part, a drive in a dialog) | Kinds setting | 3.2 |
 | Desktop kind | the desktop's empty part as a kind of its own: the handler registered for it, told apart from a folder's empty part | -- | 3.2 |
@@ -69,10 +69,9 @@ menu; which kinds use it is set in General, not inside the layout. "Make active"
   (entries added or renamed, nothing the user made lost), shown as a change not yet saved; it is written with the
   next Save. Nothing else rewrites a layout: not an update of Dexmenu, not the DLL, not the main window.
 - The DLL reads every older form it knows as it is. A file it cannot use (a form newer than it knows, or one too old
-  to read): the menu shows, as its first card, a warning that the layout needs updating ("Layout <name> needs
-  updating: open it in Dexmenu"), then the remaining card with every item of Windows' menu, so nothing is missing.
-  Choosing the warning opens that layout in the editor (the settings app started with it). [not yet checked] how
-  the DLL starts the settings app from inside Explorer; else the card only tells.
+  to read): the menu shows, as its first card, a note card (plan 02 3.3) with the warning that the layout needs
+  updating ("Layout <name> needs updating: open it in Dexmenu's editor"), then the remaining card with every item
+  of Windows' menu, so nothing is missing. A note card is no button, so the warning only tells.
 - A file that is not valid JSON or breaks a rule (no remaining card): as now, Windows' own menu, the reason in the
   log; the editor shows the reason when the file is opened.
 

@@ -56,6 +56,7 @@ the preview is the result.
 | Preview | the same window drawn by the DLL inside the settings app, from the seen items and the layout being edited | Window; plan 01 Settings app | 3.8 |
 | Use counts | every choice counted per item; the most used row; counts shown while editing | Window | 3.9 |
 | Default layouts | the suggested layouts shipped, A the default | Settings and layouts | 3.10 |
+| Note card | a card that is no button: an empty space with an optional text of several lines | Window | 3.3 |
 | Safety | fallback to Windows' own menu; a key for Windows' menu | Window | 3.11 |
 | Tests | 3.12 | -- | 3.12 |
 
@@ -123,6 +124,14 @@ in the layout is where its items show.
   its own line at the card's place, in the order found: one item, several, or none (then nothing shows). The card's
   title is the item's when it found one. So a card with a menu holds an unknown number of found items beside cards
   of its own (a menu "Open..." with a card finding the items of Windows' "Open with" and a card of the user's own).
+- **Note card:** `{ "note": "<text>" }` (or `"note": ""` for an empty space): a card that is no button. It finds
+  nothing and runs nothing: hover does not light it, a click and the keys pass it by (the arrows skip it), and it
+  has no rules or menu. Its text, when it has one, may hold several lines (a memo) and wraps to the card's width;
+  the card is as high as its text, or one line's height when empty. It stands in a line like any card (beside
+  other cards too) and is never in the priority list. Its look (text colour, background) comes with the themes
+  (plan 03); until then the dim text colour. In the editor: "+ Note" beside "+ Card" and "+ Divider", dragged or
+  clicked, its text edited in the panel as a text box. Used for the warning of a layout the DLL cannot use (plan 05
+  3.1.1).
 - **Hidden:** a card with `hidden: true` shows nothing, while its rules (and those of the cards in its menu) still
   take their items: a way to leave items out of the menu, the remaining card included. The editor draws a hidden
   card with diagonal stripes. The remaining card cannot be hidden.
