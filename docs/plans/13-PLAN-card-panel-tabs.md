@@ -18,10 +18,10 @@ picker), 11 (several found as cards, per row, square) and 12 (own rules) add mor
 
 At the top of the card panel, always shown and fixed, the card's name. Under it the card's fields are grouped by
 subject: Names (what the card and its items show as text, the icon, the hint, the comment), Rules (what the card
-finds), Inside (how what it found is shown and opens), Layout (its size and place on its line) and Look (its colours
+finds), Inside (how what it found is shown and opens), Layout (its size and place on its line) and Style (its colours
 and corners). Each group is a panel the user drags where they want it: above or below another, they stand under each
 other; onto another panel, the two become tabs; onto a tab, a new tab; into a tab, under each other in that tab,
-which is then named for its panels ("Layout/Look"). A panel holds only its fields, never tabs. So all as tabs, all
+which is then named for its panels ("Layout/Style"). A panel holds only its fields, never tabs. So all as tabs, all
 under each other, or any mix is the user's choice, and the arrangement is remembered. A card shows only the groups that apply to its kind. A group with anything set in it is marked, and the Rules group shows a
 problem in red; the tab chosen in a panel stays when another card is selected.
 
@@ -36,7 +36,7 @@ problem in red; the tab chosen in a panel stays when another card is selected.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Groups | the card's name fixed at the top; the other fields in the groups Names, Rules, Inside, Layout, Look; per kind of card the groups that apply | -- | 3.1; 3.2 |
+| Groups | the card's name fixed at the top; the other fields in the groups Names, Rules, Inside, Layout, Style; per kind of card the groups that apply | -- | 3.1; 3.2 |
 | Panels arranged | each group a panel, dragged above or below another (under each other), onto another (both tabs), onto a tab (a new tab) or into a tab (under each other in it, the tab named for its panels); the arrangement remembered | Groups | 3.3 |
 | Group marks | a group with anything set marked; the Rules group red with an invalid rule; its count of rules | Groups | 3.4 |
 | Tab kept | the chosen tab of each panel kept across selections; the Rules group shown when a rule is selected in the rules view or the preview | Panels arranged | 3.4 |
@@ -56,7 +56,7 @@ Every field of the card panel now, in its group (a field still to come in bracke
   Duplicates (skip: one item per name), Hidden.
 - **Inside:** Items as buttons, [Several found: on lines, in a submenu, as cards; Per row: plan 11], Submenus open.
 - **Layout:** Weight, Min width, Height, Wrap, Fit in line, [Square: plan 11].
-- **Look:** Background, Text colour, Border, Radius, Hover background, [the pressed look when it gets fields].
+- **Style:** Background, Text colour, Border, Radius, Hover background, [the pressed look when it gets fields].
 
 Hidden sits with the rules because what it changes is where the found items go (nowhere), not how the card looks.
 Submenus open sits in Inside: it is about what opens from the card.
@@ -64,21 +64,21 @@ Submenus open sits in Inside: it is about what opens from the card.
 ### 3.2 Per kind of card
 
 - A card with rules: all five groups.
-- A card with a menu: Names (no Rename), Inside (Submenus open), Layout, Look; no Rules group (its rules are in the
+- A card with a menu: Names (no Rename), Inside (Submenus open), Layout, Style; no Rules group (its rules are in the
   cards of its menu).
 - The remaining card: Names (Title, Extra text, Hint, Comment; no Icon, no Rename), Inside (Submenus open); the
-  Rules group holds the text that says what the remaining card does; no Layout or Look (its items each take a line of
+  Rules group holds the text that says what the remaining card does; no Layout or Style (its items each take a line of
   their own, in their own look).
 - A note: no groups (its text, where its text goes, and its size are few enough to stay one column).
 - A divider, the search box: no groups, as now.
-- Dexmenu's own card (until plan 12 turns it into a rule): Names (Title, Icon, Extra text), Layout, Look.
+- Dexmenu's own card (until plan 12 turns it into a rule): Names (Title, Icon, Extra text), Layout, Style.
 
 ### 3.3 Panels the user arranges
 
 - Each group is a panel: a box with its name on the border line (as a rule's box), its fields in two columns. A panel
   holds only its fields, never tabs.
 - Under the fixed name stand, under each other, panels and sets of tabs. A set of tabs shows one tab at a time; a tab
-  holds one or more panels under each other, and its name is its panels' names joined ("Layout/Look").
+  holds one or more panels under each other, and its name is its panels' names joined ("Layout/Style").
 - A panel's name (on its border line) is its handle. Where it is dropped:
   - at the top or bottom edge of a panel or a set of tabs standing on its own: a panel on its own above or below it;
   - onto a panel standing on its own (its middle): the two become a set of tabs, a tab each;
@@ -88,10 +88,10 @@ Submenus open sits in Inside: it is about what opens from the card.
   A tab left without panels goes; a set of tabs left with one tab becomes the panels of that tab standing on their
   own. While dragging, the place it would go is shown; Esc cancels.
 - So every arrangement is the user's: all as tabs of one set, all under each other, or any mix (Names on its own,
-  then a set of tabs Rules, Inside and Layout/Look).
+  then a set of tabs Rules, Inside and Layout/Style).
 - The arrangement is remembered by the editor (its own storage, the same in every editor window) until changed; not
   in the layout. The first arrangement: every group a panel of its own, under each other, in the order Names, Rules,
-  Inside, Layout, Look.
+  Inside, Layout, Style.
 - A card whose kind lacks a group (3.2) shows the arrangement without that panel: a tab holding only panels it lacks
   is not shown, nor a set of tabs left with none, and a tab's name lists only the panels shown. The arrangement itself stays as
   the user made it.
