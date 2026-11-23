@@ -794,7 +794,19 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { canTakeTemplate, isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  // A path with the folder it starts in written as its variable (plan 14 3.3): under AppData %APPDATA%, else under the
+  // user's profile %USERPROFILE%; else as it is. Folders compared without case, as Windows does.
+  function withVariables(path, appdata, userprofile) {
+    for (const [dir, name] of [[appdata, "%APPDATA%"], [userprofile, "%USERPROFILE%"]]) {
+      if (!dir) continue;
+      const d = dir.replace(/[\\/]+$/, "");
+      if (path.length > d.length && path.slice(0, d.length).toLowerCase() === d.toLowerCase() && /[\\/]/.test(path[d.length]))
+        return name + path.slice(d.length);
+    }
+    return path;
+  }
+
+  return { withVariables, canTakeTemplate, isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

@@ -110,6 +110,7 @@ type
     IsNote: Boolean;
     NoteText: string;
     NoteAlign: TNoteAlign;   // "align": left (default), text (with the items' text), center, right
+    NoteHideEmpty: Boolean;  // "empty": "hide": left out when its filled text is empty (plan 14 3.1)
     Font: TFontSpec;   // a note's "font" (plan 03 3.6)
     SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
     // Its size on a line (plan 03 3.5): "weight", its share of the line's width (1 when not set); "minWidth" (DIP; 0
@@ -207,7 +208,9 @@ procedure SaveTextSize(Size: Single);
 function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
 // A note's text with its placeholders filled for the moment When (plan 03 3.6): {date} and {time} in Windows' short
 // date and time (the user's regional settings), {date:<picture>} and {time:<picture>} in Windows' date and time
-// pictures ("dddd d MMMM", "HH:mm"); {{ and }} a brace; anything else in braces, or a brace not closed, as typed.
+// pictures ("dddd d MMMM", "HH:mm"); {file:<path>} what the file holds (plan 14: a local fixed drive only, read within
+// half a second, at most 320 characters, else nothing); {{ and }} a brace; anything else in braces, or a brace not
+// closed, as typed.
 function FillNote(const Text: string; When: TDateTime): string;
 
 const
@@ -223,6 +226,197 @@ implementation
 
 uses
   Winapi.Windows, System.SysUtils, System.Classes, System.SyncObjs, System.Math, Dexmenu.Json, Dexmenu.Log;
+
+const
+  NoteFileChars = 320;    // a note's file text at most (plan 14 3.1): a small paragraph, about four lines of 80
+  NoteFileBytes = 1280;   // the bytes read for it: 320 characters of up to 4 bytes each
+  NoteFileWait = 500;     // ms: a read taking longer gives nothing (the right-click does not wait)
+
+type
+  // A file read on a thread of its own, waited for a while; the thread keeps the job alive until it is done, so a
+  // read that came too late lands in a job nobody looks at any more.
+  TNoteRead = class(TInterfacedObject)
+    Path: string;
+    Bytes: TBytes;
+    More: Boolean;    // the file holds more than was read
+    Ok: Boolean;
+    Done: TEvent;
+    constructor Create(const APath: string);
+    destructor Destroy; override;
+    procedure Run;
+  end;
+
+var
+  NoteLock: TCriticalSection;
+  NoteFiles: TDictionary<string, string>;   // a file's note text by its path, time written and size
+
+constructor TNoteRead.Create(const APath: string);
+begin
+  inherited Create;
+  Path := APath;
+  Done := TEvent.Create(nil, True, False, '');
+end;
+
+destructor TNoteRead.Destroy;
+begin
+  Done.Free;
+  inherited;
+end;
+
+procedure TNoteRead.Run;
+var
+  F: TFileStream;
+  N: Integer;
+begin
+  try
+    F := TFileStream.Create(Path, fmOpenRead or fmShareDenyNone);
+    try
+      SetLength(Bytes, NoteFileBytes);
+      N := F.Read(Bytes[0], NoteFileBytes);
+      SetLength(Bytes, N);
+      More := F.Size > N;
+      Ok := True;
+    finally
+      F.Free;
+    end;
+  except
+    Ok := False;   // locked, no access, gone
+  end;
+  Done.SetEvent;
+end;
+
+// A file's first bytes as a note's text (plan 14 3.1): decoded as UTF-16 (LE or BE) by its BOM, else UTF-8 (with or
+// without its BOM); plain text (line breaks kept, tabs as spaces, other control characters left out); at most 320
+// characters, cut at the last whole line within them (or a whole character when the first line is longer), "..."
+// after it when the file holds more.
+function NoteFileText(const B: TBytes; More: Boolean): string;
+var
+  Raw: string;
+  N, I, Cut, Start, Lead, Need: Integer;
+  C: Char;
+begin
+  N := Length(B);
+  if (N >= 2) and (B[0] = $FF) and (B[1] = $FE) then
+    Raw := TEncoding.Unicode.GetString(B, 2, (N - 2) and not 1)
+  else if (N >= 2) and (B[0] = $FE) and (B[1] = $FF) then
+    Raw := TEncoding.BigEndianUnicode.GetString(B, 2, (N - 2) and not 1)
+  else
+  begin
+    Start := 0;
+    if (N >= 3) and (B[0] = $EF) and (B[1] = $BB) and (B[2] = $BF) then
+      Start := 3;
+    if More then
+    begin
+      // the read stopped inside a character: its first bytes left out (a lead byte and fewer than it needs)
+      Lead := N - 1;
+      while (Lead > Start) and (Lead > N - 4) and (B[Lead] and $C0 = $80) do
+        Dec(Lead);
+      if (Lead >= Start) and (B[Lead] >= $C0) then
+      begin
+        if B[Lead] >= $F0 then
+          Need := 4
+        else if B[Lead] >= $E0 then
+          Need := 3
+        else
+          Need := 2;
+        if N - Lead < Need then
+          N := Lead;
+      end;
+    end;
+    try
+      Raw := TEncoding.UTF8.GetString(B, Start, N - Start);
+    except
+      Raw := TEncoding.ANSI.GetString(B, Start, N - Start);   // not UTF-8: as the system's code page
+    end;
+  end;
+  if More and (Raw <> '') and (Raw[Length(Raw)] >= #$D800) and (Raw[Length(Raw)] <= #$DBFF) then
+    Delete(Raw, Length(Raw), 1);   // UTF-16 cut between a surrogate pair
+  Result := '';
+  I := 1;
+  while I <= Length(Raw) do
+  begin
+    C := Raw[I];
+    if C = #13 then
+    begin
+      Result := Result + #10;
+      if (I < Length(Raw)) and (Raw[I + 1] = #10) then
+        Inc(I);
+    end
+    else if C = #9 then
+      Result := Result + ' '
+    else if (C = #10) or (C >= ' ') then
+      Result := Result + C;
+    Inc(I);
+  end;
+  if Length(Result) > NoteFileChars then
+  begin
+    More := True;
+    Result := Copy(Result, 1, NoteFileChars);
+    if ((Result[Length(Result)] >= #$D800) and (Result[Length(Result)] <= #$DBFF)) then
+      Delete(Result, Length(Result), 1);
+  end;
+  if More then
+  begin
+    Cut := LastDelimiter(#10, Result);
+    if Cut > 1 then
+      Result := Copy(Result, 1, Cut - 1);
+    Result := TrimRight(Result) + '...';
+  end
+  else
+    Result := TrimRight(Result);
+end;
+
+function NoteFile(const Spec: string): string;
+var
+  Expanded: array[0..MAX_PATH] of Char;
+  Path, Key: string;
+  Data: TWin32FileAttributeData;
+  Job: IInterface;
+  Read: TNoteRead;
+begin
+  Result := '';
+  Path := Spec;
+  if Path = '' then
+    Exit;
+  if ExpandEnvironmentStrings(PChar(Path), Expanded, Length(Expanded)) > 0 then
+    Path := Expanded;
+  if Path.StartsWith('\\') then
+    Exit;   // a network path (UNC)
+  if ExtractFileDrive(Path) = '' then
+    Path := IncludeTrailingPathDelimiter(DataFolder) + 'layouts\' + Path;
+  // a local fixed drive only: not a network, removable or optical one
+  if GetDriveType(PChar(IncludeTrailingPathDelimiter(ExtractFileDrive(Path)))) <> DRIVE_FIXED then
+    Exit;
+  if not GetFileAttributesEx(PChar(Path), GetFileExInfoStandard, @Data) then
+    Exit;
+  Key := Format('%s|%d|%d|%d', [LowerCase(Path), Data.ftLastWriteTime.dwHighDateTime, Data.ftLastWriteTime.dwLowDateTime,
+    Data.nFileSizeLow]);
+  NoteLock.Enter;
+  try
+    if (NoteFiles <> nil) and NoteFiles.TryGetValue(Key, Result) then
+      Exit;
+  finally
+    NoteLock.Leave;
+  end;
+  Read := TNoteRead.Create(Path);
+  Job := Read;
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      TNoteRead(Job).Run;
+    end).Start;
+  if (Read.Done.WaitFor(NoteFileWait) <> wrSignaled) or not Read.Ok then
+    Exit('');   // too slow or not readable: nothing, tried again next time
+  Result := NoteFileText(Read.Bytes, Read.More);
+  NoteLock.Enter;
+  try
+    if NoteFiles = nil then
+      NoteFiles := TDictionary<string, string>.Create;
+    NoteFiles.AddOrSetValue(Key, Result);
+  finally
+    NoteLock.Leave;
+  end;
+end;
 
 function FillNote(const Text: string; When: TDateTime): string;
 var
@@ -286,6 +480,13 @@ begin
         begin
           SetString(Part, Buffer, Chars - 1);
           Result := Result + Part;
+          I := Close + 1;
+          Continue;
+        end;
+        // {file:<path>} (plan 14): what the file holds, or nothing when it cannot be read in time
+        if SameText(Name, 'file') then
+        begin
+          Result := Result + NoteFile(Trim(Picture));
           I := Close + 1;
           Continue;
         end;
@@ -611,6 +812,7 @@ begin
     Card := TCard.Create;
     Card.IsNote := True;
     Card.NoteText := Obj.GetValue('note').Value;
+    Card.NoteHideEmpty := (Obj.GetValue('empty') is TJSONString) and (Obj.GetValue('empty').Value = 'hide');
     if Obj.GetValue('align') is TJSONString then
       if Obj.GetValue('align').Value = 'text' then
         Card.NoteAlign := naText
@@ -1280,6 +1482,7 @@ end;
 
 initialization
   Lock := TCriticalSection.Create;
+  NoteLock := TCriticalSection.Create;
   Cache := TObjectDictionary<string, TCached>.Create([doOwnsValues]);
 
 end.

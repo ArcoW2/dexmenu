@@ -7,7 +7,7 @@ program DexmenuUnitTests;
 {$APPTYPE CONSOLE}
 
 uses
-  Winapi.Windows, System.SysUtils, System.IOUtils, System.Generics.Collections, System.Math,
+  Winapi.Windows, System.SysUtils, System.Classes, System.IOUtils, System.Generics.Collections, System.Math,
   Dexmenu.Json in '..\..\src\dll\Dexmenu.Json.pas',
   Dexmenu.Log in '..\..\src\dll\Dexmenu.Log.pas',
   Dexmenu.Rules in '..\..\src\dll\Dexmenu.Rules.pas',
@@ -64,6 +64,9 @@ var
   NoteLayout: ILayout;
   NoteError: string;
   When: TDateTime;
+  Dir, Lines_, Text_: string;
+  I: Integer;
+  Locked: TFileStream;
 begin
   Check(Valid(BaseLayout), 'the built-in base layout is valid');
   Check(Valid('{ "default": [ { "line": [ ' + Remaining + ' ] } ] }'), 'one remaining card at the root');
@@ -124,6 +127,44 @@ begin
   Check(FillNote('a {{b}} c', When) = 'a {b} c', '{{ and }}: a brace');
   Check(FillNote('{other} and {date', When) = '{other} and {date', 'an unknown placeholder, a brace not closed: as typed');
   Check(FillNote('no braces', When) = 'no braces', 'a note without placeholders: as it is');
+  // a note showing a file (plan 14): decoded, plain, at most 320 characters cut at a whole line
+  Dir := TPath.Combine(TPath.GetTempPath, 'dexmenu-note-files');
+  TDirectory.CreateDirectory(Dir);
+  TFile.WriteAllText(TPath.Combine(Dir, 'u8.txt'), 'Hello'#13#10'World'#9'X'#7, TEncoding.UTF8.Clone);   // with BOM
+  TFile.WriteAllBytes(TPath.Combine(Dir, 'plain.txt'), TEncoding.UTF8.GetBytes('Caf'#$E9' ok'));         // without
+  TFile.WriteAllText(TPath.Combine(Dir, 'u16.txt'), 'Hi there', TEncoding.Unicode);
+  Lines_ := '';
+  for I := 1 to 5 do
+    Lines_ := Lines_ + StringOfChar(Char(Ord('a') + I - 1), 80) + #13#10;
+  TFile.WriteAllBytes(TPath.Combine(Dir, 'lines.txt'), TEncoding.UTF8.GetBytes(Lines_));
+  TFile.WriteAllBytes(TPath.Combine(Dir, 'long.txt'), TEncoding.UTF8.GetBytes(StringOfChar('x', 500)));
+  TFile.WriteAllBytes(TPath.Combine(Dir, 'wide.txt'), TEncoding.UTF8.GetBytes(StringOfChar(#$4E2D, 500)));   // 3 bytes each
+  Check(FillNote('{file:' + TPath.Combine(Dir, 'u8.txt') + '}', When) = 'Hello'#10'World X',
+    'a file: UTF-8 with BOM; line breaks kept, a tab a space, other control characters left out');
+  Check(FillNote('[{file:' + TPath.Combine(Dir, 'plain.txt') + '}]', When) = '[Caf'#$E9' ok]', '... UTF-8 without BOM, in its place');
+  Check(FillNote('{file:' + TPath.Combine(Dir, 'u16.txt') + '}', When) = 'Hi there', '... UTF-16 by its BOM');
+  Check(FillNote('{file:' + TPath.Combine(Dir, 'lines.txt') + '}', When) =
+    StringOfChar('a', 80) + #10 + StringOfChar('b', 80) + #10 + StringOfChar('c', 80) + '...',
+    'more than 320 characters: cut at the last whole line within them, "..." after it');
+  Check(FillNote('{file:' + TPath.Combine(Dir, 'long.txt') + '}', When) = StringOfChar('x', 320) + '...',
+    'one line longer than 320: cut at 320 characters');
+  Text_ := FillNote('{file:' + TPath.Combine(Dir, 'wide.txt') + '}', When);
+  Check((Text_ = StringOfChar(#$4E2D, 320) + '...') and (Pos(#$FFFD, Text_) = 0),
+    'characters of 3 bytes: 320 of them, none cut in half');
+  Check(FillNote('<{file:' + TPath.Combine(Dir, 'missing.txt') + '}>', When) = '<>', 'a missing file: nothing');
+  Check(FillNote('<{file:\\server\share\note.txt}>', When) = '<>', 'a network path: nothing (not tried)');
+  Locked := TFileStream.Create(TPath.Combine(Dir, 'locked.txt'), fmCreate or fmShareExclusive);
+  try
+    Check(FillNote('<{file:' + TPath.Combine(Dir, 'locked.txt') + '}>', When) = '<>', 'a locked file: nothing');
+  finally
+    Locked.Free;
+  end;
+  TFile.WriteAllText(TPath.Combine(Dir, 'change.txt'), 'One');
+  Text_ := FillNote('{file:' + TPath.Combine(Dir, 'change.txt') + '}', When);
+  TFile.WriteAllText(TPath.Combine(Dir, 'change.txt'), 'Two');
+  TFile.SetLastWriteTime(TPath.Combine(Dir, 'change.txt'), Now + 1 / 86400);
+  Check((Text_ = 'One') and (FillNote('{file:' + TPath.Combine(Dir, 'change.txt') + '}', When) = 'Two'),
+    'the file changed: read again');
 end;
 
 procedure TestCurrent;
@@ -1855,6 +1896,28 @@ begin
     finally
       L.Free;
       P.Free;
+    end;
+    // a note that ends up empty (plan 14): left out with "empty": "hide", shown without it
+    for Inside in [True, False] do
+    begin
+      if Inside then
+        L := Level('{ "note": "{file:C:/dexmenu-nope/missing.txt}", "empty": "hide" }', P)
+      else
+        L := Level('{ "note": "{file:C:/dexmenu-nope/missing.txt}" }', P);
+      try
+        Box := 0;
+        for I := 0 to L.Lines.Count - 1 do
+          for V in L.Lines[I].Cards do
+            if V.Kind = vkNote then
+              Inc(Box);
+        if Inside then
+          Check(Box = 0, 'an empty note set to hide: left out')
+        else
+          Check(Box = 1, 'an empty note not set to hide: shown');
+      finally
+        L.Free;
+        P.Free;
+      end;
     end;
     // six found items flowing: a grid, the same number on every row (not 3, 2, 1 by their text)
     L := Level(Card('Six', '{ "name": { "any": [ "Cut", "Copy", "Delete", "Properties", "Edit in LexPen", "View in LexPen" ] } }',

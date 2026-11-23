@@ -345,6 +345,20 @@ sealed class EditorForm : Form, IThemed
             case "previewKind":
                 if (Kinds.Any(x => x.Kind == Str("kind"))) { kind = Str("kind"); FillItems(); Live(); Reload(); }
                 break;
+            case "pickNoteFile":
+                // a file for a note to show (plan 14), with the folders its path may start with, to write them as variables
+                using (var dialog = new OpenFileDialog { Title = "A file for the note to show", Filter = "Text|*.txt;*.md;*.log|All files|*.*" })
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK) break;
+                    Post(new
+                    {
+                        type = "pickedNoteFile",
+                        path = dialog.FileName,
+                        appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        userprofile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                    });
+                }
+                break;
             case "pickImage":
                 // a background image's file (plan 03 3.4), for the colour field that asked
                 using (var dialog = new OpenFileDialog

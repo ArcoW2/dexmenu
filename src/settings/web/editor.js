@@ -686,7 +686,7 @@ function colorField(label, get, set, gradients = false, withNone = false) {
       const file = el("input");
       file.type = "text";
       file.value = spec.image || "";
-      file.placeholder = "a file: PNG, JPEG, ...; %APPDATA%\... allowed";
+      file.placeholder = "a file: PNG, JPEG, ...; %APPDATA%\\... allowed";
       file.addEventListener("change", () => { spec.image = file.value.trim(); commit(); });
       const browse = el("button", "", "Browse...");
       browse.addEventListener("click", e => {
@@ -876,6 +876,7 @@ function shadowFields(card) {
 
 let fonts = [];   // the installed font families, from the settings app
 let pickedImage = null;   // a background image field waiting for its file from the settings app's dialog
+let pickedNoteFile = null;   // a note waiting for the file it shows (plan 14)
 
 // A font family as a dropdown of the installed ones (as LexPen's), each in its own font; empty: the items' font. A
 // family the layout names that is not installed stays, marked so.
@@ -1216,10 +1217,26 @@ function renderCardPane() {
     area.placeholder = "(empty: a space in the menu)";
     area.addEventListener("change", () => { card.note = area.value; changed(); });
     area.title = "{date} and {time}: today's date and the time the menu opens, in Windows' short formats; " +
-      "{date:dddd d MMMM} or {time:HH:mm}: in a format of your own; {{ and }}: a brace";
+      "{date:dddd d MMMM} or {time:HH:mm}: in a format of your own; {file:<path>}: what the file holds (a local drive, " +
+      "at most 320 characters); {{ and }}: a brace";
     const row = el("label", "field");
     const text = el("span");
-    text.append(area, el("div", "hint", "{date}, {time}, {date:dddd d MMMM}, {time:HH:mm}: filled in when the menu opens"));
+    // File...: {file:<path>} at the cursor (plan 14)
+    const fileButton = el("button", "", "File...");
+    fileButton.title = "A file whose text the note shows: {file:<path>} where the cursor is";
+    fileButton.addEventListener("click", e => {
+      e.preventDefault();
+      const at = area.selectionStart ?? area.value.length, to = area.selectionEnd ?? at;
+      pickedNoteFile = m => {
+        const ph = "{file:" + M.withVariables(m.path, m.appdata, m.userprofile) + "}";
+        card.note = area.value.slice(0, at) + ph + area.value.slice(to);
+        changed();
+      };
+      post({ type: "pickNoteFile" });
+    });
+    const hint = el("div", "hint", "{date}, {time}, {date:dddd d MMMM}, {time:HH:mm}, {file:<path>}: filled in when the menu opens ");
+    hint.append(fileButton);
+    text.append(area, hint);
     const label = el("span", "", "Text");
     label.style.alignSelf = "start";
     row.append(label, text);
@@ -1234,7 +1251,11 @@ function renderCardPane() {
     place.addEventListener("change", () => { if (place.value === "left") delete card.align; else card.align = place.value; changed(); });
     const placeRow = el("label", "field");
     placeRow.append(el("span", "", "Text placed"), place);
-    $("card").replaceChildren(row, placeRow, ...sizeFields(card), ...lookFields(card, true),
+    // an empty note (nothing typed, or a file giving nothing): shown as a space, or left out (plan 14)
+    const emptyRow = selectRow("When empty", [["", "shown (a space)"], ["hide", "left out"]], card.empty || "",
+      v => { if (v) card.empty = v; else delete card.empty; changed(); },
+      "When its text ends up empty: nothing typed, or a file that gives nothing");
+    $("card").replaceChildren(row, placeRow, emptyRow, ...sizeFields(card), ...lookFields(card, true),
       el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
     return;
   }
@@ -2183,4 +2204,5 @@ chrome.webview.addEventListener("message", e => {
   else if (m.type === "saved") { dirty = false; $("dirty").hidden = true; }
   else if (m.type === "fonts") { fonts = m.fonts || []; renderCardPane(); }
   else if (m.type === "pickedImage" && pickedImage) { const f = pickedImage; pickedImage = null; f(m.path); }
+  else if (m.type === "pickedNoteFile" && pickedNoteFile) { const f = pickedNoteFile; pickedNoteFile = null; f(m); }
 });

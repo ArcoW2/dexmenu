@@ -1,8 +1,9 @@
 # Plan 14: A note that shows a file
 
-Status: not started; see Status.
+Status: executed; see Status.
 
 - 2026-11-23: draft.
+- 2026-11-23: executed.
 
 Builds on plan 02 3.3 (a note: text in the menu, no button) and plan 03 3.6 (a note's style and font, and its
 `{date}` and `{time}` placeholders, `FillNote`).
@@ -16,22 +17,24 @@ today's to-do. The menu must stay as crisp and fast as it is: no markup, no wait
 ## 2. The solution, in brief
 
 A note's text may hold `{file:<path>}`, filled in each time the menu opens with what the file holds, as plain text,
-at most 320 characters (a small paragraph). A file is read only from a local drive, through a small cache that reads it again
-only when it changed; a file that cannot be read shows nothing. The editor's note gets a button to pick a file;
-the preview shows the note filled in.
+at most 320 characters (a small paragraph). A file is read only from a local fixed drive, within half a second,
+through a small cache that reads it again only when it changed; a file that cannot be read in time shows nothing. A
+note says whether it shows when it ends up empty. The editor's note gets a button to pick a file and the empty
+choice; the preview shows the note filled in.
 
 ## Status
 
 ### Built
 
-### Not yet built
+| Part | What | Reference |
+|---|---|---|
+| File | `{file:<path>}` in `FillNote`: environment variables in the path, a relative path from the layouts folder, a local fixed drive only, at most 320 characters, decoded as UTF-8 or UTF-16 by its BOM, cut at a whole line or character, `...` when cut | 3.1; 6.1 |
+| Cache | each file's text kept by its path, time written and size; read again only when those changed; a read that takes over 0.5 s gives nothing | 3.2; 6.1 |
+| Empty note | `"empty": "hide"` on a note: left out when its filled text is empty; shown (a space) by default | 3.1; 6.1 |
+| Editor | a "File..." button inserting `{file:<path>}` at the cursor (AppData and the profile written as variables); the "When empty" choice; the Text field's hint and tooltip | 3.3; 6.1 |
+| Tests | unit tests, the editor's self-test, the preview captured | 3.5; 6.1 |
 
-| Part | What | Waits for | Reference |
-|---|---|---|---|
-| File | `{file:<path>}` in `FillNote`: environment variables in the path, a local drive only, at most 320 characters, decoded as UTF-8 or UTF-16 by its BOM, cut at a whole line or character, `...` when cut | -- | 3.1 |
-| Cache | each file's text kept by its path, time written and size; read again only when those changed | File | 3.2 |
-| Editor | a "File..." button inserting `{file:<path>}` | File | 3.3 |
-| Tests | 3.5 | -- | 3.5 |
+### Not yet built
 
 ## 3. Details
 
@@ -47,12 +50,16 @@ the preview shows the note filled in.
   within it (or the last whole character when the first line is longer), followed by `...`.
 - Plain text: line breaks are kept, tabs become spaces, other control characters are left out. No markup.
 - Not read, the placeholder shows nothing: a file that is not there, cannot be opened (locked, no access), or is not
-  on a local fixed drive (a network path, a UNC path, a removable or optical drive). A note that ends up empty is
-  shown as an empty note is now (a space).
+  on a local fixed drive (a network path, a UNC path, a mapped network drive, a removable or optical drive), or takes
+  longer than half a second to read.
+- **When empty:** a note whose filled text is empty (no text, or a file giving nothing) is shown as an empty note is
+  now (a space), or, with `"empty": "hide"`, left out of the menu.
 
 ### 3.2 Speed
 
-- A right-click must not wait on a file. Only local fixed drives are read, and only the first bytes. A cache in the
+- A right-click must not wait on a file. Only local fixed drives are read, and only the first bytes; the read runs on
+  a thread of its own and is waited for half a second at most (then the note shows nothing, and the read's result,
+  when it comes, is dropped). A cache in the
   DLL keeps each file's text by its path, its time written and its size; a menu opening reads the file's attributes
   (one call) and the file only when those changed.
 - The preview fills its notes the same way, so what the editor shows is what the menu will show.
@@ -62,6 +69,7 @@ the preview shows the note filled in.
 - Beside the note's Text: a "File..." button that asks for a file (the settings app's file dialog) and inserts
   `{file:<path>}` at the cursor, the path with `%APPDATA%` or `%USERPROFILE%` in it where it starts with one. The
   Text field's hint names `{file:<path>}` beside the date and time.
+- A "When empty" choice: shown (a space), or left out.
 - The cards view shows the note's text as typed; the preview shows it filled in.
 
 ### 3.4 What does not work, and why
@@ -76,16 +84,33 @@ the preview shows the note filled in.
 
 - Unit tests: a file read (UTF-8 with and without BOM, UTF-16); cut at 320 characters on a whole line with `...` (also
   when its characters take 3 or 4 bytes each); a first line longer than that cut on a whole character; environment variables and a relative path; a missing
-  file, a locked file and a network path giving nothing; the cache reading the file again only after it changed; a
+  file, a locked file and a network path giving nothing; an empty note left out with `"empty": "hide"`, shown
+  without it; the cache reading the file again only after it changed; a
   note's size following its filled text.
 - Editor self-test: the File... button's insert (a path under `%APPDATA%` written with the variable).
 - By hand: a note with a reminder file at a right-click; the file changed and the next right-click showing it.
 
 ## 4. Open questions
 
-1. A file on a network drive: always skipped (as planned, so a slow or lost connection never holds up a right-click),
-   or allowed per note with a short time limit?
+None.
 
 ## 5. Not used
 
 ## 6. As built
+
+### 6.1 How it was built and tested
+
+- `NoteFile` (Dexmenu.Layout) reads a file for `{file:<path>}`: UNC paths and drives that `GetDriveType` does not call
+  fixed are skipped before any read; the file's attributes give the cache key; a miss starts a thread
+  (`TNoteRead`, kept alive by the thread until it ends) that reads the first 1280 bytes, waited for 500 ms. Too slow,
+  locked or gone: nothing, not cached, tried again next time.
+- Decoding: a UTF-8 character cut by the 1280-byte read is left out before decoding (Delphi's UTF-8 decoder raises on
+  it rather than giving a replacement character: caught by the unit test with 3-byte characters); bytes that are
+  still not UTF-8 are read in the system's code page rather than fail.
+- A note fills its text when it is placed (`PlaceLines`), so an empty one set to hide is left out there; measuring
+  and drawing use that text.
+- Tested: unit tests (UTF-8 with and without BOM, UTF-16, control characters, the 320 cut at a whole line, one long
+  line, 3-byte characters, a missing file, a network path, a locked file, the cache reading a changed file again, an
+  empty note hidden and shown), the editor's self-test (a picked path under AppData and the profile written as
+  variables), and the preview captured as a picture (the date, the time and a reminder file's three lines in a
+  styled note; an empty note set to hide left out). The 0.5 s limit is not tested with a slow drive: none here.

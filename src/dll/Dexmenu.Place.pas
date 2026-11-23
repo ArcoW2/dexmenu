@@ -1232,6 +1232,7 @@ var
   List: TList<TFound>;
   Inner: TViewLevel;
   Nothing: Boolean;
+  Filled: string;
 begin
   Result := TViewLevel.Create;
   for Line in Lines do
@@ -1269,9 +1270,15 @@ begin
         V := nil;
         if Card.IsNote then
         begin
+          // its placeholders filled now (the menu opening); empty and set to hide: left out (plan 14 3.1)
+          Filled := FillNote(Card.NoteText, Now);
+          if Card.NoteHideEmpty and (Trim(Filled) = '') then
+            Continue;
           V := TViewCard.Create;
           V.Kind := vkNote;
           V.Card := Card;
+          V.NoteShown := Filled;
+          V.NoteFilled := True;
         end
         else if (Card.Menu <> nil) and (Card.Shows in [csRow, csColumn]) then
         begin

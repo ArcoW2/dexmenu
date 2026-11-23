@@ -295,6 +295,13 @@
       "border3d,font,shadow", "a style takes the 3D border, the shadow and a note's font");
   }
 
+  // a note's file written with the folder it starts in as a variable (plan 14)
+  check(M.withVariables("C:\\Users\\a\\AppData\\Roaming\\R\\today.txt", "C:\\Users\\a\\AppData\\Roaming", "C:\\Users\\a") === "%APPDATA%\\R\\today.txt" &&
+    M.withVariables("c:\\users\\A\\notes.txt", "C:\\Users\\a\\AppData\\Roaming", "C:\\Users\\a") === "%USERPROFILE%\\notes.txt" &&
+    M.withVariables("D:\\x.txt", "C:\\Users\\a\\AppData\\Roaming", "C:\\Users\\a") === "D:\\x.txt" &&
+    M.withVariables("C:\\Users\\ab\\x.txt", "C:\\Users\\a\\AppData\\Roaming", "C:\\Users\\a") === "C:\\Users\\ab\\x.txt",
+    "a note's file: under AppData %APPDATA%, under the profile %USERPROFILE%, elsewhere as it is (not a folder that only starts the same)");
+
   // a template copied onto another card: a copy added to its templates; not onto a card holding cards
   {
     const L6 = mk([ { line: [ { card: "A", show: "row", templates: [ { background: "#ff0000", square: true } ], rules: [ { name: { equals: "a" } } ] } ] },
