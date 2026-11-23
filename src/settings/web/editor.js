@@ -425,9 +425,18 @@ function cardActions(card) {
   const action = (into, label, tip, fn, icon = false) => {
     const b = el("button", "", label);
     if (icon) withIcon(b, label);
-    b.title = tip;
+    b.title = tip + " (hold the click a moment)";
     b.draggable = false;
-    b.addEventListener("click", e => { e.stopPropagation(); fn(); });
+    // only a click held at least holdMs acts (a quick click passing over the icon does nothing); from the keyboard
+    // (no pointer press) at once
+    let down = 0;
+    b.addEventListener("pointerdown", () => { down = performance.now(); });
+    b.addEventListener("click", e => {
+      e.stopPropagation();
+      const held = e.detail === 0 || (down > 0 && performance.now() - down >= holdMs);
+      down = 0;
+      if (held) fn();
+    });
     into.append(b);
   };
   action(adds, "+ beside", "A new card beside this one", () => addAndFocus(M.addCard(layout, linesOf(), null, card.id)), true);
@@ -1149,6 +1158,7 @@ function renderCardPane() {
 
 // ---- the card panel's parts (plan 13): the name fixed at the top, the other fields in panels the user arranges -----
 
+const holdMs = 200;   // how long a card's hover icon must be held down to act
 let revealRule = false;   // a rule selected elsewhere (the rules view, the preview): shown once the panel is drawn
 const chosenTabs = new Map();   // a set of tabs (by its panels) -> the tab chosen in it (by that tab's panels), this session
 const panelsKey = "dexmenu.cardPanels";
