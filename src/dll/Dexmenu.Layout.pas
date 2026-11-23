@@ -193,7 +193,7 @@ const
   // the layout files' form this DLL reads (older forms are read too): 2, the menu one card holding cards (plan 11)
   FormatVersion = 2;
   BaseLayout = '// the base layout: Windows'' menu as cards'#10 +
-    '{ "format": 1, "lines": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }';
+    '{ "format": 2, "menu": { "content": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } }';
 
 implementation
 

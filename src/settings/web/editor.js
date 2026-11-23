@@ -21,7 +21,6 @@ let kind = "default";
 let selectedId = null;
 let selectedRule = -1;   // index on the selected card
 let hoverId = null;
-let selectedLine = null;   // the cards of a line selected in the gutter (their ids, in order), dragged together; null none
 const collapsed = new Set();   // cards with a menu shown folded (this session only)
 let generalStates = "both";   // what a rule without states of its own takes (the main window's General)
 let palette = {};  // the theme's palette, { name: "#rrggbbaa" } (the app, DexmenuThemePalette): the colour pickers
@@ -87,7 +86,7 @@ function el(tag, cls, text) {
 
 // The lines of the kind being edited: its own, or the default's.
 // The menu being edited: a layout is one menu (plan 05 3.1), whatever kind of right-click the preview shows.
-function linesOf() { return layout.lines; }
+function linesOf() { return M.rootOf(layout); }
 
 function changed() {
   dirty = true;
@@ -107,7 +106,11 @@ function describeCard(card) {
   if (M.isNote(card)) return "a note: shown as text, no button";
   if (M.isOwn(card)) return "Dexmenu's own item: " + (card.own === "windowsMenu" ? "shows Windows' menu" : "opens this editor");
   if (card.hidden && !M.isRemaining(card)) return "hidden: what it finds is left out of the menu";
-  if (card.menu) return "a card with a menu";
+  if (M.isHolder(card)) {
+    const n = card.content.filter(e => !M.isDividerEntry(e)).length;
+    const how = card.show === "row" ? "side by side" : card.show === "column" ? "under each other" : "in a submenu";
+    return "holds " + n + (n === 1 ? " card" : " cards") + ", " + how;
+  }
   if (M.isRemaining(card)) return "the remaining card: every item no rule took, each a card of its own here";
   const n = (card.rules || []).length;
   if (n === 0) return "no rules: finds nothing";
@@ -132,14 +135,6 @@ function dropZone(cls, onDrop) {
 // the end, then moved by the drop like any; taken out again when the drop cannot place it). place(id, isDivider)
 // moves it and says whether it did.
 function withDragged(e, place) {
-  // a line selected in the gutter: its first card placed as a dragged card is, the others after it in its line
-  if (e.dataTransfer.types.includes("text/line")) {
-    const ids = JSON.parse(e.dataTransfer.getData("text/line") || "[]");
-    if (!ids.length || !place(ids[0], false)) return;
-    for (let i = 1; i < ids.length; i++) M.moveCardNext(linesOf(), ids[i], ids[i - 1], "after");
-    changed();
-    return;
-  }
   const isDivider = e.dataTransfer.types.includes("text/divider");
   let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
   if (!id) return;
@@ -193,22 +188,21 @@ function focusNew(id) {
 }
 function addAndFocus(card) { select(card.id, -1); changed(); focusNew(card.id); }
 
+// A container (the menu's content, or a card's holding them under each other): each card on a line of its own, a
+// drop gap before each and at the end. A plain row (what a line was) is drawn as that line, its cards side by side.
 function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
     box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index) : M.moveCard(linesOf(), id, parentId, index)));
-    if (entry.divider !== undefined || entry.search) {
+    if (M.isDividerEntry(entry)) {
       const d = renderDivider(entry);
-      if (!parentId) d.dataset.top = index;   // a top-level line's place, for a card pasted in the gutter
+      if (!parentId) d.dataset.top = index;   // a top-level place, for a card pasted in the gutter
       box.append(d);
       return;
     }
-    if (!entry.line) return;
-    const row = el("div", "line");
+    const row = M.isPlainRow(entry) ? renderRow(entry) : el("div", "line");
+    if (!M.isPlainRow(entry)) row.append(renderCard(entry));
     if (!parentId) row.dataset.top = index;
-    for (const card of entry.line) row.append(renderCard(card));
-    row.append(dropZone("line-end", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index + 1)
-      : M.moveCard(linesOf(), id, parentId, index, true)));
     box.append(row);
   });
   box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, lines.length)
@@ -216,9 +210,59 @@ function renderLines(lines, parentId) {
   return box;
 }
 
+// A row's cards side by side (its content), a drop place at its end; a plain row (no style of its own) is the line
+// itself, selected as a card (a click in the gutter beside it, plan 11 3.5).
+function renderRow(holder) {
+  const row = el("div", "line" + (M.isPlainRow(holder) ? " row-holder" : "") + (holder.id === selectedId ? " selected" : ""));
+  row.dataset.holder = holder.id;
+  for (const entry of holder.content) row.append(M.isDividerEntry(entry) ? renderDivider(entry) : renderCard(entry));
+  row.append(dropZone("line-end", (id, isDiv) => isDiv ? M.moveDividerNext(linesOf(), id, holder.id, "below")
+    : M.moveCard(linesOf(), id, holder.id, holder.content.length)));
+  return row;
+}
+
+// A card whose found items become inner cards (in a row, a column or a submenu: plan 11 3.1), which follow templates.
+function usesTemplates(card) {
+  return !M.isHolder(card) && !M.isNote(card) && !M.isRemaining(card) && ["row", "column", "submenu"].includes(card.show);
+}
+
+// Its templates as dashed cards inside it ("Template 1", ...), selected and edited as a card; "+ Template" adds one,
+// "x" on one removes it. Selected by "<card id>~t<n>".
+function renderTemplates(card) {
+  const box = el("div", "templates");
+  (card.templates || []).forEach((t, i) => {
+    const id = card.id + "~t" + i;
+    const chip = el("div", "template-card" + (selectedId === id ? " selected" : ""), "Template " + (i + 1));
+    chip.title = "What its inner cards follow" + ((card.templates.length > 1) ? (card.templatesBy === "rule" ? " (the rules that name it)" : " (in turn)") : "");
+    const x = el("button", "", "x");
+    x.title = "Remove this template";
+    x.addEventListener("click", e => {
+      e.stopPropagation();
+      card.templates.splice(i, 1);
+      if (!card.templates.length) delete card.templates;
+      if (selectedId === id) selectedId = card.id;
+      changed();
+    });
+    chip.append(x);
+    chip.addEventListener("click", e => { e.stopPropagation(); select(id, -1); });
+    box.append(chip);
+  });
+  const add = el("button", "", "+ Template");
+  add.title = "A template its inner cards follow: their texts, layout and style";
+  add.addEventListener("click", e => {
+    e.stopPropagation();
+    card.templates = card.templates || [];
+    card.templates.push({});
+    select(card.id + "~t" + (card.templates.length - 1), -1);
+    changed();
+  });
+  box.append(add);
+  return box;
+}
+
 function renderCard(card) {
   const classes = ["card"];
-  if (card.id === selectedId || (selectedLine && selectedLine.includes(card.id))) classes.push("selected");
+  if (card.id === selectedId) classes.push("selected");
   if (card.id === hoverId) classes.push("hover");
   if (M.useless(card)) classes.push("useless");
   if (M.isRemaining(card)) classes.push("remaining");
@@ -227,17 +271,18 @@ function renderCard(card) {
   box.draggable = true;
   box.dataset.id = card.id;
   // a card with a menu folds; its toggle is in the pane's gutter (placeToggles)
-  const folded = !!card.menu && collapsed.has(card.id);
-  if (card.menu) box.dataset.fold = folded ? "folded" : "open";
+  const folded = M.isHolder(card) && collapsed.has(card.id);
+  if (M.isHolder(card)) box.dataset.fold = folded ? "folded" : "open";
   const title = el("div", "title");
   // its own element, so a long name wraps inside the card; a note shows its text (its first lines)
   title.append(M.isNote(card) ? el("span", "name note-text align-" + (card.align || "left"), card.note || "(empty)")
     : el("span", "name", card.card));
   title.append(...ruleBadges(card));
-  const cardsIn = card.menu ? [...M.cards(card.menu)].length : 0;
+  const cardsIn = M.isHolder(card) ? [...M.cards(card.content)].length : 0;
   box.append(cardActions(card), title,
     el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
-  if (card.menu && !folded) box.append(renderLines(card.menu, card.id));
+  if (usesTemplates(card)) box.append(renderTemplates(card));
+  if (M.isHolder(card) && !folded) box.append(card.show === "row" ? renderRow(card) : renderLines(card.content, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
   // its right-click menu: the card copied, a copied card pasted inside it (when it can hold one), its style copied, or
   // a copied style pasted onto it (the remaining card: no copy, no style)
@@ -250,7 +295,7 @@ function renderCard(card) {
     const remaining = M.isRemaining(card);
     showContextMenu(x, y, [
       ["Copy card", "A duplicate of it (with its menu and rules) can be pasted elsewhere, also in another layout (Ctrl+C)", copyCard, remaining],
-      ["Paste card inside", card.menu ? "The copied card added to this card's menu" : "This card becomes a card with a menu: its rules in the first card, the copied card after it",
+      ["Paste card inside", M.isHolder(card) ? "The copied card added to what this card holds" : "This card becomes a card with a submenu: its rules in the first card, the copied card after it",
         () => pasteCardAt({ into: card.id }), type !== "card" || !M.canHold(card)],
       null,
       ["Copy style", "Its background, text colour, border, radius, hover look, height, wrap, fit in line, extra text at and submenus open (Ctrl+Shift+C)", copyStyle, remaining],
@@ -259,7 +304,7 @@ function renderCard(card) {
   // a double click on a card with a menu (its own space, not a card in it or a button) folds or unfolds it
   box.addEventListener("dblclick", e => {
     e.stopPropagation();
-    if (!card.menu || e.target.closest("button")) return;
+    if (!M.isHolder(card) || e.target.closest("button")) return;
     collapsed.has(card.id) ? collapsed.delete(card.id) : collapsed.add(card.id);
     render();
   });
@@ -278,7 +323,7 @@ function renderCard(card) {
     box.classList.remove(...zones);
     if (e.dataTransfer.types.includes("text/ruleref")) {   // a rule: onto the card, moved or (Shift) copied
       e.dataTransfer.dropEffect = e.shiftKey ? "copy" : "move";
-      if (!card.menu && !M.isRemaining(card) && !M.isNote(card) && !M.isOwn(card)) box.classList.add("over");
+      if (!M.isHolder(card) && !M.isRemaining(card) && !M.isNote(card) && !M.isOwn(card)) box.classList.add("over");
       return;
     }
     box.classList.add(zoneClass(dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"))));
@@ -296,7 +341,6 @@ function renderCard(card) {
       return;
     }
     // a selected line dropped onto one of its own cards: nothing
-    if (e.dataTransfer.types.includes("text/line") && selectedLine && selectedLine.includes(card.id)) return;
     const zone = dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"));
     withDragged(e, (id, isDiv) => isDiv ? M.moveDividerNext(linesOf(), id, card.id, zone)
       : zone === "onto" ? M.dropOnCard(layout, linesOf(), id, card.id) : M.moveCardNext(linesOf(), id, card.id, zone));
@@ -319,11 +363,11 @@ function cardActions(card) {
     into.append(b);
   };
   action(adds, "+ beside", "A new card beside this one", () => addAndFocus(M.addCard(layout, linesOf(), null, card.id)), true);
-  if (card.menu) action(adds, "+ in menu", "A new card at the end of its menu", () => {
+  if (M.isHolder(card)) action(adds, "+ inside", "A new card at the end of what it holds", () => {
     collapsed.delete(card.id);
     addAndFocus(M.addCard(layout, linesOf(), card.id));
   }, true);
-  if (!card.menu && !M.isRemaining(card) && !M.isNote(card) && !M.isOwn(card)) action(rest, "menu", "Make it a card with a menu (its rules go to a first card in it)", () => {
+  if (!M.isHolder(card) && !M.isRemaining(card) && !M.isNote(card) && !M.isOwn(card)) action(rest, "menu", "Make it a card with a submenu (its rules go to a first card in it)", () => {
     M.makeMenu(layout, linesOf(), card.id);
     changed();
   });
@@ -355,7 +399,6 @@ function dropZoneOf(box, e, divider = false) {
 const zoneClass = zone => zone === "onto" ? "over" : "over-" + zone;
 
 function select(id, ruleIndex) {
-  selectedLine = null;
   if (ruleIndex >= 0) revealRule = true;
   selectedId = id;
   selectedRule = ruleIndex;
@@ -405,9 +448,17 @@ function sizeFields(card) {
   wrapRow.title = "The title wraps over more lines: within Height when it is set (the last line cut with ...), else the card is as high as its lines";
   wrapRow.append(el("span", "", "Wrap"), el("span"));
   wrapRow.lastChild.append(wrap, " the title over more lines");
+  // as high as it is wide (plan 11 3.1)
+  const square = el("input");
+  square.type = "checkbox";
+  square.checked = !!card.square;
+  square.addEventListener("change", () => { if (square.checked) card.square = true; else delete card.square; changed(); });
+  const squareRow = el("label", "field");
+  squareRow.append(el("span", "", "Square"), el("span"));
+  squareRow.lastChild.append(square, " as high as it is wide");
   return [number("weight", "Weight", "1: its share of the line's width"),
     number("minWidth", "Min width", "(none) the line wraps when it does not fit"),
-    number("height", "Height", "(its content) in lines of text"), wrapRow, fitRow];
+    number("height", "Height", "(its content) in lines of text"), wrapRow, squareRow, fitRow];
 }
 
 // One colour's controls (plan 03 3.6): a swatch, where the colour comes from (the theme's own colour, when withTheme;
@@ -716,6 +767,18 @@ function ruleEditor(card, rule, index) {
   });
   if (M.ruleType(rule) === "name")
     row("Where", placeSel, ...(rule.path ? matchEditor(rule.path, m => { rule.path = m; changed(); }) : []));
+  // the template the items it finds follow, when its card picks templates by rule (plan 11 3.1)
+  if (card.templatesBy === "rule" && Array.isArray(card.templates) && card.templates.length > 0) {
+    const tsel = el("select");
+    for (let i = 0; i <= card.templates.length; i++) {
+      const o = el("option", "", i === 0 ? "(the first)" : "Template " + i);
+      o.value = i === 0 ? "" : String(i);
+      tsel.append(o);
+    }
+    tsel.value = rule.template ? String(rule.template) : "";
+    tsel.addEventListener("change", () => { if (tsel.value) rule.template = +tsel.value; else delete rule.template; changed(); });
+    row("Template", tsel);
+  }
   // the states it takes: a group whose border holds "Overrule general setting: States"; not ticked, the rule takes what General sets (shown,
   // greyed); ticked, its own, written even when both (General may say otherwise)
   const statesBox = el("fieldset", "states");
@@ -813,11 +876,22 @@ function renderCardPane() {
     box.append(row);
     return;
   }
-  if (selectedLine) {
-    $("cardHeading").textContent = "A line of cards";
-    $("card").replaceChildren(el("div", "hint", "The " + selectedLine.length + (selectedLine.length === 1 ? " card" : " cards") +
-      " of this line are selected. Drag the grip in the gutter beside them to move them together: between lines as a line " +
-      "of their own, beside a card into its line, onto a card into its menu. Esc while dragging cancels."));
+  // a template (plan 11 3.1): its texts that apply to every item, its layout and its style
+  const tm = /^(.*)~t(\d+)$/.exec(selectedId || "");
+  const holderAt = tm ? M.find(linesOf(), tm[1]) : null;
+  if (holderAt && Array.isArray(holderAt.card.templates) && holderAt.card.templates[+tm[2]]) {
+    const t = holderAt.card.templates[+tm[2]];
+    $("cardHeading").textContent = "Template " + (+tm[2] + 1) + " of " + holderAt.card.card;
+    const names = [textField("Rename (regex)", t.rename && t.rename.regex, v => {
+      if (v) t.rename = { regex: v, replace: (t.rename && t.rename.replace) || "" }; else delete t.rename;
+      changed();
+    }), textField("... replace with", t.rename && t.rename.replace, v => { if (t.rename) { t.rename.replace = v; changed(); } }),
+    textField("Extra text", t.extra, v => { if (v) t.extra = v; else delete t.extra; changed(); }, "(none) a smaller text with each title"),
+    extraAtField(t),
+    textField("Icon", t.icon, v => { if (v.trim()) t.icon = v.trim(); else delete t.icon; changed(); }, "(each item's own) e.g. E8C8"),
+    textField("Hint", typeof t.hint === "string" ? t.hint : "", v => { if (v) t.hint = v; else delete t.hint; changed(); }, "(each item's own hint)")];
+    $("card").replaceChildren(el("div", "hint", "Every inner card made for what " + holderAt.card.card + " finds follows a template: its title is the item's text."),
+      renderPanels(t, { names, layout: sizeFields(t), style: lookFields(t) }));
     return;
   }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
@@ -853,7 +927,7 @@ function renderCardPane() {
     return;
   }
   $("cardHeading").textContent = M.isOwn(card) ? "Dexmenu's own item" : M.isRemaining(card) ? "The remaining card"
-    : card.menu ? "A card with a menu" : "A card with rules";
+    : M.isHolder(card) ? "A card holding cards" : "A card with rules";
   const groups = cardGroups(card);
   $("card").replaceChildren(cardTop(card), renderPanels(card, groups));
   if (revealRule) {
@@ -900,7 +974,7 @@ function cardTop(card) {
 // A card's fields by panel (plan 13 3.1, 3.2): { names, rules, inside, layout, style }, each a list of elements; a
 // panel the card's kind does not have is left out.
 function cardGroups(card) {
-  const own = M.isOwn(card), rest = M.isRemaining(card), withRules = !card.menu && !rest && !own;
+  const own = M.isOwn(card), rest = M.isRemaining(card), withRules = !M.isHolder(card) && !rest && !own;
   const g = {};
   // Names: what it and its items show as text, the icon, the hint, the comment
   const names = [];
@@ -917,7 +991,17 @@ function cardGroups(card) {
     row.append(el("span", "", "Item"), which);
     names.push(row);
   } else names.push(textField("Title", card.title, v => { if (v) card.title = v; else delete card.title; changed(); },
-    card.menu ? "(its name)" : "(the item's own text for one item)"));
+    M.isHolder(card) ? "(its name, shown as its submenu's item; none above what it holds)" : "(the item's own text for one item)"));
+  if (M.isHolder(card) && card.show !== "submenu") {
+    // a holder's title above what it holds: as a title, or as a divider with that text
+    const titleAs = el("select");
+    for (const [v, label] of [["", "a title"], ["divider", "a divider"]]) { const o = el("option", "", label); o.value = v; titleAs.append(o); }
+    titleAs.value = card.titleAs || "";
+    titleAs.addEventListener("change", () => { if (titleAs.value) card.titleAs = titleAs.value; else delete card.titleAs; changed(); });
+    const row = el("label", "field");
+    row.append(el("span", "", "Title shown as"), titleAs);
+    names.push(row);
+  }
   if (withRules) names.push(textField("Rename (regex)", card.rename && card.rename.regex, v => {
     if (v) card.rename = { regex: v, replace: (card.rename && card.rename.replace) || "" }; else delete card.rename;
     changed();
@@ -976,18 +1060,7 @@ function cardGroups(card) {
   // Inside: how what it found shows and opens
   if (!own) {
     const inside = [];
-    if (withRules) {
-      // what it finds as buttons inside it, a found submenu unfolded (plan 02 3.3)
-      const bt = el("input");
-      bt.type = "checkbox";
-      bt.checked = !!card.buttons;
-      bt.addEventListener("change", () => { if (bt.checked) card.buttons = true; else delete card.buttons; changed(); });
-      const lb = el("label", "field");
-      lb.title = "What it finds shows as buttons inside it, side by side; an item with a submenu shows the items of that submenu";
-      lb.append(el("span", "", "Items as buttons"), el("span"));
-      lb.lastChild.append(bt, " inside the card");
-      inside.push(lb);
-    }
+    if (withRules || M.isHolder(card)) inside.push(...showFields(card, withRules));
     // how what opens from this card opens: as set for every menu (main window), or its own way
     const way = el("select");
     for (const [v, label] of [["", "as set for every menu"], ["next", "next to the card"], ["under", "under the card"],
@@ -999,7 +1072,7 @@ function cardGroups(card) {
     way.value = card.submenus || "";
     way.addEventListener("change", () => { if (way.value) card.submenus = way.value; else delete card.submenus; changed(); });
     const row = el("label", "field");
-    row.title = card.menu ? "How this card's menu opens" : "How the submenus of the items this card shows open";
+    row.title = M.isHolder(card) ? "How this card's submenu opens" : "How the submenus of the items this card shows open";
     row.append(el("span", "", "Submenus open"), way);
     inside.push(row);
     g.inside = inside;
@@ -1128,6 +1201,48 @@ function renderPanels(card, groups) {
   });
   box.addEventListener("dragend", clear);
   return box;
+}
+
+// How a card shows what it found or holds (plan 11 3.1): Shows; a row's per row and rows, a column's per column and
+// columns; the rest beyond them; a holder's shown when; with templates, how they are picked.
+function showFields(card, withRules) {
+  const fields = [];
+  const select = (label, title, options, value, set) => {
+    const sel = el("select");
+    for (const [v, text] of options) { const o = el("option", "", text); o.value = v; sel.append(o); }
+    sel.value = value;
+    sel.addEventListener("change", () => { set(sel.value); changed(); });
+    const row = el("label", "field");
+    row.title = title;
+    row.append(el("span", "", label), sel);
+    return row;
+  };
+  const shows = withRules
+    ? [["", "each a card of its own (the card multiplied)"], ["submenu", "in a submenu"], ["row", "side by side inside it"], ["column", "under each other inside it"]]
+    : [["submenu", "in a submenu"], ["row", "side by side inside it"], ["column", "under each other inside it"]];
+  fields.push(select("Shows", withRules ? "How what its rules find shows" : "How the cards it holds show", shows,
+    card.show || (withRules ? "" : "column"), v => { if (v) card.show = v; else delete card.show; }));
+  const number = (key, label, placeholder) => textField(label, card[key] === undefined ? "" : String(card[key]), v => {
+    const n = Math.round(Number(v.trim()));
+    if (v.trim() && n >= 1) card[key] = n; else delete card[key];
+    changed();
+  }, placeholder);
+  if (card.show === "row") fields.push(number("perRow", "Per row", "(as many as fit)"), number("rows", "Rows", "(as many as needed)"));
+  if (card.show === "column") fields.push(number("perColumn", "Per column", "(all in one column)"), number("columns", "Columns", "(as many as needed)"));
+  if ((card.show === "row" && card.perRow && card.rows) || (card.show === "column" && card.perColumn && card.columns))
+    fields.push(select("The rest", "What does not fit", [["", "in a \"More\" submenu"], ["none", "left out"]], card.rest || "",
+      v => { if (v) card.rest = v; else delete card.rest; }));
+  if (M.isHolder(card))
+    fields.push(select("Shown when", "When this card shows: something in it can be chosen, anything in it shows, or always",
+      [["", "something in it can be chosen"], ["anyItem", "anything in it shows"], ["always", "always"]], card.shownWhen || "",
+      v => { if (v) card.shownWhen = v; else delete card.shownWhen; }));
+  if (withRules && card.show && card.show !== "item") {
+    const row = select("Templates picked", "With more than one template: by the inner card's place (in turn), or by the rule that found it",
+      [["", "by place, in turn"], ["rule", "by rule"]], card.templatesBy || "", v => { if (v) card.templatesBy = v; else delete card.templatesBy; });
+    if (!Array.isArray(card.templates) || card.templates.length < 2) row.querySelector("select").disabled = true;
+    fields.push(row);
+  }
+  return fields;
 }
 
 // Extra text at: above or below the title (a Names field)
@@ -1318,17 +1433,16 @@ function placeToggles() {
   const gutter = $("cardsGutter");
   for (const t of gutter.querySelectorAll(".fold, .rest-mark, .use-count, .line-grip")) t.remove();
   const top = gutter.getBoundingClientRect().top;
-  // a line selected in the gutter: a grip beside it, as high as the line, to drag its cards by
-  const firstBox = selectedLine && $("cards").querySelector(`.card[data-id="${selectedLine[0]}"]`);
-  const row = firstBox && firstBox.closest(".line");
+  // a plain row selected (a click in the gutter): a grip beside it, as high as the row, to drag it by
+  const row = selectedId && $("cards").querySelector(`.row-holder[data-holder="${selectedId}"]`);
   if (row) {
     const r = row.getBoundingClientRect(), grip = el("div", "line-grip");
-    grip.title = "Drag to move this line's cards together; Esc cancels";
+    grip.title = "Drag to move this row with its cards; Esc cancels";
     grip.draggable = true;
     grip.style.top = (r.top - top) + "px";
     grip.style.height = r.height + "px";
     grip.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("text/line", JSON.stringify(selectedLine));
+      e.dataTransfer.setData("text/card", selectedId);
       e.dataTransfer.effectAllowed = "move";
     });
     gutter.append(grip);
@@ -1375,13 +1489,13 @@ function useCount(id) {
   const at = M.find(linesOf(), id);
   if (!at) return 0;
   const sum = card => (counts[card.id] || 0) +
-    (card.menu ? card.menu.reduce((t, entry) => t + (entry.line ? entry.line.reduce((u, c) => u + sum(c), 0) : 0), 0) : 0);
+    (M.isHolder(card) ? card.content.reduce((t, entry) => t + (M.isDividerEntry(entry) ? 0 : sum(entry)), 0) : 0);
   return sum(at.card);
 }
 new ResizeObserver(() => { if (layout) placeToggles(); }).observe($("cards"));
 
-// A click in the gutter selects the cards of the line beside it (the innermost line there: a line in a card's menu
-// before the line of that card), to drag them together by the grip that then shows.
+// A click in the gutter selects the row beside it (the innermost there: a row inside a card before the row holding
+// that card), or the card alone on its line there; a row is then dragged by the grip that shows beside it.
 $("cardsGutter").addEventListener("click", e => {
   if (!layout || e.target.closest("button, .line-grip")) return;
   let best = null;
@@ -1389,13 +1503,9 @@ $("cardsGutter").addEventListener("click", e => {
     const r = row.getBoundingClientRect();
     if (e.clientY >= r.top && e.clientY <= r.bottom && (!best || r.height < best.getBoundingClientRect().height)) best = row;
   }
-  const ids = best ? [...best.children].filter(c => c.classList.contains("card")).map(c => c.dataset.id) : [];
-  if (!ids.length) return;
-  selectedId = null;
-  selectedRule = -1;
-  selectedLine = ids;
-  post({ type: "mark", cardId: "" });
-  render();
+  if (!best) return;
+  const id = best.dataset.holder || best.querySelector(":scope > .card")?.dataset.id;
+  if (id) select(id, -1);
 });
 
 function load(state) {
@@ -1409,6 +1519,12 @@ function load(state) {
   let older = false;
   try {
     const current = M.upToDate(JSON.parse(M.withoutComments(state.layout)));
+    if (!current.layout) {
+      // an older form: not converted here (that was done once by a script); not opened
+      layout = null;
+      $("cards").replaceChildren(el("div", "problem", current.error));
+      return;
+    }
     layout = M.ensureIds(current.layout);
     older = current.changed;
   } catch (e) {
@@ -1474,7 +1590,7 @@ $("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("collapseAll").addEventListener("click", () => {
   if (!layout) return;
-  for (const at of M.cards(linesOf())) if (at.card.menu) collapsed.add(at.card.id);
+  for (const at of M.cards(linesOf())) if (M.isHolder(at.card)) collapsed.add(at.card.id);
   render();
 });
 $("expandAll").addEventListener("click", () => { collapsed.clear(); render(); });
@@ -1655,7 +1771,7 @@ document.addEventListener("keydown", async e => {
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch (err) { return; }
   if (text.includes('"dexmenu":"style"')) { pasteStyle(text); return; }   // a style: onto the selected card
-  const onto = at && !at.card.menu && !M.isRemaining(at.card) ? at.card : null;
+  const onto = at && !M.isHolder(at.card) && !M.isRemaining(at.card) ? at.card : null;
   const pasted = M.paste(layout, linesOf(), text, at ? selectedId : null, onto);
   if (!pasted) return;
   if (pasted.id) select(pasted.id, -1);

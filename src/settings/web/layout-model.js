@@ -1,27 +1,39 @@
-// The layout as the editor changes it (docs/plans/executed/02-PLAN-own-menu.md 3.3, 3.5; plan 00 step 5): pure functions on
-// the parsed layout, no page. A layout: { "<kind>": [ { "line": [ card, ... ] }, ... ], ... }. A card: { id, card
-// (its name), rules: [ ... ] } or { id, card, menu: [ lines ] }, with title, extra, rename where given. The remaining
-// card's rule is the text "remaining"; every kind has exactly one. Every other rule has a priority (the priority
-// list, lower first). Tested by selftest.js (DexmenuSettings.exe --selftest).
+// The layout as the editor changes it (docs/plans/11-PLAN-cards-hold-content.md 3.1, 3.5; plan 02 3.3, 3.5): pure
+// functions on the parsed layout, no page. A layout (format 2): { format: 2, menu: { content: [ ... ] } }, the menu one
+// card holding the others. A container (the menu's content, a card's content) is a list of entries: cards, dividers
+// ({ id, divider }) and the search box ({ id, search: true }). A card: { id, card (its name), rules: [ ... ] }, or
+// { id, card, content: [ entries ], show } holding cards (show "submenu", "row" or "column"), with title, extra,
+// rename, style where given. The remaining card's rule is the text "remaining"; a layout has exactly one. Every other
+// rule has a priority (the priority list, lower first). The functions take the menu's content (`lines`) as the root.
+// Tested by selftest.js (DexmenuSettings.exe --selftest).
 "use strict";
 
 const LayoutModel = (() => {
   const matchKinds = ["equals", "contains", "startsWith", "endsWith", "wildcard", "regex", "any"];
 
   function isRemaining(card) { return Array.isArray(card.rules) && card.rules.includes("remaining"); }
-  // A note card ({ id, note: "<text>" }, plan 02 3.3): no button, no rules, no menu.
+  // A note card ({ id, note: "<text>" }, plan 02 3.3): no button, no rules, holds nothing.
   function isNote(card) { return card.note !== undefined; }
+  // A divider or the search box: an entry between cards, not a card.
+  function isDividerEntry(entry) { return entry.divider !== undefined || entry.search === true; }
+  // A card holding cards (plan 11): its content, shown as its show says.
+  function isHolder(card) { return Array.isArray(card.content); }
+  // A row card that only puts cards side by side, with nothing of its own (what a line was): made by a drop beside a
+  // card, undone when one card is left in it.
+  const plainRowKeys = ["id", "card", "show", "shownWhen", "content", "cardFit"];
+  function isPlainRow(card) {
+    return isHolder(card) && card.show === "row" && Object.keys(card).every(k => plainRowKeys.includes(k));
+  }
+  function isRow(card) { return isHolder(card) && card.show === "row"; }
 
-  // Every card of some lines, depth first, with where it is.
+  // Every card of a container, depth first, with where it is: its container (lines), its place in it (lineIndex, and
+  // cardIndex the same), the card holding it (parent; null at the menu's top).
   function* cards(lines, parent = null) {
-    for (let li = 0; li < lines.length; li++) {
-      const entry = lines[li];
-      if (!entry.line) continue;
-      for (let ci = 0; ci < entry.line.length; ci++) {
-        const card = entry.line[ci];
-        yield { card, lines, lineIndex: li, cardIndex: ci, parent };
-        if (card.menu) yield* cards(card.menu, card);
-      }
+    for (let i = 0; i < lines.length; i++) {
+      const card = lines[i];
+      if (!card || isDividerEntry(card)) continue;
+      yield { card, lines, lineIndex: i, cardIndex: i, parent };
+      if (isHolder(card)) yield* cards(card.content, card);
     }
   }
 
@@ -31,42 +43,42 @@ const LayoutModel = (() => {
   }
 
   function contains(card, id) {
-    if (!card.menu) return false;
-    for (const at of cards(card.menu)) if (at.card.id === id) return true;
+    if (!isHolder(card)) return false;
+    for (const at of cards(card.content)) if (at.card.id === id) return true;
     return false;
   }
 
-  function allCards(layout) {
-    const all = [];
-    for (const kind of Object.keys(layout)) if (Array.isArray(layout[kind])) for (const at of cards(layout[kind])) all.push(at.card);
-    return all;
-  }
+  // The menu's content of a layout.
+  function rootOf(layout) { return layout && layout.menu && Array.isArray(layout.menu.content) ? layout.menu.content : []; }
 
-  // Every divider entry of some lines, depth first: { entry, lines, index, parent }. A divider: { id, divider: "<text>"
-  // or "", align: "left" | "center" | "right" }, between lines of cards. The search box ({ id, search: true }) stands
-  // between lines as a divider does, so it is handled as one: moved, deleted, copied.
+  function allCards(layout) { return [...cards(rootOf(layout))].map(at => at.card); }
+
+  // Every divider entry of a container, depth first: { entry, lines, index, parent }. A divider: { id, divider: "<text>"
+  // or "", align: "left" | "center" | "right" }, between cards. The search box ({ id, search: true }) stands between
+  // cards as a divider does, so it is handled as one: moved, deleted, copied.
   function* dividers(lines, parent = null) {
     for (let i = 0; i < lines.length; i++) {
       const entry = lines[i];
-      if (entry.divider !== undefined || entry.search) yield { entry, lines, index: i, parent };
-      if (entry.line) for (const card of entry.line) if (card.menu) yield* dividers(card.menu, card);
+      if (!entry) continue;
+      if (isDividerEntry(entry)) yield { entry, lines, index: i, parent };
+      else if (isHolder(entry)) yield* dividers(entry.content, entry);
     }
   }
-  function allDividers(layout) {
-    const all = [];
-    for (const kind of Object.keys(layout)) if (Array.isArray(layout[kind])) for (const d of dividers(layout[kind])) all.push(d.entry);
-    return all;
-  }
+  function allDividers(layout) { return [...dividers(rootOf(layout))].map(d => d.entry); }
   function findDivider(lines, id) {
     for (const d of dividers(lines)) if (d.entry.id === id) return d;
     return null;
   }
 
-  function newId(layout) {
+  // A fresh id "c<n>" for a container's tree (the menu's content).
+  function freshId(lines) {
     let max = 0;
-    for (const c of [...allCards(layout), ...allDividers(layout)]) { const m = /^c(\d+)$/.exec(c.id || ""); if (m) max = Math.max(max, +m[1]); }
+    const see = id => { const m = /^c(\d+)$/.exec(id || ""); if (m) max = Math.max(max, +m[1]); };
+    for (const at of cards(lines)) see(at.card.id);
+    for (const d of dividers(lines)) see(d.entry.id);
     return "c" + (max + 1);
   }
+  function newId(layout) { return freshId(rootOf(layout)); }
 
   // Ids on every card, each once, and a priority on every rule, so the editor, the file and the DLL name the same
   // things. A card whose id an earlier card has already gets a new one (a layout saved with a duplicate).
@@ -77,7 +89,7 @@ const LayoutModel = (() => {
       if (!c.id || seen.has(c.id)) c.id = "c" + next++;
       seen.add(c.id);
     }
-    for (const kind of Object.keys(layout)) if (Array.isArray(layout[kind])) renumber(layout[kind]);
+    renumber(rootOf(layout));
     return layout;
   }
 
@@ -261,7 +273,7 @@ const LayoutModel = (() => {
 
   // A card that can never show anything (outlined red): a card with rules but none, or with an invalid rule.
   function useless(card) {
-    if (card.menu || isNote(card) || isOwn(card)) return false;
+    if (isHolder(card) || isNote(card) || isOwn(card)) return false;
     const rules = card.rules || [];
     return rules.length === 0 || rules.some(r => ruleProblem(r) !== "");
   }
@@ -314,7 +326,7 @@ const LayoutModel = (() => {
   // a card with a menu or the remaining card. The rule now on toCard, or null.
   function moveRuleToCard(lines, fromCard, index, toCard, copy) {
     const rule = fromCard.rules && fromCard.rules[index];
-    if (!rule || rule === "remaining" || !toCard || toCard.menu || isRemaining(toCard) || isNote(toCard)) return null;
+    if (!rule || rule === "remaining" || !toCard || isHolder(toCard) || isRemaining(toCard) || isNote(toCard)) return null;
     if (!copy && fromCard === toCard) return null;
     toCard.rules = toCard.rules || [];
     let placed = rule;
@@ -343,23 +355,36 @@ const LayoutModel = (() => {
 
   // ---- cards ----------------------------------------------------------------------------------------------------
 
-  // A card taken out of its place: its line goes when empty; a submenu left empty makes its parent a card with rules
-  // that has none (it finds nothing and is outlined red).
+  // A container cleaned up after a card left it: a plain row with one card left is that card again; one with none
+  // goes; a submenu holder left empty becomes a card with rules that has none (it finds nothing, outlined red).
+  function tidy(lines, holder) {
+    if (!holder || !isHolder(holder)) return;
+    const left = holder.content.filter(e => e && !isDividerEntry(e));
+    if (isPlainRow(holder) && left.length <= 1) {
+      const at = find(lines, holder.id);
+      if (!at) return;
+      if (left.length === 1) at.lines.splice(at.lineIndex, 1, left[0]);
+      else at.lines.splice(at.lineIndex, 1);
+      return;
+    }
+    if (holder.show === "submenu" && left.length === 0) {
+      delete holder.content;
+      delete holder.show;
+      holder.rules = [];
+    }
+  }
+
+  // A card taken out of its place; its container tidied (a plain row of one card undone).
   function takeOut(lines, id) {
     const at = find(lines, id);
     if (!at) return null;
-    const line = at.lines[at.lineIndex].line;
-    line.splice(at.cardIndex, 1);
-    if (line.length === 0) at.lines.splice(at.lineIndex, 1);
-    if (at.parent && !at.parent.menu.some(e => e.line && e.line.length)) {
-      delete at.parent.menu;
-      at.parent.rules = [];
-    }
+    at.lines.splice(at.lineIndex, 1);
+    tidy(lines, at.parent);
     return at.card;
   }
 
-  // A card dropped onto another card: a card with rules becomes a card with a menu, its rules in a new first card
-  // (nothing lost), the dropped card after it; a card with a menu takes the dropped card as a new line at its end.
+  // A card dropped onto another card: a card holding cards takes it at the end of its content; a card with rules
+  // becomes a card with a submenu, its rules in a new first card (nothing lost), the dropped card after it.
   function dropOnCard(layout, lines, draggedId, targetId) {
     if (draggedId === targetId) return false;
     const dragged = find(lines, draggedId), target = find(lines, targetId);
@@ -367,54 +392,62 @@ const LayoutModel = (() => {
     const firstId = newId(layout);   // before the dragged card is taken out: else its id counts as free
     const card = takeOut(lines, draggedId);
     const t = find(lines, targetId).card;
-    if (t.menu) t.menu.push({ line: [card] });
+    if (isHolder(t)) t.content.push(card);
     else {
       const first = { id: firstId, card: t.card, rules: t.rules || [] };
       for (const k of ["title", "rename"]) if (t[k] !== undefined) { first[k] = t[k]; delete t[k]; }
       delete t.rules;
-      t.menu = [{ line: [first] }, { line: [card] }];
+      t.show = "submenu";
+      t.content = [first, card];
     }
     return true;
   }
 
-  // A card moved to a level (parentId: a card with a menu, or null for the top), as a new line at lineIndex, or into
-  // an existing line (intoLine: that line's index) at its end.
-  function moveCard(lines, draggedId, parentId, lineIndex, intoLine = false) {
+  // The container a card goes into: a card holding cards (parentId), or the menu's top (null).
+  function containerOf(lines, parentId) {
+    if (!parentId) return lines;
+    const at = find(lines, parentId);
+    return at && isHolder(at.card) ? at.card.content : null;
+  }
+
+  // A card moved into a container (parentId: a card holding cards, or null for the top) before the entry at index
+  // (counted before it was taken out), or at the end. intoLine: no longer used (a row is a card holding cards).
+  function moveCard(lines, draggedId, parentId, index, intoLine = false) {
     const dragged = find(lines, draggedId);
     if (!dragged) return false;
     if (parentId && (parentId === draggedId || contains(dragged.card, parentId))) return false;
-    const levelOf = () => parentId ? find(lines, parentId).card.menu : lines;
-    const level = levelOf();
-    if (parentId && !level) return false;
-    // the lines it goes before / into, kept across taking it out: its own line may go with it (it was alone there),
-    // then the line after that one is the place
-    const intoAnchor = intoLine ? level[lineIndex] : null;
-    const anchors = level.slice(lineIndex);
+    const level = containerOf(lines, parentId);
+    if (!level) return false;
+    // the entries it goes before, kept across taking it out (its own row may be undone, its place moving)
+    const anchors = level.slice(index).filter(e => e !== dragged.card);
     const card = takeOut(lines, draggedId);
-    const now = parentId ? (find(lines, parentId).card.menu || (find(lines, parentId).card.menu = [])) : lines;
-    if (parentId) delete find(lines, parentId).card.rules;
+    const now = containerOf(lines, parentId) || lines;
     const survivor = anchors.find(a => now.includes(a));
-    let at = survivor ? now.indexOf(survivor) : -1;
-    if (intoLine && intoAnchor && now.includes(intoAnchor)) now[now.indexOf(intoAnchor)].line.push(card);
-    else if (at >= 0) now.splice(at, 0, { line: [card] });
-    else now.push({ line: [card] });
+    if (survivor) now.splice(now.indexOf(survivor), 0, card);
+    else now.push(card);
     return true;
   }
 
-  // A card dropped next to another card: beside it in its line (side "before" / "after"), or on a line of its own
-  // just above or below that card's line ("above" / "below": a card that shared a line becomes menu-wide again).
+  // A card dropped next to another card: beside it (side "before" / "after": into the target's row, or a new plain row
+  // made of the two in the target's place), or above or below it ("above" / "below": in the target's container; a
+  // card in a plain row: above or below that row).
   function moveCardNext(lines, draggedId, targetId, side) {
     if (draggedId === targetId) return false;
     const dragged = find(lines, draggedId), target = find(lines, targetId);
     if (!dragged || !target || contains(dragged.card, targetId)) return false;
     if (side === "above" || side === "below") {
-      const parentId = target.parent ? target.parent.id : null;
-      return moveCard(lines, draggedId, parentId, target.lineIndex + (side === "below" ? 1 : 0));
+      // a card in a plain row stands for the row: above or below the row
+      const anchor = target.parent && isPlainRow(target.parent) && target.parent.id !== draggedId ? find(lines, target.parent.id) : target;
+      return moveCard(lines, draggedId, anchor.parent ? anchor.parent.id : null, anchor.lineIndex + (side === "below" ? 1 : 0));
     }
+    const id = freshId(lines);
     const card = takeOut(lines, draggedId);
     const t = find(lines, targetId);
-    const line = t.lines[t.lineIndex].line;
-    line.splice(t.cardIndex + (side === "after" ? 1 : 0), 0, card);
+    if (t.parent && isRow(t.parent)) t.lines.splice(t.lineIndex + (side === "after" ? 1 : 0), 0, card);
+    else {
+      const row = { id, card: "Line", show: "row", shownWhen: "always", content: side === "after" ? [t.card, card] : [card, t.card] };
+      t.lines.splice(t.lineIndex, 1, row);
+    }
     return true;
   }
 
@@ -422,8 +455,7 @@ const LayoutModel = (() => {
 
   function addDivider(layout, lines, parentId) {
     const entry = { id: newId(layout), divider: "" };
-    const level = parentId ? find(lines, parentId).card.menu : lines;
-    level.push(entry);
+    (containerOf(lines, parentId) || lines).push(entry);
     return entry;
   }
 
@@ -440,38 +472,38 @@ const LayoutModel = (() => {
     return true;
   }
 
-  // A divider moved to a level (parentId: a card with a menu, or null for the top) before the entry at lineIndex
-  // (counted before it was taken out), or to the level's end.
-  function moveDivider(lines, id, parentId, lineIndex) {
+  // A divider moved into a container (parentId: a card holding cards, or null for the top) before the entry at index
+  // (counted before it was taken out), or to the container's end.
+  function moveDivider(lines, id, parentId, index) {
     const d = findDivider(lines, id);
     if (!d) return false;
-    const level = parentId ? (find(lines, parentId) || {}).card?.menu : lines;
+    const level = containerOf(lines, parentId);
     if (!level) return false;
-    const anchors = level.slice(lineIndex).filter(e => e !== d.entry);
+    const anchors = level.slice(index).filter(e => e !== d.entry);
     d.lines.splice(d.index, 1);
     const survivor = anchors.find(a => level.includes(a));
-    const at = survivor ? level.indexOf(survivor) : level.length;
-    level.splice(at, 0, d.entry);
+    level.splice(survivor ? level.indexOf(survivor) : level.length, 0, d.entry);
     return true;
   }
 
-  // A divider dropped on a card's top or bottom edge: just above or below that card's line.
+  // A divider dropped on a card's top or bottom edge: just above or below it (a card in a plain row: that row).
   function moveDividerNext(lines, id, targetCardId, side) {
-    const target = find(lines, targetCardId);
+    let target = find(lines, targetCardId);
     if (!target) return false;
+    if (target.parent && isPlainRow(target.parent)) target = find(lines, target.parent.id);
     return moveDivider(lines, id, target.parent ? target.parent.id : null, target.lineIndex + (side === "below" ? 1 : 0));
   }
 
-  // Deleting a card: never the remaining card; the last card of a submenu gives its rules to its parent, which becomes
-  // a card with rules again (the reverse of dropping a card onto a card).
+  // Deleting a card: never the remaining card, nor a card holding it; the last card of a submenu gives its rules to the
+  // card holding it, which becomes a card with rules again (the reverse of dropping a card onto a card).
   function deleteCard(lines, id) {
     const at = find(lines, id);
     if (!at || isRemaining(at.card)) return false;
-    if (at.card.menu && [...cards(at.card.menu)].some(c => isRemaining(c.card))) return false;   // it holds the remaining card
-    const last = at.parent && at.parent.menu.reduce((n, e) => n + (e.line ? e.line.length : 0), 0) === 1;
-    if (last) {
-      const parent = at.parent;
-      delete parent.menu;
+    if (isHolder(at.card) && [...cards(at.card.content)].some(c => isRemaining(c.card))) return false;
+    const parent = at.parent;
+    if (parent && parent.show === "submenu" && parent.content.filter(e => e && !isDividerEntry(e)).length === 1) {
+      delete parent.content;
+      delete parent.show;
       parent.rules = at.card.rules || [];
       return true;
     }
@@ -479,34 +511,40 @@ const LayoutModel = (() => {
     return true;
   }
 
-  // Dexmenu's own item as a card ({ id, card: its title, own: "editMenu" | "windowsMenu" }; plan 02 3.6, 3.11): no rules.
+  // Dexmenu's own item as a card of its own (an earlier layout's; plan 12 turned it into a rule): no rules.
   function isOwn(card) { return typeof card.own === "string"; }
   function addNote(layout, lines) {
     const card = { id: newId(layout), note: "" };
-    lines.push({ line: [card] });
+    lines.push(card);
     return card;
   }
 
+  // A new card: beside a card (as a drop after it), or at the end of a container (parentId, or the top).
   function addCard(layout, lines, parentId, besideId) {
     const card = { id: newId(layout), card: "New card", rules: [] };
     if (besideId) {
-      const at = find(lines, besideId);
-      at.lines[at.lineIndex].line.splice(at.cardIndex + 1, 0, card);
-    } else {
-      const level = parentId ? find(lines, parentId).card.menu : lines;
-      level.push({ line: [card] });
-    }
+      lines.push(card);
+      moveCardNext(lines, card.id, besideId, "after");
+    } else (containerOf(lines, parentId) || lines).push(card);
     return card;
   }
 
-  // A card made a card with a menu: its rules go to a new first card in the menu.
+  // A card holding cards without a style (plan 11 3.5 "+ Group"), its cards under each other, at the top's end.
+  function addGroup(layout, lines) {
+    const card = { id: newId(layout), card: "Group", show: "column", content: [] };
+    lines.push(card);
+    return card;
+  }
+
+  // A card made a card with a submenu: its rules go to a new first card in it.
   function makeMenu(layout, lines, id) {
     const t = find(lines, id).card;
-    if (t.menu) return false;
+    if (isHolder(t)) return false;
     const first = { id: newId(layout), card: t.card, rules: t.rules || [] };
     for (const k of ["title", "rename"]) if (t[k] !== undefined) { first[k] = t[k]; delete t[k]; }
     delete t.rules;
-    t.menu = [{ line: [first] }];
+    t.show = "submenu";
+    t.content = [first];
     return true;
   }
 
@@ -596,10 +634,10 @@ const LayoutModel = (() => {
   function panelSet(card, id) { return (panelKeys[id] || []).some(k => card[k] !== undefined); }
 
   // A card's style, what "Copy style" takes and "Paste style" puts on another card: its look (background, text
-  // colour, border, radius, the hover and pressed look) and how it sits and opens (height, wrap, fit in line, extra
-  // text at, submenus open). Not its name, texts, icon, rules or menu.
-  const styleKeys = ["background", "foreground", "border", "borderWidth", "radius", "hover", "pressed", "height", "wrap",
-    "cardFit", "extraAt", "submenus"];
+  // colour, border, radius, the hover and pressed look) and how it sits and opens (height, square, wrap, fit in line,
+  // extra text at, submenus open). Not its name, texts, icon, rules or what it holds.
+  const styleKeys = ["background", "foreground", "border", "borderWidth", "radius", "hover", "pressed", "disabled",
+    "height", "square", "wrap", "cardFit", "extraAt", "submenus"];
   function styleOf(card) {
     const style = {};
     for (const k of styleKeys) if (card[k] !== undefined) style[k] = JSON.parse(JSON.stringify(card[k]));
@@ -617,15 +655,15 @@ const LayoutModel = (() => {
     try { const d = JSON.parse(text); return d && typeof d.dexmenu === "string" && d.item ? d.dexmenu : ""; } catch (e) { return ""; }
   }
 
-  // Whether a card can take a pasted card inside it: one with a menu (it joins the menu), or one with rules (it becomes
-  // a card with a menu, its rules in the first card, as when a card is dropped onto it); not a note, Dexmenu's own
+  // Whether a card can take a pasted card inside it: one holding cards (it joins them), or one with rules (it becomes
+  // a card with a submenu, its rules in the first card, as when a card is dropped onto it); not a note, Dexmenu's own
   // item or the remaining card.
   function canHold(card) {
-    return !!card.menu || (!isNote(card) && !isOwn(card) && !isRemaining(card));
+    return isHolder(card) || (!isNote(card) && !isOwn(card) && !isRemaining(card));
   }
 
   // A copied card pasted as a duplicate (new ids, its rules at the end of the priority list): inside the card into
-  // (canHold), or at the top level as a line of its own at index. What was pasted, or null.
+  // (canHold), or at the top at index. What was pasted, or null.
   function pasteCard(layout, lines, text, where) {
     if (clipType(text) !== "card") return null;
     if (where.into) {
@@ -643,10 +681,10 @@ const LayoutModel = (() => {
   // What goes on the clipboard: { dexmenu: "card" | "divider" | "rule" | "style", item }, a deep copy.
   function clip(type, item) { return JSON.stringify({ dexmenu: type, item: JSON.parse(JSON.stringify(item)) }); }
 
-  // A card, a divider or a rule from the clipboard into this layout. A card (with its menu) gets new ids and its rules
-  // places at the end of the priority list; it goes on a line of its own after the line of the card afterId (or at
-  // the end of the top level). The remaining card is never pasted (each layout has its own). A rule goes to the end
-  // of a card with rules (onto), at the end of the priority list. What was pasted, or null.
+  // A card, a divider or a rule from the clipboard into this layout. A card (with what it holds) gets new ids and its
+  // rules places at the end of the priority list; it goes after the card afterId (a card in a plain row: after the
+  // row), or at the end of the top. The remaining card is never pasted (each layout has its own). A rule goes to the
+  // end of a card with rules (onto), at the end of the priority list. What was pasted, or null.
   function paste(layout, lines, text, afterId, onto) {
     let data;
     try { data = JSON.parse(text); } catch (e) { return null; }
@@ -660,7 +698,7 @@ const LayoutModel = (() => {
       return onto;
     }
     if (data.dexmenu === "rule") {
-      if (!onto || onto.menu || isRemaining(onto) || item === "remaining") return null;
+      if (!onto || isHolder(onto) || isRemaining(onto) || item === "remaining") return null;
       delete item.priority;
       onto.rules = onto.rules || [];
       onto.rules.push(item);
@@ -670,7 +708,7 @@ const LayoutModel = (() => {
     }
     if (data.dexmenu !== "card" && data.dexmenu !== "divider") return null;
     if (data.dexmenu === "card") {
-      const all = [item, ...(item.menu ? [...cards(item.menu)].map(a => a.card) : [])];
+      const all = [item, ...(isHolder(item) ? [...cards(item.content)].map(a => a.card) : [])];
       if (all.some(isRemaining)) return null;
       let next = ruleList(lines).length + 1;
       for (const c of all) {
@@ -678,53 +716,23 @@ const LayoutModel = (() => {
         for (const r of c.rules || []) if (r !== "remaining") r.priority = next++;
       }
       for (const c of all) c.id = fresh();
-      if (item.menu) for (const d of dividers(item.menu)) d.entry.id = fresh();
+      if (isHolder(item)) for (const d of dividers(item.content)) d.entry.id = fresh();
     } else item.id = fresh();
-    const entry = data.dexmenu === "card" ? { line: [item] } : item;
-    const at = afterId ? find(lines, afterId) : null;
-    if (at) at.lines.splice(at.lineIndex + 1, 0, entry); else lines.push(entry);
+    let at = afterId ? find(lines, afterId) : null;
+    if (at && at.parent && isPlainRow(at.parent)) at = find(lines, at.parent.id);
+    if (at) at.lines.splice(at.lineIndex + 1, 0, item); else lines.push(item);
     renumber(lines);
     return item;
   }
 
-  // The layout in the current form (plan 05 3.1.1): { format, lines } - one menu. An older file (no "format": a
-  // section per kind of right-click) brought to it: its "default" section becomes the menu, its other sections go.
-  // Whether it changed, so the editor shows it as not saved.
-  const formatVersion = 1;
-  // An older layout brought to the current form: an older file's default menu as its lines; a most used row
-  // ({ mostUsed: true }, which used rules replaced, plan 09 6.5) as three cards side by side, each with a used rule.
+  // The layout's form (format 2, plan 11): { format: 2, menu: { content } }. The editor reads and writes only that; an
+  // older file is not converted here (that was done once, tools/convert-layouts-to-format-2.py): it is not opened.
+  const formatVersion = 2;
   function upToDate(layout) {
-    let changed = false;
-    if (!(layout.format === formatVersion && Array.isArray(layout.lines))) {
-      layout = { format: formatVersion, lines: Array.isArray(layout.default) ? layout.default : [] };
-      changed = true;
-    }
-    const mostUsed = n => ({ card: "Most used " + n, rules: [ { used: "most", rank: n, states: ["enabled"], also: true, consume: false } ] });
-    const convert = lines => {
-      for (let i = 0; i < lines.length; i++) {
-        const entry = lines[i];
-        if (entry && entry.mostUsed) { lines[i] = { line: [mostUsed(1), mostUsed(2), mostUsed(3)] }; changed = true; }
-        else if (entry && entry.line) for (const card of entry.line) if (Array.isArray(card.menu)) convert(card.menu);
-      }
-    };
-    convert(layout.lines);
-    // Dexmenu's own item as a card of its own ({ own }, plan 12): a card with one rule finding it, its name its title
-    // when it is not the item's own text
-    const ownText = { editMenu: "Edit menu...", windowsMenu: "Windows' menu" };
-    const ownCards = lines => {
-      for (const entry of lines) if (entry && entry.line) for (const card of entry.line) {
-        if (card && typeof card.own === "string") {
-          const own = card.own;
-          delete card.own;
-          card.rules = [{ own }];
-          if (card.card && card.card !== ownText[own] && card.title === undefined) card.title = card.card;
-          changed = true;
-        }
-        if (card && Array.isArray(card.menu)) ownCards(card.menu);
-      }
-    };
-    ownCards(layout.lines);
-    return { layout, changed };
+    if (layout && layout.format === formatVersion && layout.menu && Array.isArray(layout.menu.content))
+      return { layout, changed: false };
+    return { layout: null, changed: false, error: "This layout is not in the current form (format " + formatVersion +
+      "): convert it once with tools/convert-layouts-to-format-2.py." };
   }
 
   function remainingCount(lines) {
@@ -749,7 +757,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

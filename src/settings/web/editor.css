@@ -218,3 +218,11 @@ dialog menu { display: flex; justify-content: flex-end; gap: 6px; padding: 0; ma
 .cpanel-body select { max-width: 100%; min-width: 0; }
 /* the typed values beside the sliders: no spin buttons, the digits have the room */
 .slider input.slider-value::-webkit-inner-spin-button, .slider input.slider-value::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* a card's templates (plan 11 3.1): dashed cards inside it, edited as cards */
+.templates { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.template-card { display: flex; gap: 4px; align-items: center; border: 1px dashed var(--line); border-radius: 4px; padding: 1px 6px;
+  font-size: 12px; cursor: pointer; }
+.template-card.selected { border-color: var(--accent); }
+.template-card button, .templates > button { padding: 0 5px; font-size: 11px; }
+/* a plain row (what a line was) selected from the gutter */
+.line.row-holder.selected { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }

@@ -12,132 +12,717 @@ static class ShippedLayouts
     [
         (First, """
         {
-          "format": 1,
-          "lines": [
-            { "line": [
-              { "id": "cut", "card": "Cut", "icon": "E8C6", "rules": [ { "name": { "equals": "Cut" } } ] },
-              { "id": "copy", "card": "Copy", "icon": "E8C8", "rules": [ { "name": { "equals": "Copy" } } ] },
-              { "id": "paste", "card": "Paste", "icon": "E77F", "rules": [ { "name": { "equals": "Paste" } } ] },
-              { "id": "rename", "card": "Rename", "icon": "E8AC", "rules": [ { "name": { "equals": "Rename" } } ] },
-              { "id": "delete", "card": "Delete", "icon": "E74D", "rules": [ { "name": { "equals": "Delete" } } ] }
-            ] },
-            { "line": [
-              { "id": "properties", "card": "Properties", "icon": "E946", "rules": [ { "name": { "equals": "Properties" } } ] }
-            ] },
-            { "id": "d1", "divider": "" },
-            { "line": [
-              { "id": "open", "card": "Open", "icon": "E8E5", "rules": [ { "name": { "equals": "Open" } } ] },
-              { "id": "openwith", "card": "Open with", "icon": "E7AC", "rules": [ { "name": { "regex": "^Open with(\\.\\.\\.)?$" } } ] }
-            ] },
-            { "id": "d2", "divider": "" },
-            { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] },
-            { "id": "d3", "divider": "" },
-            { "line": [
-              { "id": "about", "note": "Dexmenu - default menu" },
-              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
-              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
-            ] }
-          ]
+          "format": 2,
+          "menu": {
+            "content": [
+              {
+                "id": "line1",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "cut",
+                    "card": "Cut",
+                    "icon": "E8C6",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Cut"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "copy",
+                    "card": "Copy",
+                    "icon": "E8C8",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Copy"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "paste",
+                    "card": "Paste",
+                    "icon": "E77F",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Paste"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "rename",
+                    "card": "Rename",
+                    "icon": "E8AC",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Rename"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "delete",
+                    "card": "Delete",
+                    "icon": "E74D",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Delete"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "properties",
+                "card": "Properties",
+                "icon": "E946",
+                "rules": [
+                  {
+                    "name": {
+                      "equals": "Properties"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "d1",
+                "divider": ""
+              },
+              {
+                "id": "line2",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "open",
+                    "card": "Open",
+                    "icon": "E8E5",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Open"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "openwith",
+                    "card": "Open with",
+                    "icon": "E7AC",
+                    "rules": [
+                      {
+                        "name": {
+                          "regex": "^Open with(\\.\\.\\.)?$"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "d2",
+                "divider": ""
+              },
+              {
+                "id": "rest",
+                "card": "Rest",
+                "rules": [
+                  "remaining"
+                ]
+              },
+              {
+                "id": "d3",
+                "divider": ""
+              },
+              {
+                "id": "line3",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "about",
+                    "note": "Dexmenu - default menu"
+                  },
+                  {
+                    "id": "edit",
+                    "card": "Edit menu...",
+                    "rules": [
+                      {
+                        "own": "editMenu"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "windows",
+                    "card": "Windows' menu",
+                    "rules": [
+                      {
+                        "own": "windowsMenu"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
         """),
         ("Default B", """
         {
-          "format": 1,
-          "lines": [
-            { "id": "search", "search": true },
-            { "line": [
-              { "id": "cut", "card": "Cut", "icon": "E8C6", "rules": [ { "name": { "equals": "Cut" } } ] },
-              { "id": "copy", "card": "Copy", "icon": "E8C8", "rules": [ { "name": { "equals": "Copy" } } ] },
-              { "id": "paste", "card": "Paste", "icon": "E77F", "rules": [ { "name": { "equals": "Paste" } } ] },
-              { "id": "rename", "card": "Rename", "icon": "E8AC", "rules": [ { "name": { "equals": "Rename" } } ] },
-              { "id": "delete", "card": "Delete", "icon": "E74D", "rules": [ { "name": { "equals": "Delete" } } ] }
-            ] },
-            { "id": "d1", "divider": "" },
-            { "line": [
-              { "id": "open", "card": "Open", "icon": "E8E5", "rules": [ { "name": { "equals": "Open" } } ] },
-              { "id": "openwith", "card": "Open with", "icon": "E7AC", "rules": [ { "name": { "regex": "^Open with(\\.\\.\\.)?$" } } ] },
-              { "id": "properties", "card": "Properties", "icon": "E946", "rules": [ { "name": { "equals": "Properties" } } ] }
-            ] },
-            { "id": "d2", "divider": "" },
-            { "line": [
-              { "id": "archive", "card": "Archive", "buttons": true, "rules": [ { "name": { "regex": "^(7-Zip|WinRAR|Extract All\\.\\.\\.)$" } } ] },
-              { "id": "code", "card": "Code", "buttons": true, "rules": [ { "name": { "regex": "^Open (with|in) (Code|Visual Studio)" } } ] }
-            ] },
-            { "line": [
-              { "id": "git", "card": "Git", "buttons": true, "rules": [ { "name": { "regex": "^(TortoiseGit$|Git |Open Git )" } } ] },
-              { "id": "svn", "card": "SVN", "buttons": true, "rules": [ { "name": { "regex": "^(TortoiseSVN$|SVN )" } } ] }
-            ] },
-            { "id": "d3", "divider": "" },
-            { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] },
-            { "id": "d9", "divider": "" },
-            { "line": [
-              { "id": "about", "note": "Dexmenu - cards per program" },
-              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
-              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
-            ] }
-          ]
+          "format": 2,
+          "menu": {
+            "content": [
+              {
+                "id": "search",
+                "search": true
+              },
+              {
+                "id": "line1",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "cut",
+                    "card": "Cut",
+                    "icon": "E8C6",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Cut"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "copy",
+                    "card": "Copy",
+                    "icon": "E8C8",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Copy"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "paste",
+                    "card": "Paste",
+                    "icon": "E77F",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Paste"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "rename",
+                    "card": "Rename",
+                    "icon": "E8AC",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Rename"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "delete",
+                    "card": "Delete",
+                    "icon": "E74D",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Delete"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "d1",
+                "divider": ""
+              },
+              {
+                "id": "line2",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "open",
+                    "card": "Open",
+                    "icon": "E8E5",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Open"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "openwith",
+                    "card": "Open with",
+                    "icon": "E7AC",
+                    "rules": [
+                      {
+                        "name": {
+                          "regex": "^Open with(\\.\\.\\.)?$"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "properties",
+                    "card": "Properties",
+                    "icon": "E946",
+                    "rules": [
+                      {
+                        "name": {
+                          "equals": "Properties"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "d2",
+                "divider": ""
+              },
+              {
+                "id": "line3",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "archive",
+                    "card": "Archive",
+                    "rules": [
+                      {
+                        "name": {
+                          "regex": "^(7-Zip|WinRAR|Extract All\\.\\.\\.)$"
+                        }
+                      }
+                    ],
+                    "show": "row"
+                  },
+                  {
+                    "id": "code",
+                    "card": "Code",
+                    "rules": [
+                      {
+                        "name": {
+                          "regex": "^Open (with|in) (Code|Visual Studio)"
+                        }
+                      }
+                    ],
+                    "show": "row"
+                  }
+                ]
+              },
+              {
+                "id": "line4",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "git",
+                    "card": "Git",
+                    "rules": [
+                      {
+                        "name": {
+                          "regex": "^(TortoiseGit$|Git |Open Git )"
+                        }
+                      }
+                    ],
+                    "show": "row"
+                  },
+                  {
+                    "id": "svn",
+                    "card": "SVN",
+                    "rules": [
+                      {
+                        "name": {
+                          "regex": "^(TortoiseSVN$|SVN )"
+                        }
+                      }
+                    ],
+                    "show": "row"
+                  }
+                ]
+              },
+              {
+                "id": "d3",
+                "divider": ""
+              },
+              {
+                "id": "rest",
+                "card": "Rest",
+                "rules": [
+                  "remaining"
+                ]
+              },
+              {
+                "id": "d9",
+                "divider": ""
+              },
+              {
+                "id": "line5",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "about",
+                    "note": "Dexmenu - cards per program"
+                  },
+                  {
+                    "id": "edit",
+                    "card": "Edit menu...",
+                    "rules": [
+                      {
+                        "own": "editMenu"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "windows",
+                    "card": "Windows' menu",
+                    "rules": [
+                      {
+                        "own": "windowsMenu"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
         """),
         ("Default C", """
         {
-          "format": 1,
-          "lines": [
-            { "line": [
-              { "id": "open", "card": "Open", "icon": "E8E5", "menu": [
-                { "line": [ { "id": "openrules", "card": "Open and edit", "rules": [ { "name": { "regex": "^(Open|Edit|View|Print|Run)\\b" } } ] } ] }
-              ] },
-              { "id": "share", "card": "Share and send", "icon": "E72D", "menu": [
-                { "line": [ { "id": "sharerules", "card": "Share", "rules": [ { "name": { "regex": "^(Share|Send to|Copy as path|Give access)" } } ] } ] }
-              ] }
-            ] },
-            { "line": [
-              { "id": "archive", "card": "Archive", "icon": "E7B8", "menu": [
-                { "line": [ { "id": "archiverules", "card": "Archive", "rules": [ { "name": { "regex": "zip|7z|archive|extract|compress" } } ] } ] }
-              ] },
-              { "id": "vcs", "card": "Version control", "icon": "E8D4", "menu": [
-                { "line": [ { "id": "vcsrules", "card": "Version control", "rules": [ { "name": { "regex": "git|svn|tortoise" } } ] } ] }
-              ] }
-            ] },
-            { "line": [
-              { "id": "file", "card": "File", "icon": "E7C3", "menu": [
-                { "line": [ { "id": "filerules", "card": "File", "rules": [ { "name": { "any": [ "Cut", "Copy", "Paste", "Rename", "Delete", "Properties" ] } } ] } ] }
-              ] },
-              { "id": "more", "card": "More", "icon": "E712", "menu": [
-                { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] }
-              ] }
-            ] },
-            { "id": "d9", "divider": "" },
-            { "line": [
-              { "id": "about", "note": "Dexmenu - by task" },
-              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
-              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
-            ] }
-          ]
+          "format": 2,
+          "menu": {
+            "content": [
+              {
+                "id": "line1",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "open",
+                    "card": "Open",
+                    "icon": "E8E5",
+                    "content": [
+                      {
+                        "id": "openrules",
+                        "card": "Open and edit",
+                        "rules": [
+                          {
+                            "name": {
+                              "regex": "^(Open|Edit|View|Print|Run)\\b"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "show": "submenu"
+                  },
+                  {
+                    "id": "share",
+                    "card": "Share and send",
+                    "icon": "E72D",
+                    "content": [
+                      {
+                        "id": "sharerules",
+                        "card": "Share",
+                        "rules": [
+                          {
+                            "name": {
+                              "regex": "^(Share|Send to|Copy as path|Give access)"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "show": "submenu"
+                  }
+                ]
+              },
+              {
+                "id": "line2",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "archive",
+                    "card": "Archive",
+                    "icon": "E7B8",
+                    "content": [
+                      {
+                        "id": "archiverules",
+                        "card": "Archive",
+                        "rules": [
+                          {
+                            "name": {
+                              "regex": "zip|7z|archive|extract|compress"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "show": "submenu"
+                  },
+                  {
+                    "id": "vcs",
+                    "card": "Version control",
+                    "icon": "E8D4",
+                    "content": [
+                      {
+                        "id": "vcsrules",
+                        "card": "Version control",
+                        "rules": [
+                          {
+                            "name": {
+                              "regex": "git|svn|tortoise"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "show": "submenu"
+                  }
+                ]
+              },
+              {
+                "id": "line3",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "file",
+                    "card": "File",
+                    "icon": "E7C3",
+                    "content": [
+                      {
+                        "id": "filerules",
+                        "card": "File",
+                        "rules": [
+                          {
+                            "name": {
+                              "any": [
+                                "Cut",
+                                "Copy",
+                                "Paste",
+                                "Rename",
+                                "Delete",
+                                "Properties"
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "show": "submenu"
+                  },
+                  {
+                    "id": "more",
+                    "card": "More",
+                    "icon": "E712",
+                    "content": [
+                      {
+                        "id": "rest",
+                        "card": "Rest",
+                        "rules": [
+                          "remaining"
+                        ]
+                      }
+                    ],
+                    "show": "submenu"
+                  }
+                ]
+              },
+              {
+                "id": "d9",
+                "divider": ""
+              },
+              {
+                "id": "line4",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "about",
+                    "note": "Dexmenu - by task"
+                  },
+                  {
+                    "id": "edit",
+                    "card": "Edit menu...",
+                    "rules": [
+                      {
+                        "own": "editMenu"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "windows",
+                    "card": "Windows' menu",
+                    "rules": [
+                      {
+                        "own": "windowsMenu"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
         """),
         ("Default D", """
         {
-          "format": 1,
-          "lines": [
-            { "id": "search", "search": true },
-            { "line": [
-              { "id": "most1", "card": "Most used 1", "rules": [ { "used": "most", "rank": 1, "states": [ "enabled" ], "also": true, "consume": false } ] },
-              { "id": "most2", "card": "Most used 2", "rules": [ { "used": "most", "rank": 2, "states": [ "enabled" ], "also": true, "consume": false } ] },
-              { "id": "most3", "card": "Most used 3", "rules": [ { "used": "most", "rank": 3, "states": [ "enabled" ], "also": true, "consume": false } ] }
-            ] },
-            { "id": "d1", "divider": "" },
-            { "line": [
-              { "id": "all", "card": "All items", "icon": "E700", "menu": [
-                { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] }
-              ] }
-            ] },
-            { "id": "d9", "divider": "" },
-            { "line": [
-              { "id": "about", "note": "Dexmenu - minimal" },
-              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
-              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
-            ] }
-          ]
+          "format": 2,
+          "menu": {
+            "content": [
+              {
+                "id": "search",
+                "search": true
+              },
+              {
+                "id": "line1",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "most1",
+                    "card": "Most used 1",
+                    "rules": [
+                      {
+                        "used": "most",
+                        "rank": 1,
+                        "states": [
+                          "enabled"
+                        ],
+                        "also": true,
+                        "consume": false
+                      }
+                    ]
+                  },
+                  {
+                    "id": "most2",
+                    "card": "Most used 2",
+                    "rules": [
+                      {
+                        "used": "most",
+                        "rank": 2,
+                        "states": [
+                          "enabled"
+                        ],
+                        "also": true,
+                        "consume": false
+                      }
+                    ]
+                  },
+                  {
+                    "id": "most3",
+                    "card": "Most used 3",
+                    "rules": [
+                      {
+                        "used": "most",
+                        "rank": 3,
+                        "states": [
+                          "enabled"
+                        ],
+                        "also": true,
+                        "consume": false
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "d1",
+                "divider": ""
+              },
+              {
+                "id": "all",
+                "card": "All items",
+                "icon": "E700",
+                "content": [
+                  {
+                    "id": "rest",
+                    "card": "Rest",
+                    "rules": [
+                      "remaining"
+                    ]
+                  }
+                ],
+                "show": "submenu"
+              },
+              {
+                "id": "d9",
+                "divider": ""
+              },
+              {
+                "id": "line2",
+                "card": "Line",
+                "show": "row",
+                "shownWhen": "always",
+                "content": [
+                  {
+                    "id": "about",
+                    "note": "Dexmenu - minimal"
+                  },
+                  {
+                    "id": "edit",
+                    "card": "Edit menu...",
+                    "rules": [
+                      {
+                        "own": "editMenu"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "windows",
+                    "card": "Windows' menu",
+                    "rules": [
+                      {
+                        "own": "windowsMenu"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
         """),
     ];

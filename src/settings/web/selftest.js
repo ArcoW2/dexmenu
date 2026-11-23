@@ -8,15 +8,38 @@
   const out = [];
   let failures = 0;
   const check = (ok, what) => { out.push((ok ? "PASS " : "FAIL ") + what); if (!ok) failures++; };
-  const titles = lines => lines.map(e => e.line.map(c => c.card + (c.menu ? "[" + titles(c.menu) + "]" : "")).join(" | ")).join(" / ");
+  // The fixtures written compactly as lines (each { line: [ cards ] }, a card's menu as { menu: lines }) and made a
+  // format 2 layout (plan 11): a line of one card that card, of more a plain row; a menu a card holding cards in a
+  // submenu. The layout's root also as .default and .lines. In the checks, "A | B" is a row's cards, "X[...]" what a
+  // card holds.
+  const fmt2 = lines => lines.map(e => {
+    if (!e.line) return e;
+    const cards = e.line.map(c => {
+      if (!c.menu) return c;
+      const { menu, ...rest } = c;
+      return { ...rest, show: "submenu", content: fmt2(menu) };
+    });
+    return cards.length === 1 ? cards[0] : { card: "Line", show: "row", shownWhen: "always", content: cards };
+  });
+  const mk = lines => {
+    const L = { format: M.formatVersion, menu: { content: fmt2(lines) } };
+    for (const k of ["default", "lines"]) Object.defineProperty(L, k, { get() { return this.menu.content; }, enumerable: false });
+    return M.ensureIds(L);
+  };
+  // a container as text: entries " / ", a plain row's cards " | ", a holder's content in [ ]
+  const titles = lines => lines.map(e => M.isDividerEntry(e) ? "D(" + (e.divider || "") + ")" : M.isPlainRow(e)
+    ? e.content.map(c => c.card + (M.isHolder(c) ? "[" + titles(c.content) + "]" : "")).join(" | ")
+    : e.card + (M.isHolder(e) ? "[" + titles(e.content) + "]" : "")).join(" / ");
+  // the j-th card of the i-th entry of a container (a plain row's j-th card)
+  const at = (lines, i, j) => M.isPlainRow(lines[i]) ? lines[i].content[j] : lines[i];
 
   function sample() {
-    return M.ensureIds({ default: [
+    return mk([
       { line: [ { card: "LexPen", rules: [ { name: { contains: "LexPen" } } ] } ] },
       { line: [ { card: "Clip", rules: [ { name: { any: ["Cut", "Copy"] } } ] }, { card: "Zip", rules: [ { name: { startsWith: "7" } } ] } ] },
       { line: [ { card: "Tools", menu: [ { line: [ { card: "Git", rules: [ { name: { contains: "Git" } } ] } ] } ] } ] },
       { line: [ { card: "Rest", rules: [ "remaining" ] } ] }
-    ] });
+    ]);
   }
   const id = (layout, name) => [...M.cards(layout.default)].find(a => a.card.card === name).card.id;
 
@@ -30,8 +53,8 @@
   const clipRules = JSON.stringify([...M.cards(L.default)].find(a => a.card.card === "Clip").card.rules);
   check(M.dropOnCard(L, L.default, id(L, "LexPen"), id(L, "Clip")), "drop LexPen onto Clip");
   check(titles(L.default) === "Clip[Clip / LexPen] | Zip / Tools[Git] / Rest", "Clip has a menu: a first card Clip, then LexPen; LexPen's line gone: " + titles(L.default));
-  const clip = [...M.cards(L.default)].find(a => a.card.card === "Clip" && a.card.menu).card;
-  check(!clip.rules && JSON.stringify(clip.menu[0].line[0].rules) === clipRules, "Clip's rules moved to the first card in its menu, not lost");
+  const clip = [...M.cards(L.default)].find(a => a.card.card === "Clip" && M.isHolder(a.card)).card;
+  check(!clip.rules && JSON.stringify(clip.content[0].rules) === clipRules, "Clip's rules moved to the first card in its menu, not lost");
 
   // the newest card dropped onto a card: the card made first in the menu gets an id of its own, not the dropped one's
   L = sample();
@@ -40,9 +63,9 @@
   const ids = [...M.cards(L.default)].map(a => a.card.id);
   check(new Set(ids).size === ids.length, "every card's id once: " + ids.join());
   // a layout saved with a duplicate id: the later card gets a new one when opened
-  L = M.ensureIds({ default: [ { line: [ { id: "c2", card: "A", menu: [ { line: [ { id: "c3", card: "B", rules: [] } ] } ] } ] },
-    { line: [ { id: "c2", card: "Rest", rules: [ "remaining" ] } ] } ] });
-  check(L.default[0].line[0].id === "c2" && L.default[1].line[0].id === "c4", "a duplicate id made unique: " + L.default[1].line[0].id);
+  L = mk([ { line: [ { id: "c2", card: "A", menu: [ { line: [ { id: "c3", card: "B", rules: [] } ] } ] } ] },
+    { line: [ { id: "c2", card: "Rest", rules: [ "remaining" ] } ] } ]);
+  check(at(L.default, 0, 0).id === "c2" && at(L.default, 1, 0).id === "c4", "a duplicate id made unique: " + at(L.default, 1, 0).id);
 
   // onto a card with a menu: a new line at its end
   L = sample();
@@ -58,13 +81,13 @@
   const gitRules = JSON.stringify([...M.cards(L.default)].find(a => a.card.card === "Git").card.rules);
   check(M.deleteCard(L.default, id(L, "Git")), "delete Git, the last card of Tools' menu");
   const tools = [...M.cards(L.default)].find(a => a.card.card === "Tools").card;
-  check(!tools.menu && JSON.stringify(tools.rules) === gitRules, "Tools is a card with rules again, with Git's rules");
+  check(!tools.content && JSON.stringify(tools.rules) === gitRules, "Tools is a card with rules again, with Git's rules");
 
   // the last card dragged out of a submenu: the parent keeps no rules and is outlined red
   L = sample();
   check(M.moveCard(L.default, id(L, "Git"), null, 0), "drag Git out of Tools, to the top");
   const tools2 = [...M.cards(L.default)].find(a => a.card.card === "Tools").card;
-  check(!tools2.menu && tools2.rules.length === 0 && M.useless(tools2), "Tools: a card with rules but none, useless (red)");
+  check(!tools2.content && tools2.rules.length === 0 && M.useless(tools2), "Tools: a card with rules but none, useless (red)");
   check(titles(L.default) === "Git / LexPen / Clip | Zip / Tools / Rest", "Git is the first line now: " + titles(L.default));
 
   // the remaining card: moved, never deleted, always one
@@ -78,7 +101,7 @@
 
   // a card moved into a line (beside others)
   L = sample();
-  check(M.moveCard(L.default, id(L, "LexPen"), null, 1, true), "LexPen moved into Clip's line");
+  check(M.moveCard(L.default, id(L, "LexPen"), M.find(L.default, id(L, "Clip")).parent.id, 99), "LexPen moved into Clip's row");
   check(titles(L.default) === "Clip | Zip | LexPen / Tools[Git] / Rest", "three cards on one line: " + titles(L.default));
 
   // a card alone on its line moved to the gap before that line, or after it: it stays there (not to the end)
@@ -111,14 +134,14 @@
 
   // dividers: added, moved between lines and into a card's menu, deleted; ids of their own
   L = sample();
-  const lineNames = lines => lines.map(e => e.divider !== undefined ? "D(" + e.divider + ")" : e.line.map(c => c.card).join("|")).join(" / ");
+  const lineNames = lines => titles(lines).replace(/ \| /g, "|").replace(/\[[^\]]*\]/g, "");
   const dv = M.addDivider(L, L.default, null);
   check(/^c\d+$/.test(dv.id) && lineNames(L.default) === "LexPen / Clip|Zip / Tools / Rest / D()", "a divider added at the end: " + lineNames(L.default));
   dv.divider = "Programs";
   check(M.moveDivider(L.default, dv.id, null, 1), "the divider moved before Clip's line");
   check(lineNames(L.default) === "LexPen / D(Programs) / Clip|Zip / Tools / Rest", "between LexPen and Clip: " + lineNames(L.default));
   check(M.moveDividerNext(L.default, dv.id, id(L, "Git"), "above"), "the divider moved above Git, in Tools' menu");
-  check(lineNames([...M.cards(L.default)].find(a => a.card.card === "Tools").card.menu) === "D(Programs) / Git", "in Tools' menu: first");
+  check(lineNames([...M.cards(L.default)].find(a => a.card.card === "Tools").card.content) === "D(Programs) / Git", "in Tools' menu: first");
   check(M.moveDivider(L.default, dv.id, null, 0) && lineNames(L.default) === "D(Programs) / LexPen / Clip|Zip / Tools / Rest", "back to the top: " + lineNames(L.default));
   const ids2 = [...[...M.cards(L.default)].map(a => a.card.id), ...[...M.dividers(L.default)].map(d => d.entry.id)];
   check(new Set(ids2).size === ids2.length, "a divider's id is not a card's");
@@ -137,11 +160,11 @@
   check(M.ruleList(L.default).length === 4, "a rule deleted");
 
   // a card's own rules reordered: they keep their places in the priority list, swapped among themselves
-  L = M.ensureIds({ default: [
+  L = mk([
     { line: [ { card: "A", rules: [ { name: { equals: "a1" } }, { name: { equals: "a2" } } ] } ] },
     { line: [ { card: "B", rules: [ { name: { equals: "b1" } } ] } ] },
     { line: [ { card: "Rest", rules: [ "remaining" ] } ] }
-  ] });
+  ]);
   const a = [...M.cards(L.default)].find(x => x.card.card === "A").card;
   M.moveRule(L.default, 2, 1);   // the list: a1, b1, a2
   check(M.ruleList(L.default).map(r => r.rule.name.equals).join() === "a1,b1,a2", "the list: a1, b1, a2");
@@ -181,13 +204,13 @@
   check(!M.useless({ card: "x", rules: [ { name: { equals: "Cut" } } ] }), "a valid rule: not useless");
   check(!M.useless({ card: "x", rules: [ { name: { equals: "Cut" }, consume: false } ] }), "consume false: valid");
   check(M.useless({ card: "x", rules: [ { name: { equals: "Cut" }, consume: "no" } ] }), "consume not true or false: useless");
-  check(!M.useless({ card: "x", menu: [] }), "a card with a menu: not outlined");
+  check(!M.useless({ card: "x", show: "submenu", content: [] }), "a card holding cards: not outlined");
 
   // made a card with a menu
   L = sample();
   M.makeMenu(L, L.default, id(L, "Zip"));
-  const zip = [...M.cards(L.default)].find(a => a.card.card === "Zip" && a.card.menu).card;
-  check(zip && zip.menu[0].line[0].rules[0].name.startsWith === "7", "made a menu: its rules in the first card");
+  const zip = [...M.cards(L.default)].find(a => a.card.card === "Zip" && M.isHolder(a.card)).card;
+  check(zip && zip.content[0].rules[0].name.startsWith === "7", "made a menu: its rules in the first card");
 
   // copied between layouts (plan 05 3.6): a card with its menu gets new ids and its rules at the end of the list; a rule
   // onto a card at the end; the remaining card never pasted
@@ -212,18 +235,17 @@
   {
     const L2 = sample();
     const note = M.addNote(L2, L2.default);
-    check(M.isNote(note) && !M.useless(note) && L2.default[L2.default.length - 1].line[0] === note, "a note added at the end, not outlined red");
+    check(M.isNote(note) && !M.useless(note) && L2.default[L2.default.length - 1] === note, "a note added at the end, not outlined red");
     check(!M.dropOnCard(L2, L2.default, id(L2, "Zip"), note.id), "a card is not dropped onto a note");
     const lex = [...M.cards(L2.default)].find(x => x.card.card === "LexPen").card;
     check(!M.moveRuleToCard(L2.default, lex, 0, note, true), "a rule is not put on a note");
   }
 
-  // the current form (plan 05 3.1): an older file brought to it by its default menu; a current one left as it is
-  const old = M.upToDate({ default: [ { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ], folder: [ { line: [] } ] });
-  check(old.changed && old.layout.format === M.formatVersion && old.layout.lines[0].line[0].card === "Rest" && !old.layout.folder,
-    "an older file: its default menu as the layout's lines, the other kinds gone, marked changed");
-  const cur = M.upToDate({ format: M.formatVersion, lines: [] });
-  check(!cur.changed, "a current file: unchanged");
+  // the current form (plan 11): format 2 opened as it is; an older form not converted here, not opened
+  const cur = M.upToDate({ format: M.formatVersion, menu: { content: [] } });
+  check(cur.layout && !cur.changed, "a current file (format 2): opened, unchanged");
+  const old = M.upToDate({ format: 1, lines: [ { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
+  check(old.layout === null && /convert/.test(old.error), "an older file (format 1): not opened, the message says how to convert it");
 
   // a rule's type (plan 09 3.3): Name or Usage, the other type's keys taken out on a switch; the rank checked
   {
@@ -255,35 +277,35 @@
     const style = M.styleOf(from);
     check(Object.keys(style).sort().join() === "background,cardFit,extraAt,height,hover,radius,submenus,wrap",
       "a card's style: its look, height, wrap, fit, extra text at and submenus; not its name, icon, texts or rules");
-    const L3 = M.ensureIds({ format: M.formatVersion, lines: [ { line: [ { card: "B", rules: [ { name: { equals: "b" } } ], border: "#ff0000", icon: "E700" } ] },
-      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
-    const to = L3.lines[0].line[0];
+    const L3 = mk([ { line: [ { card: "B", rules: [ { name: { equals: "b" } } ], border: "#ff0000", icon: "E700" } ] },
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ]);
+    const to = at(L3.lines, 0, 0);
     check(M.paste(L3, L3.lines, M.clip("style", style), null, to) === to && to.radius === 8 && to.wrap && to.border === undefined &&
       to.icon === "E700" && to.card === "B" && to.rules[0].name.equals === "b" && to.background !== from.background,
       "the style pasted: the card's look replaced (what the style does not set gone), its name, icon and rules kept, a copy");
-    check(M.paste(L3, L3.lines, M.clip("style", style), null, L3.lines[1].line[0]) === null, "no style onto the remaining card");
+    check(M.paste(L3, L3.lines, M.clip("style", style), null, at(L3.lines, 1, 0)) === null, "no style onto the remaining card");
   }
 
   // a card copied and pasted as a duplicate: at the top, at a place, inside a card; not inside a note
   {
-    const L4 = M.ensureIds({ format: M.formatVersion, lines: [
+    const L4 = mk([
       { line: [ { card: "A", rules: [ { name: { equals: "a" } } ] } ] },
       { line: [ { card: "M", menu: [ { line: [ { card: "In", rules: [ { name: { equals: "in" } } ] } ] } ] } ] },
       { line: [ { card: "N", note: "n" } ] },
-      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
-    const names = () => L4.lines.map(e => e.line ? e.line.map(c => c.card).join("|") : "-").join(" / ");
-    const a = L4.lines[0].line[0];
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ]);
+    const names = () => titles(L4.lines).replace(/ \| /g, "|").replace(/\[[^\]]*\]/g, "");
+    const a = at(L4.lines, 0, 0);
     const text = M.clip("card", a);
     check(M.clipType(text) === "card" && M.clipType("hello") === "" && M.clipType(M.clip("style", {})) === "style", "what the clipboard holds");
     const top = M.pasteCard(L4, L4.lines, text, { index: 0 });
-    check(top && top.id !== a.id && names() === "A / A / M / N / Rest" && L4.lines[0].line[0] === top, "pasted at the top: a duplicate, its own id: " + names());
+    check(top && top.id !== a.id && names() === "A / A / M / N / Rest" && at(L4.lines, 0, 0) === top, "pasted at the top: a duplicate, its own id: " + names());
     const mid = M.pasteCard(L4, L4.lines, text, { index: 3 });
     check(mid && names() === "A / A / M / A / N / Rest", "pasted at a place: " + names());
-    const m = L4.lines[2].line[0];
+    const m = at(L4.lines, 2, 0);
     const inside = M.pasteCard(L4, L4.lines, text, { into: m.id });
-    check(inside && m.menu.length === 2 && m.menu[1].line[0] === inside, "pasted inside a card with a menu: it joins the menu");
-    check(M.canHold(a) && !M.canHold(L4.lines[4].line[0]) && !M.canHold(L4.lines[5].line[0]) &&
-      M.pasteCard(L4, L4.lines, text, { into: L4.lines[4].line[0].id }) === null, "not inside a note or the remaining card");
+    check(inside && m.content.length === 2 && m.content[1] === inside, "pasted inside a card with a menu: it joins the menu");
+    check(M.canHold(a) && !M.canHold(at(L4.lines, 4, 0)) && !M.canHold(at(L4.lines, 5, 0)) &&
+      M.pasteCard(L4, L4.lines, text, { into: at(L4.lines, 4, 0).id }) === null, "not inside a note or the remaining card");
     const ids = [...M.cards(L4.lines)].map(c => c.card.id);
     check(new Set(ids).size === ids.length && M.ruleList(L4.lines).map(r => r.rule.priority).every((p, i) => p === i + 1),
       "every id once; the priorities 1..n");
@@ -291,11 +313,11 @@
 
   // a line's cards moved together (the gutter's line drag): the first placed as a dragged card, the others after it
   {
-    const L5 = M.ensureIds({ format: M.formatVersion, lines: [
+    const L5 = mk([
       { line: [ { card: "A", rules: [ { name: { equals: "a" } } ] }, { card: "B", rules: [ { name: { equals: "b" } } ] } ] },
       { line: [ { card: "X", rules: [ { name: { equals: "x" } } ] } ] },
-      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
-    const names = () => L5.lines.map(e => e.line.map(c => c.card).join("|")).join(" / ");
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ]);
+    const names = () => titles(L5.lines).replace(/ \| /g, "|");
     const idOf = n => [...M.cards(L5.lines)].find(c => c.card.card === n).card.id;
     const ids = [idOf("A"), idOf("B")];
     const moveLine = place => { if (!place(ids[0])) return false; for (let i = 1; i < ids.length; i++) M.moveCardNext(L5.lines, ids[i], ids[i - 1], "after"); return true; };
@@ -342,27 +364,12 @@
     check(r.own === undefined && r.used === "most", "away from it: own taken out");
     check(M.ruleProblem({ own: "other" }) !== "" && M.ruleProblem({ own: "editMenu", name: { equals: "a" } }) !== "",
       "an unknown tag, or own with a name: outlined red");
-    const up = M.upToDate({ format: M.formatVersion, lines: [
-      { line: [ { card: "Edit menu...", own: "editMenu" }, { card: "Back to Windows", own: "windowsMenu" } ] },
-      { line: [ { card: "M", menu: [ { line: [ { card: "Windows' menu", own: "windowsMenu" } ] } ] } ] } ] });
-    const [e, w] = up.layout.lines[0].line, inner = up.layout.lines[1].line[0].menu[0].line[0];
-    check(up.changed && e.own === undefined && e.rules[0].own === "editMenu" && e.title === undefined &&
-      w.rules[0].own === "windowsMenu" && w.title === "Back to Windows" && inner.rules[0].own === "windowsMenu",
-      "an own card of an earlier layout: a card with an own rule, its name its title when not the item's own; also in a menu");
   }
 
   // a rule's states: its own, else what General sets
   check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
     M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",
     "a rule's states: as General sets unless its own (both kept when General says enabled)");
-  // an earlier layout's most used row: three cards with used rules (plan 09 6.5)
-  {
-    const r = M.upToDate({ format: M.formatVersion, lines: [ { mostUsed: true }, { line: [ { card: "M", menu: [ { mostUsed: true } ] } ] } ] });
-    check(r.changed && r.layout.lines[0].line.map(c => c.rules[0].rank).join() === "1,2,3" &&
-      r.layout.lines[0].line.every(c => c.rules[0].used === "most") && r.layout.lines[1].line[0].menu[0].line.length === 3,
-      "an earlier most used row: three cards with used rules 1, 2, 3, also in a card's menu");
-  }
-
   // the colour pickers (plan 03 3.6): read, written in the shortest form, shown
   {
     const back = v => JSON.stringify(M.colorValue(M.colorState(v)).value);
