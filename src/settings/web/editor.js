@@ -366,9 +366,10 @@ function sizeFields(card) {
     number("height", "Height", "(its content) in lines of text"), fitRow];
 }
 
-// A colour picker (plan 03 3.6): the theme's (nothing given), a colour picked, a colour of the theme's palette by
-// name, or a gradient or anything else as JSON; for a colour or a palette colour an intensity (0 - 200, 100 the colour
-// itself) and an opacity (0 - 100). Written in its shortest form (LayoutModel.colorValue).
+// A colour picker (plan 03 3.6): the theme's own colour, a colour picked, a colour of the theme's palette by name, or
+// a gradient or anything else as JSON; for the first three an intensity (0 - 200, 100 the colour itself) and an
+// opacity (0 - 100) that only counts when "overrule" is ticked (else the colour's own alpha stays). Written in its
+// shortest form (LayoutModel.colorValue).
 function colorField(label, get, set) {
   let state = M.colorState(get());
   const row = el("div", "field color-field");
@@ -405,16 +406,23 @@ function colorField(label, get, set) {
   };
   const [intensityBox, intensity, intensityShown] = slider(0, 200, state.intensity ?? 100,
     "Intensity: 0 the theme's base colour, 100 the colour itself, 200 towards the base colour inverted");
-  const [opacityBox, opacity, opacityShown] = slider(0, 100, state.opacity ?? 100, "Opacity: 0 invisible, 100 solid");
+  const [opacityBox, opacity, opacityShown] = slider(0, 100, state.opacity ?? 100,
+    "Opacity: 0 invisible, 100 solid; only with overrule ticked, else the colour's own (the theme's) opacity");
+  const overrule = el("input");
+  overrule.type = "checkbox";
+  overrule.checked = !!state.overrule;
+  overrule.title = "Ticked: this opacity overrules the colour's own; not ticked: as the theme has it";
   intensityBox.prepend("Intensity ");
-  opacityBox.prepend("Opacity ");
+  opacityBox.prepend(overrule, " Opacity ");
   const json = el("input");
   json.type = "text";
   json.value = state.mode === "json" ? state.text : "";
   json.placeholder = '{ "gradient": [ "accent", "surface" ] } or "none"';
   const show = () => {
     picker.hidden = source.value !== "pick";
-    intensityBox.hidden = opacityBox.hidden = state.mode !== "pick";
+    intensityBox.hidden = opacityBox.hidden = state.mode === "json";
+    opacity.disabled = !state.overrule;
+    opacityShown.classList.toggle("off", !state.overrule);
     json.hidden = state.mode !== "json";
     swatch.hidden = state.mode !== "pick";
     swatch.style.setProperty("--swatch", M.colorCss(state, palette) || "transparent");
@@ -437,16 +445,20 @@ function colorField(label, get, set) {
   opacity.addEventListener("input", live);
   intensity.addEventListener("change", write);
   opacity.addEventListener("change", write);
+  overrule.addEventListener("change", () => { state.overrule = overrule.checked; write(); });
   picker.addEventListener("change", () => { state.base = picker.value; write(); });
   json.addEventListener("change", () => { state.text = json.value.trim(); write(); });
   source.addEventListener("change", () => {
     const v = source.value;
-    if (v === "theme") state = { mode: "theme" };
-    else if (v === "json") state = { mode: "json", text: state.mode === "pick" ? JSON.stringify(M.colorValue(state).value) : "" };
-    else {
-      const keep = state.mode === "pick" ? state : { intensity: 100, opacity: 100 };
-      state = { mode: "pick", base: v === "pick" ? picker.value : v.slice(5), intensity: keep.intensity, opacity: keep.opacity };
+    // the intensity and opacity kept when switching between the theme's, a colour and a palette colour
+    const keep = state.mode === "json" ? { intensity: 100, opacity: 100, overrule: false }
+      : { intensity: state.intensity, opacity: state.opacity, overrule: state.overrule };
+    if (v === "theme") state = { mode: "theme", ...keep };
+    else if (v === "json") {
+      const current = M.colorValue(state).value;
+      state = { mode: "json", text: current === undefined ? "" : JSON.stringify(current) };
     }
+    else state = { mode: "pick", base: v === "pick" ? picker.value : v.slice(5), ...keep };
     if (state.mode !== "json" || state.text) write(); else show();
   });
   controls.append(swatch, source, picker, intensityBox, opacityBox, json);

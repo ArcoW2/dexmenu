@@ -42,7 +42,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
-| Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: the theme's, a colour, a colour of the theme's palette, or JSON for a gradient; an intensity and an opacity; a swatch; written in the shortest form | 3.6; 6.6 |
+| Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: the theme's own colour (as it is or adjusted), a colour, a colour of the theme's palette, or JSON for a gradient; an intensity, an opacity with an Overrule checkbox; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
@@ -220,10 +220,14 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   `height`, `minWidth`, `weight`, `cardFit` (3.5). Per state where wanted
   (`hover` of its own).
 - **Its colours in the editor:** each colour field of the card panel (Background, Text colour, Border, Hover
-  background) is a colour picker with what a theme's colour has (3.2): a colour picked, or a colour of the theme's
-  palette chosen by name; an intensity (0 - 200, 100 the colour itself) and an opacity (0 - 100). What is chosen is
-  written in its shortest form: `#rrggbb` or the palette name alone at intensity and opacity 100, else
-  `{ "color", "intensity", "opacity" }`. A gradient (or `none`) stays a text field beside it, as JSON.
+  background) is a colour picker with what a theme's colour has (3.2): the theme's own colour, a colour picked, or a
+  colour of the theme's palette chosen by name; an intensity (0 - 200, 100 the colour itself) and an opacity
+  (0 - 100) with an Overrule checkbox: not ticked, the colour's own opacity stays (the theme's, the palette
+  colour's); ticked, the opacity set overrules it. What is chosen is written in its shortest form: nothing for the
+  theme's colour as it is; `{ "intensity", "opacity" }` without `color` for the theme's colour adjusted (the DLL
+  takes the theme's colour there and adjusts it, every colour of a gradient alike); `#rrggbb` or the palette name
+  alone at intensity 100 without an overruled opacity; else `{ "color", "intensity", "opacity" }` with what is given.
+  A gradient (or `none`) stays a text field beside it, as JSON.
 - **Template cards:** items Dexmenu places in a submenu itself are drawn with a template card's look (plan 02 3.3):
   the layout's, or a card's own submenu template. A template has the same look settings as a card, no rules.
 - **An action or a submenu:** the same card; the mark and the click differ (an item, or a card with a menu or an
@@ -394,13 +398,19 @@ None.
 - The DLL gives the palette of the theme the preview draws with (`DexmenuThemePalette`: `{ "<name>": "#rrggbbaa" }`,
   each palette colour resolved, `basecolor` among them); the settings app posts it to the editor with every reload,
   so a theme switched in the main window or the editor shows in the pickers.
-- A picker per colour field: a swatch (over a checkerboard, so the opacity shows), a choice of the theme's, a colour
-  (Windows' colour picker of the web view), each palette colour by name (its option tinted with its colour), or a
-  gradient or other as JSON; with a colour or a palette colour an Intensity slider (0 - 200) and an Opacity slider
-  (0 - 100), written when let go. A palette name the theme lacks stays in the list.
+- A picker per colour field: a swatch (over a checkerboard, so the opacity shows; not for the theme's colour, which
+  the editor does not know), a choice of the theme's, a colour (the web view's colour picker), each palette colour by
+  name (its option tinted with its colour), or a gradient or other as JSON; for all but JSON an Intensity slider
+  (0 - 200) and an Opacity slider (0 - 100) behind an Overrule checkbox, written when let go. A palette name the
+  theme lacks stays in the list. Switching between the theme's, a colour and a palette colour keeps the intensity and
+  opacity.
 - Read and written by the layout model (`colorState`, `colorValue`, `colorCss`): `#rgb` and `#rrggbbaa` read (the
-  alpha as the opacity), written as `#rrggbb` or the name alone at 100 / 100, else `{ color, intensity, opacity }`
-  with only what differs from 100; JSON that does not parse leaves the value as it was.
-- Tested: the editor's self-test (reading, the shortest form, a gradient and `none` kept, the swatch's colour with an
-  intensity below and above 100, the palette's alpha, an opacity); the palette export called for light and dark. The
+  alpha as an overruled opacity); written in the shortest form of 3.6.
+- The DLL (`TTheme.Color`, `TTheme.Background`): a card's own colour that is an object with an intensity or an
+  opacity and no `color` or `gradient` takes the theme's own value there (without the card's look) and adjusts it;
+  for a gradient each of its colours.
+- Tested: the editor's self-test (reading, the theme's colour adjusted, an opacity written only when overruled, the
+  shortest form, a gradient and `none` kept, the swatch's colour with an intensity below and above 100, the palette's
+  alpha, an opacity); unit tests (the theme's colour, background and gradient adjusted by a card's own look); the
+  palette export called for light and dark. The
   pickers themselves not yet looked at by hand.

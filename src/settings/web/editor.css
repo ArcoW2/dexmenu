@@ -127,6 +127,7 @@ h2 button { white-space: nowrap; }
 .slider { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .slider input[type=range] { width: 90px; }
 .slider-value { min-width: 2.4em; text-align: right; color: var(--dim); }
+.slider-value.off { text-decoration: line-through; }
 [hidden] { display: none !important; }
 textarea { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; resize: vertical; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }

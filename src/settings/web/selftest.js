@@ -251,12 +251,17 @@
   // the colour pickers (plan 03 3.6): read, written in the shortest form, shown
   {
     const back = v => JSON.stringify(M.colorValue(M.colorState(v)).value);
-    check(M.colorState(undefined).mode === "theme" && M.colorValue({ mode: "theme" }).value === undefined, "nothing given: the theme's");
+    const st = M.colorState(undefined);
+    check(st.mode === "theme" && !st.overrule && M.colorValue(st).value === undefined, "nothing given: the theme's, as it is");
+    check(back({ intensity: 80 }) === '{"intensity":80}' && back({ opacity: 40 }) === '{"opacity":40}' &&
+      M.colorState({ intensity: 80 }).mode === "theme" && M.colorValue({ mode: "theme", intensity: 100, opacity: 30, overrule: false }).value === undefined,
+      "the theme's colour adjusted: an intensity, an opacity; an opacity not overruled not written");
     check(back("#D03030") === '"#d03030"' && back("#abc") === '"#aabbcc"' && back("accent") === '"accent"',
       "a colour and a palette name: written alone");
-    check(back({ color: "accent", intensity: 100, opacity: 100 }) === '"accent"', "intensity and opacity 100: the name alone");
+    check(back({ color: "accent", intensity: 100 }) === '"accent"' && back({ color: "accent", opacity: 100 }) === '{"color":"accent","opacity":100}',
+      "intensity 100: left out; an opacity given (overruled) kept, also 100");
     check(back({ color: "surface", intensity: 80 }) === '{"color":"surface","intensity":80}' &&
-      back("#11223380") === '{"color":"#112233","opacity":50}', "an intensity, an opacity (also from #rrggbbaa): only what differs");
+      back("#11223380") === '{"color":"#112233","opacity":50}', "an intensity; #rrggbbaa read as an overruled opacity");
     check(M.colorState({ gradient: ["a", "b"] }).mode === "json" && M.colorState("none").mode === "json" &&
       back({ gradient: ["a", "b"] }) === '{"gradient":["a","b"]}', "a gradient and none: JSON, kept");
     check(!M.colorValue({ mode: "json", text: "{ bad" }).ok, "JSON that does not parse: not written");

@@ -1029,6 +1029,25 @@ begin
     Own.Free;
     T.Free;
   end;
+  // a card's own colour without "color": the theme's own colour there, adjusted (plan 03 3.6)
+  T := ThemeFromText('{ "palette": { "basecolor": "#000000", "a": "#ff000080" }, "card": { "normal": { ' +
+    '"background": "a", "foreground": "#0000ff" }, "hover": { "background": { "gradient": [ "#ffffff", "#00ff00" ] } } } }',
+    Lookup, Error);
+  Own := TJSONObject.ParseJSONValue('{ "background": { "intensity": 50 }, "foreground": { "opacity": 40 }, ' +
+    '"hover": { "background": { "intensity": 50, "opacity": 100 } } }') as TJSONObject;
+  try
+    Check(Near(T.Color('card', 'normal', 'background', RGBA(0, 0, 0), Own), 128, 0, 0, 128 / 255),
+      'the theme''s colour with an intensity: mixed towards the base colour, its own alpha kept');
+    Check(Near(T.Color('card', 'normal', 'foreground', RGBA(0, 0, 0), Own), 0, 0, 255, 0.4),
+      'the theme''s colour with an opacity: overruled');
+    Check(T.Background('card', 'normal', Stops, Angle, Own) and (Length(Stops) = 1) and Near(Stops[0], 128, 0, 0, 128 / 255),
+      'the theme''s background with an intensity');
+    Check(T.Background('card', 'hover', Stops, Angle, Own, True) and (Length(Stops) = 2) and Near(Stops[0], 128, 128, 128) and
+      Near(Stops[1], 0, 128, 0), 'the theme''s gradient with an intensity: each of its colours');
+  finally
+    Own.Free;
+    T.Free;
+  end;
   // the theme the settings name, from the user's themes folder
   Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-themes');
   if TDirectory.Exists(Data) then

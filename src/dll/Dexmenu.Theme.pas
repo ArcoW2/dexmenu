@@ -5,7 +5,8 @@ unit Dexmenu.Theme;
 // differs from its base; "light" and "dark" are built in and set everything. A colour in an element is a literal
 // ("#rrggbb", "rgba(...)"), a palette name, or { "color": <palette name or literal>, "intensity": 0 - 200,
 // "opacity": 0 - 100 }: intensity 0 the base colour, 100 the colour, 200 the base colour inverted, mixed per
-// channel in sRGB; opacity, when given, overrules the colour's own alpha.
+// channel in sRGB; opacity, when given, overrules the colour's own alpha. A card's own look (the layout) may give a
+// colour as { "intensity", "opacity" } without "color": the theme's own colour there, adjusted (plan 03 3.6).
 
 interface
 
@@ -23,6 +24,7 @@ type
     FPalette: TJSONObject;  // FRoot's palette (not owned)
     function Value(const Element, State, Prop: string; Own: TJSONObject; StateOnly: Boolean = False): TJSONValue;
     function Resolve(V: TJSONValue; out Color: TRGBA; Depth: Integer = 0): Boolean;
+    function Adjusted(const Color: TRGBA; Adjust: TJSONObject): TRGBA;
     procedure Problem(const Text: string);
   public
     Name: string;
@@ -353,9 +355,43 @@ begin
   end;
 end;
 
-function TTheme.Color(const Element, State, Prop: string; const Default: TRGBA; Own: TJSONObject): TRGBA;
+// A card's own colour that adjusts the theme's: an object with an intensity or an opacity and no colour or gradient.
+function IsAdjustment(V: TJSONValue): Boolean;
 begin
-  if not Resolve(Value(Element, State, Prop, Own), Result) then
+  Result := (V is TJSONObject) and (TJSONObject(V).GetValue('color') = nil) and
+    (TJSONObject(V).GetValue('gradient') = nil) and ((TJSONObject(V).GetValue('intensity') is TJSONNumber) or
+    (TJSONObject(V).GetValue('opacity') is TJSONNumber));
+end;
+
+function TTheme.Adjusted(const Color: TRGBA; Adjust: TJSONObject): TRGBA;
+var
+  Base: TRGBA;
+begin
+  Result := Color;
+  if Adjust.GetValue('intensity') is TJSONNumber then
+  begin
+    Base := RGBA(0, 0, 0);
+    if (FPalette = nil) or not Resolve(FPalette.GetValue('basecolor'), Base) then
+      Problem('an intensity without a basecolor in the palette');
+    Result := Intensity(Base, Result, TJSONNumber(Adjust.GetValue('intensity')).AsDouble);
+  end;
+  if Adjust.GetValue('opacity') is TJSONNumber then
+    Result.A := Max(0, Min(100, TJSONNumber(Adjust.GetValue('opacity')).AsDouble)) / 100;
+end;
+
+function TTheme.Color(const Element, State, Prop: string; const Default: TRGBA; Own: TJSONObject): TRGBA;
+var
+  V: TJSONValue;
+begin
+  V := Value(Element, State, Prop, Own);
+  if IsAdjustment(V) then
+  begin
+    // the theme's own colour (without the card's look), adjusted
+    if not Resolve(Value(Element, State, Prop, nil), Result) then
+      Result := Default;
+    Result := Adjusted(Result, TJSONObject(V));
+  end
+  else if not Resolve(V, Result) then
     Result := Default;
 end;
 
@@ -364,26 +400,41 @@ function TTheme.Background(const Element, State: string; out Colors: TArray<TRGB
 var
   V, Stop: TJSONValue;
   C: TRGBA;
+  Adjust: TJSONObject;
+  I: Integer;
 begin
   Colors := nil;
   Angle := 90;
   V := Value(Element, State, 'background', Own, StateOnly);
-  if (V is TJSONString) and (V.Value = 'none') then
-    Exit(False);
-  if (V is TJSONObject) and (TJSONObject(V).GetValue('gradient') is TJSONArray) then
+  Adjust := nil;
+  if IsAdjustment(V) then
   begin
-    for Stop in TJSONArray(TJSONObject(V).GetValue('gradient')) do
-      if Resolve(Stop, C) then
-        Colors := Colors + [C];
-    if TJSONObject(V).GetValue('angle') is TJSONNumber then
-      Angle := TJSONNumber(TJSONObject(V).GetValue('angle')).AsDouble;
-    if Length(Colors) = 1 then
-      Colors := Colors + [Colors[0]];
-    Exit(Length(Colors) >= 2);
+    // the theme's own background (a colour or a gradient's every colour), adjusted
+    Adjust := TJSONObject(V);
+    V := Value(Element, State, 'background', nil, StateOnly);
   end;
-  Result := Resolve(V, C);
-  if Result then
-    Colors := [C];
+  try
+    if (V is TJSONString) and (V.Value = 'none') then
+      Exit(False);
+    if (V is TJSONObject) and (TJSONObject(V).GetValue('gradient') is TJSONArray) then
+    begin
+      for Stop in TJSONArray(TJSONObject(V).GetValue('gradient')) do
+        if Resolve(Stop, C) then
+          Colors := Colors + [C];
+      if TJSONObject(V).GetValue('angle') is TJSONNumber then
+        Angle := TJSONNumber(TJSONObject(V).GetValue('angle')).AsDouble;
+      if Length(Colors) = 1 then
+        Colors := Colors + [Colors[0]];
+      Exit(Length(Colors) >= 2);
+    end;
+    Result := Resolve(V, C);
+    if Result then
+      Colors := [C];
+  finally
+    if Adjust <> nil then
+      for I := 0 to High(Colors) do
+        Colors[I] := Adjusted(Colors[I], Adjust);
+  end;
 end;
 
 function TTheme.Number(const Element, State, Prop: string; Default: Single; Own: TJSONObject): Single;

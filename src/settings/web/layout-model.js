@@ -88,43 +88,54 @@ const LayoutModel = (() => {
   const hexColor = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
   const paletteName = /^[A-Za-z][\w-]*$/;
 
-  // A colour value of a card's look as the picker shows it: mode "theme" (none given), "pick" (a colour or a palette
-  // name, with an intensity and an opacity) or "json" (a gradient, "none", anything else, as text).
+  // A colour value of a card's look as the picker shows it: mode "theme" (the theme's own colour, as it is or with an
+  // intensity and an opacity: { "intensity", "opacity" } without "color"), "pick" (a colour or a palette name, with an
+  // intensity and an opacity) or "json" (a gradient, "none", anything else, as text). overrule: the opacity is given
+  // (else the colour's own alpha stays).
   function colorState(value) {
-    if (value === undefined) return { mode: "theme" };
-    let base = value, intensity = 100, opacity = 100;
-    if (value && typeof value === "object" && !Array.isArray(value) && typeof value.color === "string" &&
-      Object.keys(value).every(k => ["color", "intensity", "opacity"].includes(k)) &&
-      (value.intensity === undefined || typeof value.intensity === "number") &&
-      (value.opacity === undefined || typeof value.opacity === "number")) {
+    const numbers = v => (v.intensity === undefined || typeof v.intensity === "number") &&
+      (v.opacity === undefined || typeof v.opacity === "number");
+    const adjust = v => ({ intensity: v.intensity === undefined ? 100 : v.intensity,
+      opacity: v.opacity === undefined ? 100 : v.opacity, overrule: v.opacity !== undefined });
+    if (value === undefined) return { mode: "theme", intensity: 100, opacity: 100, overrule: false };
+    const isObject = value && typeof value === "object" && !Array.isArray(value);
+    if (isObject && value.color === undefined && Object.keys(value).length > 0 &&
+      Object.keys(value).every(k => k === "intensity" || k === "opacity") && numbers(value))
+      return { mode: "theme", ...adjust(value) };
+    let base = value, a = { intensity: 100, opacity: 100, overrule: false };
+    if (isObject && typeof value.color === "string" && numbers(value) &&
+      Object.keys(value).every(k => ["color", "intensity", "opacity"].includes(k))) {
       base = value.color;
-      if (value.intensity !== undefined) intensity = value.intensity;
-      if (value.opacity !== undefined) opacity = value.opacity;
+      a = adjust(value);
     }
     if (typeof base === "string" && hexColor.test(base)) {
       let h = base.slice(1).toLowerCase();
       if (h.length === 3) h = [...h].map(c => c + c).join("");
-      if (h.length === 8) { if (base === value) opacity = Math.round(parseInt(h.slice(6), 16) / 255 * 100); h = h.slice(0, 6); }
-      return { mode: "pick", base: "#" + h, intensity, opacity };
+      if (h.length === 8) {
+        if (!a.overrule) a = { ...a, opacity: Math.round(parseInt(h.slice(6), 16) / 255 * 100), overrule: true };
+        h = h.slice(0, 6);
+      }
+      return { mode: "pick", base: "#" + h, ...a };
     }
-    if (typeof base === "string" && base !== "none" && paletteName.test(base)) return { mode: "pick", base, intensity, opacity };
+    if (typeof base === "string" && base !== "none" && paletteName.test(base)) return { mode: "pick", base, ...a };
     return { mode: "json", text: JSON.stringify(value) };
   }
 
-  // The value written for a picker's state, in its shortest form: nothing for the theme's; "#rrggbb" or the palette name
-  // alone at intensity and opacity 100, else { color, intensity, opacity } with only what differs from 100. JSON
-  // text that does not parse: undefined with ok false (left as it was).
+  // The value written for a picker's state, in its shortest form. The theme's: nothing at intensity 100 without an
+  // opacity of its own, else { intensity, opacity } with what is given. A colour or palette name: "#rrggbb" or the name
+  // alone at intensity 100 without an opacity of its own, else { color, intensity, opacity } with what is given. JSON
+  // text that does not parse: ok false (left as it was).
   function colorValue(state) {
-    if (state.mode === "theme") return { ok: true, value: undefined };
     if (state.mode === "json") {
       try { return { ok: true, value: JSON.parse(state.text) }; } catch { return { ok: false }; }
     }
-    const intensity = Math.max(0, Math.min(200, Math.round(state.intensity)));
-    const opacity = Math.max(0, Math.min(100, Math.round(state.opacity)));
-    if (intensity === 100 && opacity === 100) return { ok: true, value: state.base };
-    const v = { color: state.base };
+    const intensity = Math.max(0, Math.min(200, Math.round(state.intensity ?? 100)));
+    const opacity = Math.max(0, Math.min(100, Math.round(state.opacity ?? 100)));
+    const v = state.mode === "pick" ? { color: state.base } : {};
     if (intensity !== 100) v.intensity = intensity;
-    if (opacity !== 100) v.opacity = opacity;
+    if (state.overrule) v.opacity = opacity;
+    if (Object.keys(v).length === 0) return { ok: true, value: undefined };
+    if (Object.keys(v).length === 1 && v.color !== undefined) return { ok: true, value: v.color };
     return { ok: true, value: v };
   }
 
@@ -143,7 +154,7 @@ const LayoutModel = (() => {
     const t = state.intensity;
     const mixed = [0, 1, 2].map(i => Math.round(t <= 100 ? base[i] + (c[i] - base[i]) * t / 100
       : c[i] + (255 - base[i] - c[i]) * (t - 100) / 100));
-    const alpha = state.opacity !== 100 || hexColor.test(state.base) ? state.opacity / 100 : c[3];
+    const alpha = state.overrule ? state.opacity / 100 : c[3];
     return "rgba(" + mixed.join(", ") + ", " + alpha + ")";
   }
 
