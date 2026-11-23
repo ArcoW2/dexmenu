@@ -163,6 +163,9 @@ const LayoutModel = (() => {
   // more colours, "none").
   function fillState(value, gradients) {
     if (value === "none") return { kind: "none" };   // nothing drawn: no background, no border line
+    // a background image (plan 03 3.4): { image, fit, opacity, tint, color }
+    if (gradients && value && typeof value === "object" && !Array.isArray(value) && typeof value.image === "string")
+      return { kind: "image", spec: JSON.parse(JSON.stringify(value)) };
     if (gradients && value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.gradient) &&
       value.gradient.length === 2 && Object.keys(value).every(k => k === "gradient" || k === "angle") &&
       (value.angle === undefined || typeof value.angle === "number")) {
@@ -179,6 +182,14 @@ const LayoutModel = (() => {
   // gradient: { "gradient": [ start, end ], "angle" } with each colour in its shortest form, the angle only when not 90.
   function fillValue(state) {
     if (state.kind === "none") return { ok: true, value: "none" };
+    if (state.kind === "image") {
+      // what is not set left out: stretch, full opacity, no tint and no colour under it are the defaults
+      const v = { image: state.spec.image || "" };
+      for (const k of ["fit", "opacity", "tint", "color"])
+        if (state.spec[k] !== undefined && state.spec[k] !== "" && !(k === "fit" && state.spec[k] === "stretch") &&
+          !(k === "opacity" && state.spec[k] === 100)) v[k] = state.spec[k];
+      return { ok: true, value: v };
+    }
     if (state.kind === "json") return colorValue({ mode: "json", text: state.text });
     if (state.kind === "colour") return colorValue(state.colour);
     const v = { gradient: [colorValue(state.start).value, colorValue(state.end).value] };

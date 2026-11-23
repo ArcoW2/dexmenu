@@ -120,6 +120,12 @@ h2 button { white-space: nowrap; }
 /* the selected card */
 .field { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; margin: 3px 0; }
 .field input[type=text], .field textarea { width: 100%; box-sizing: border-box; }
+/* fields inside a colour field (a background image's opacity, colour under, tint over): a narrower label column */
+.color-body .field { grid-template-columns: 84px minmax(0, 1fr); margin: 2px 0; min-width: 0; }
+.color-body .color-row input[type=text] { flex: 1 1 120px; min-width: 0; }
+.color-body .field .slider-name { flex-basis: 52px; }
+.color-body .field .slider input[type=range] { min-width: 24px; flex-basis: 30px; }
+.color-body .field select { min-width: 0; max-width: 100%; }
 /* a field that belongs to the one above it (a note's own font): its label indented, a tree line to its parent */
 .field.sub { margin: 0; --tree: color-mix(in srgb, var(--dim) 50%, transparent); }
 .field.sub > span:first-child { position: relative; padding-left: 20px; align-self: stretch; display: flex; align-items: center; }

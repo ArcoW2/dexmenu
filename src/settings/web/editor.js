@@ -658,7 +658,7 @@ function colorField(label, get, set, gradients = false, withNone = false) {
     : { mode: "pick", base: Object.keys(palette).find(n => n !== "basecolor") || "#808080", intensity: 100, opacity: 100, overrule: false };
   const build = () => {
     const kind = el("select");
-    for (const [v, text] of [["colour", "a colour"], ...(gradients ? [["gradient", "a gradient"]] : []),
+    for (const [v, text] of [["colour", "a colour"], ...(gradients ? [["gradient", "a gradient"], ["image", "an image"]] : []),
       ...(withNone ? [["none", "none (not drawn)"]] : []), ["json", "other (JSON)"]]) {
       const o = el("option", "", text);
       o.value = v;
@@ -673,12 +673,48 @@ function colorField(label, get, set, gradients = false, withNone = false) {
         state = { kind: "colour", colour: state.kind === "gradient" ? { ...state.start } : { mode: "theme", intensity: 100, opacity: 100, overrule: false } };
       else if (kind.value === "gradient") { const s = stop(); state = { kind: "gradient", start: s, end: { ...s }, angle: 90 }; }
       else if (kind.value === "none") state = { kind: "none" };
+      else if (kind.value === "image") state = { kind: "image", spec: { image: "" } };
       else state = { kind: "json", text: current.ok && current.value !== undefined ? JSON.stringify(current.value) : "" };
       if (state.kind === "json" && !state.text) body.replaceChildren(...build());   // nothing to write yet
       else commit();
     });
     const first = el("div", "color-row");
     first.append(kind);
+    if (state.kind === "image") {
+      // the file (typed, or Browse...), how it fits, its opacity; a colour under it and a tint over it
+      const spec = state.spec;
+      const file = el("input");
+      file.type = "text";
+      file.value = spec.image || "";
+      file.placeholder = "a file: PNG, JPEG, ...; %APPDATA%\... allowed";
+      file.addEventListener("change", () => { spec.image = file.value.trim(); commit(); });
+      const browse = el("button", "", "Browse...");
+      browse.addEventListener("click", e => {
+        e.preventDefault();
+        pickedImage = path => { spec.image = path; commit(); };
+        post({ type: "pickImage" });
+      });
+      first.append(file, browse);
+      const fit = el("select");
+      for (const [v, text] of [["stretch", "stretched to the whole box"], ["fit", "whole inside, its proportions kept"],
+        ["center", "its own size, in the middle"], ["repeatX", "tiled across"], ["repeatY", "tiled down"], ["repeat", "tiled"]]) {
+        const o = el("option", "", text);
+        o.value = v;
+        fit.append(o);
+      }
+      fit.value = spec.fit || "stretch";
+      fit.addEventListener("change", () => { spec.fit = fit.value; commit(); });
+      const fitRow = el("div", "color-row");
+      fitRow.append(el("span", "slider-name", "Fit"), fit);
+      const opacity = sliderRow("Opacity", 0, 100, spec.opacity, 100, v => { spec.opacity = v; commit(); }, "0 invisible, 100 solid");
+      // written into the image's value; the colour field itself reports the change
+      const sub = (name, label) => colorField(label, () => spec[name], v => {
+        if (v === undefined) delete spec[name]; else spec[name] = v;
+        const r = M.fillValue(state);
+        if (r.ok) set(r.value);
+      });
+      return [first, fitRow, opacity, sub("color", "Colour under"), sub("tint", "Tint over")];
+    }
     if (state.kind === "colour") {
       first.append(colorControls(state.colour, true, commit));
       return [first];
@@ -839,6 +875,7 @@ function shadowFields(card) {
 }
 
 let fonts = [];   // the installed font families, from the settings app
+let pickedImage = null;   // a background image field waiting for its file from the settings app's dialog
 
 // A font family as a dropdown of the installed ones (as LexPen's), each in its own font; empty: the items' font. A
 // family the layout names that is not installed stays, marked so.
@@ -2145,4 +2182,5 @@ chrome.webview.addEventListener("message", e => {
   }
   else if (m.type === "saved") { dirty = false; $("dirty").hidden = true; }
   else if (m.type === "fonts") { fonts = m.fonts || []; renderCardPane(); }
+  else if (m.type === "pickedImage" && pickedImage) { const f = pickedImage; pickedImage = null; f(m.path); }
 });

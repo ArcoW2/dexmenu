@@ -21,6 +21,9 @@ function BitmapPixels(Bitmap: HBITMAP; out Pixels: TIconPixels): Boolean;
 function FileIconPixels(const Spec: string; Size: Integer; out Pixels: TIconPixels): Boolean;
 // Whether a card's icon is a glyph: its code point in hex, "E8C8"; the character is returned.
 function IsGlyph(const Spec: string; out Glyph: string): Boolean;
+// An image file (any format Windows decodes: PNG, JPEG, BMP, GIF, TIFF, ...) as premultiplied BGRA pixels, scaled
+// down to MaxSide at most on its longer side (plan 03 3.4: a background image); False when it cannot be read.
+function ImagePixels(const Path: string; MaxSide: Integer; out Pixels: TIconPixels): Boolean;
 
 // The icons kept for the settings app's preview (plan 02 3.8), which has no bitmaps of its own: every item's bitmap,
 // at any depth, saved as <SeenFolder>\icons\<hash of its key>.png (its key: Dexmenu.Usage.UsageKey). An icon saved
@@ -373,6 +376,41 @@ begin
     if Initialized then
       CoUninitialize;
   end;
+end;
+
+function ImagePixels(const Path: string; MaxSide: Integer; out Pixels: TIconPixels): Boolean;
+var
+  WIC: IWICImagingFactory;
+  Decoder: IWICBitmapDecoder;
+  Frame: IWICBitmapFrameDecode;
+  Source, Sized: IWICBitmapSource;
+  Scaler: IWICBitmapScaler;
+  W, H: UINT;
+  F: Double;
+begin
+  Result := False;
+  Pixels := Default(TIconPixels);
+  WIC := Factory;
+  if (WIC = nil) or Failed(WIC.CreateDecoderFromFilename(PChar(Path), TGUID(nil^), GENERIC_READ,
+    WICDecodeMetadataCacheOnDemand, Decoder)) or Failed(Decoder.GetFrame(0, Frame)) or Failed(Frame.GetSize(W, H)) or
+    (W = 0) or (H = 0) then
+    Exit;
+  Sized := Frame;
+  if (Integer(W) > MaxSide) or (Integer(H) > MaxSide) then
+  begin
+    F := MaxSide / Max(W, H);
+    W := Max(1, Round(W * F));
+    H := Max(1, Round(H * F));
+    if Failed(WIC.CreateBitmapScaler(Scaler)) or Failed(Scaler.Initialize(Frame, W, H, WICBitmapInterpolationModeFant)) then
+      Exit;
+    Sized := Scaler;
+  end;
+  if Failed(WICConvertBitmapSource(GUID_WICPixelFormat32bppPBGRA, Sized, Source)) or Failed(Source.GetSize(W, H)) then
+    Exit;
+  Pixels.Width := W;
+  Pixels.Height := H;
+  SetLength(Pixels.Bits, W * H * 4);
+  Result := Succeeded(Source.CopyPixels(nil, W * 4, Length(Pixels.Bits), @Pixels.Bits[0]));
 end;
 
 function ReadPng(const Path: string; out Pixels: TIconPixels): Boolean;

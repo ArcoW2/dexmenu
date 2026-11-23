@@ -417,6 +417,13 @@
     check(M.fillState({ gradient: ["a", "b", "c"] }, true).kind === "json" && M.fillState({ gradient: ["a", { intensity: 5 }] }, true).kind === "json",
       "a gradient of more colours, or with the theme's colour in it: as JSON");
     check(M.fillState("none", false).kind === "none" && fill("none") === '"none"', "none: its own kind, written as none");
+    {
+      const img = { image: "a.png", fit: "repeat", opacity: 40, tint: "#00000080" };
+      const st = M.fillState(img, true);
+      check(st.kind === "image" && JSON.stringify(M.fillValue(st).value) === JSON.stringify(img) &&
+        JSON.stringify(M.fillValue({ kind: "image", spec: { image: "b.jpg", fit: "stretch", opacity: 100 } }).value) === '{"image":"b.jpg"}' &&
+        M.fillState(img, false).kind !== "image", "an image background: read and written back, its defaults left out; not for a plain colour field");
+    }
     check(M.fillState("accent", true).kind === "colour" && fill("accent") === '"accent"' && fill(undefined) === undefined,
       "a colour field holding a colour, or nothing");
     const pal = { basecolor: "#000000ff", accent: "#ff0000ff", glass: "#ffffff80" };

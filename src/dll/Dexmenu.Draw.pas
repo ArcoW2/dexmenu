@@ -1073,6 +1073,185 @@ begin
     T.DrawRoundedRectangle(D2D1RoundedRect(R, Radius, Radius), Fallback, Theme.Number(Element, State, 'borderWidth', 1, Own));
 end;
 
+var
+  Images: TDictionary<string, TIconPixels>;   // background images read, by path, time written and size (plan 03 3.4)
+
+const
+  MaxImageSide = 2048;   // a background image's longer side at most (pixels); a larger one is scaled down once
+
+// A background image's pixels, read once per version of the file (its path, time written and size); False when it is
+// not there or cannot be read.
+function ImageOf(const Path: string; out Pixels: TIconPixels): Boolean;
+var
+  Data: TWin32FileAttributeData;
+  Key: string;
+begin
+  Pixels := Default(TIconPixels);
+  if not GetFileAttributesEx(PChar(Path), GetFileExInfoStandard, @Data) then
+    Exit(False);
+  Key := Format('%s|%d|%d|%d', [LowerCase(Path), Data.ftLastWriteTime.dwHighDateTime, Data.ftLastWriteTime.dwLowDateTime,
+    Data.nFileSizeLow]);
+  FactoryLock.Enter;
+  try
+    if Images = nil then
+      Images := TDictionary<string, TIconPixels>.Create;
+    if not Images.TryGetValue(Key, Pixels) then
+    begin
+      if not ImagePixels(Path, MaxImageSide, Pixels) then
+        Pixels := Default(TIconPixels);   // kept as not readable: not tried again until the file changes
+      Images.AddOrSetValue(Key, Pixels);
+    end;
+  finally
+    FactoryLock.Leave;
+  end;
+  Result := Pixels.Width > 0;
+end;
+
+// A background image (plan 03 3.4): { "image": <file>, "fit", "opacity", "tint", "color" } over a rounded box: its
+// "color" under it, the image as "fit" says (stretch: to the whole box, the default; fit: whole inside, its
+// proportions kept; center: its own size in the middle; repeatX, repeatY, repeat: tiled from the top left at its own
+// size), its "opacity" (0 - 100), its "tint" colour over it. The file: environment variables expanded, a relative
+// path from Dexmenu's data folder. A file that cannot be read: only the colour and the tint.
+function FillImage(T: ID2D1RenderTarget; Theme: TTheme; Spec: TJSONObject; const R: TD2D1RectF; Radius: Single): Boolean;
+var
+  Path, Fit: string;
+  Expanded: array[0..MAX_PATH] of Char;
+  Pixels: TIconPixels;
+  Bitmap: ID2D1Bitmap;
+  Props: TD2D1BitmapProperties;
+  BrushProps: TD2D1BitmapBrushProperties;
+  Brush: ID2D1BitmapBrush;
+  Solid: ID2D1SolidColorBrush;
+  Shape: ID2D1RoundedRectangleGeometry;
+  Part: ID2D1RectangleGeometry;
+  Region: ID2D1PathGeometry;
+  Sink: ID2D1GeometrySink;
+  M, Identity: TD2DMatrix3x2F;
+  C: TRGBA;
+  W, H, IW, IH, SX, SY, OX, OY: Single;
+  Area: TD2D1RectF;
+  Clip: Boolean;
+begin
+  Result := True;
+  if Spec.GetValue('color') <> nil then
+  begin
+    C := Theme.Color('card', 'normal', 'color', RGBA(0, 0, 0, 0), Spec);
+    if C.A > 0 then
+    begin
+      T.CreateSolidColorBrush(ToD2D(C), nil, Solid);
+      T.FillRoundedRectangle(D2D1RoundedRect(R, Radius, Radius), Solid);
+    end;
+  end;
+  Path := '';
+  if Spec.GetValue('image') is TJSONString then
+    Path := Trim(Spec.GetValue('image').Value);
+  if Path <> '' then
+  begin
+    if ExpandEnvironmentStrings(PChar(Path), Expanded, Length(Expanded)) > 0 then
+      Path := Expanded;
+    if ExtractFileDrive(Path) = '' then
+      Path := IncludeTrailingPathDelimiter(DataFolder) + Path;
+  end;
+  if (Path <> '') and ImageOf(Path, Pixels) then
+  begin
+    Props.pixelFormat := D2D1PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+    Props.dpiX := 96;   // a pixel of the image a DIP of the menu
+    Props.dpiY := 96;
+    W := R.right - R.left;
+    H := R.bottom - R.top;
+    IW := Pixels.Width;
+    IH := Pixels.Height;
+    Fit := 'stretch';
+    if Spec.GetValue('fit') is TJSONString then
+      Fit := Spec.GetValue('fit').Value;
+    BrushProps.extendModeX := D2D1_EXTEND_MODE_CLAMP;
+    BrushProps.extendModeY := D2D1_EXTEND_MODE_CLAMP;
+    BrushProps.interpolationMode := D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
+    SX := 1;
+    SY := 1;
+    OX := R.left;
+    OY := R.top;
+    Clip := True;   // only where the image lies (else clamping smears its edge pixels)
+    if Fit = 'fit' then
+    begin
+      SX := Min(W / IW, H / IH);
+      SY := SX;
+      OX := R.left + (W - IW * SX) / 2;
+      OY := R.top + (H - IH * SY) / 2;
+    end
+    else if Fit = 'center' then
+    begin
+      OX := R.left + (W - IW) / 2;
+      OY := R.top + (H - IH) / 2;
+    end
+    else if Fit = 'repeatX' then
+      BrushProps.extendModeX := D2D1_EXTEND_MODE_WRAP
+    else if Fit = 'repeatY' then
+      BrushProps.extendModeY := D2D1_EXTEND_MODE_WRAP
+    else if Fit = 'repeat' then
+    begin
+      BrushProps.extendModeX := D2D1_EXTEND_MODE_WRAP;
+      BrushProps.extendModeY := D2D1_EXTEND_MODE_WRAP;
+      Clip := False;
+    end
+    else
+    begin
+      SX := W / IW;   // stretch
+      SY := H / IH;
+      Clip := False;
+    end;
+    if Succeeded(T.CreateBitmap(D2D1SizeU(Pixels.Width, Pixels.Height), @Pixels.Bits[0], Pixels.Width * 4, Props, Bitmap)) and
+      Succeeded(T.CreateBitmapBrush(Bitmap, @BrushProps, nil, Brush)) and
+      Succeeded(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(R, Radius, Radius), Shape)) then
+    begin
+      FillChar(M, SizeOf(M), 0);
+      M._11 := SX;
+      M._22 := SY;
+      M._31 := OX;
+      M._32 := OY;
+      Brush.SetTransform(M);
+      if Spec.GetValue('opacity') is TJSONNumber then
+        Brush.SetOpacity(EnsureRange(TJSONNumber(Spec.GetValue('opacity')).AsDouble, 0, 100) / 100);
+      if not Clip then
+        T.FillGeometry(Shape, Brush, nil)
+      else
+      begin
+        // the box where the image lies: all of it across for repeatX, down for repeatY
+        Area := D2D1RectF(OX, OY, OX + IW * SX, OY + IH * SY);
+        if BrushProps.extendModeX = D2D1_EXTEND_MODE_WRAP then
+        begin
+          Area.left := R.left;
+          Area.right := R.right;
+        end;
+        if BrushProps.extendModeY = D2D1_EXTEND_MODE_WRAP then
+        begin
+          Area.top := R.top;
+          Area.bottom := R.bottom;
+        end;
+        FillChar(Identity, SizeOf(Identity), 0);
+        Identity._11 := 1;
+        Identity._22 := 1;
+        if Succeeded(D2D.CreateRectangleGeometry(Area, Part)) and Succeeded(D2D.CreatePathGeometry(Region)) and
+          Succeeded(Region.Open(Sink)) then
+        begin
+          Shape.CombineWithGeometry(Part, D2D1_COMBINE_MODE_INTERSECT, Identity, 0.25, Sink);
+          Sink.Close;
+          T.FillGeometry(Region, Brush, nil);
+        end;
+      end;
+    end;
+  end;
+  if Spec.GetValue('tint') <> nil then
+  begin
+    C := Theme.Color('card', 'normal', 'tint', RGBA(0, 0, 0, 0), Spec);
+    if C.A > 0 then
+    begin
+      T.CreateSolidColorBrush(ToD2D(C), nil, Solid);
+      T.FillRoundedRectangle(D2D1RoundedRect(R, Radius, Radius), Solid);
+    end;
+  end;
+end;
+
 // A theme's background for an element and state over a rounded box (plan 03 3.4): a colour, or a linear gradient at
 // its angle across the box; False (nothing drawn) when the theme gives none.
 function FillBackground(T: ID2D1RenderTarget; Theme: TTheme; const Element, State: string; const R: TD2D1RectF;
@@ -1086,7 +1265,17 @@ var
   Gradient: ID2D1LinearGradientBrush;
   Solid: ID2D1SolidColorBrush;
   Box: TD2D1RoundedRect;
+  V: TJSONValue;
 begin
+  // the layout's own background an image (plan 03 3.4): drawn as one
+  V := nil;
+  if Own <> nil then
+    if State = 'normal' then
+      V := Own.GetValue('background')
+    else if Own.GetValue(State) is TJSONObject then
+      V := TJSONObject(Own.GetValue(State)).GetValue('background');
+  if (V is TJSONObject) and (TJSONObject(V).GetValue('image') <> nil) then
+    Exit(FillImage(T, Theme, TJSONObject(V), R, Radius));
   Result := Theme.Background(Element, State, Colors, Angle, Own, StateOnly);
   if not Result then
     Exit;

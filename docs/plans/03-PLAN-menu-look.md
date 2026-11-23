@@ -12,6 +12,7 @@ Status: partly executed; see Status.
 - 2026-11-23: partly executed: the see-through menu; the menu's shadow.
 - 2026-11-23: partly executed: a divider's own look.
 - 2026-11-23: partly executed: the focus ring.
+- 2026-11-23: partly executed: own cards' icons, the scrollbar, image fill.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -62,6 +63,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Focus ring | the card the keys moved to drawn with a ring in the theme's focused colour, until the mouse moves | 3.7; 6.14 |
 | Own cards' icons | Dexmenu's own items with a glyph of their own where the layout gives none: Edit menu... a pencil (E70F), Windows' menu three lines (E700) | 3.8 |
 | Scrollbar | a level taller than the work area: a thin bar at its right edge where the shown part is; the wheel and the keys scroll it | 3.4; 6.17 |
+| Image fill | an image as a background of the menu, a card, a hovered card, a note or a divider: `{ image, fit, opacity, tint, color }`, every `fit`; the background fields' third kind with a file dialog | 3.4; 3.6; 6.18 |
 | States | hover, pressed, disabled, checked (a check mark), default (bold); unavailable stripes in the preview | 3.7; 3.10 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
@@ -72,8 +74,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | -- | 3.9 |
-| New badge | a badge in the preview on items seen for the first time | open question 1 | 3.10 |
-| Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient; every `fit` | -- | 3.4; 3.6 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step | Image fill | 3.4 |
 | Tests | the parts of 3.11 for what is not built yet (pictures compared with approved ones, images, animation, see-through) | -- | 3.11 |
 
@@ -327,7 +327,6 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - **Unavailable:** diagonal stripes over an item that is not always there, or a card that would be empty (plan 02
   3.8), in the theme's `unavailable` colours.
-- **New:** a badge on items seen for the first time.
 - **Useless:** a red outline around a card that can never show anything (no rules, or an invalid rule; plan 02 3.5),
   in the editor's cards view; the preview has nothing of such a card to outline. Distinct from the stripes: a striped
   card is sometimes there, an outlined one never.
@@ -358,9 +357,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 ## 4. Open questions
 
-1. The "new" badge in the preview: what makes an item new? Items seen for the first time are already striped as
-   "sometimes" (earlier right-clicks did not have them). New could mean: first seen today; first seen since the editor
-   opened; or new until it was clicked once. Or is the stripe enough, and the badge dropped?
+None.
 
 ## 6. As built
 
@@ -596,3 +593,21 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   part's share, its place the scroll position. It shows whenever the level scrolls, not only on hover: the level
   window does not know the mouse is over it when it draws. It is a sign of where one is, not a control: the wheel and
   the keys scroll. Tested: a unit test rendering a level whole and at half its height (the pixel at the bar differs).
+
+### 6.18 Image fill
+
+- A background (the layout's own: the menu card's, a card's, a hovered card's, a note's, a divider's) may be
+  `{ "image": <file>, "fit", "opacity", "tint", "color" }`: `color` under the image, the image, `tint` over it. The
+  file: environment variables expanded, a relative path from Dexmenu's data folder; read with WIC (any format Windows
+  decodes), scaled down to 2048 pixels on its longer side at most, kept by path, time written and size (read again
+  only when the file changes; a file that cannot be read is not tried again until it changes, and only the colour and
+  tint show). A pixel of the image is a DIP of the menu. Drawn with a bitmap brush over the rounded box: stretch (the
+  default) and repeat fill the box; fit, center, repeatX and repeatY only where the image lies (the box intersected
+  with it), so no edge pixels smear. Themes do not take images (only the layout's own backgrounds).
+- In the editor the background fields (Background, Hover background, a divider's Background) have a third kind, "an
+  image": the file (typed, or Browse... through the settings app's file dialog), Fit, Opacity (a slider), Colour
+  under and Tint over.
+- The "new" badge of plan 3.10 is dropped: an item seen for the first time is striped as "sometimes" already.
+- Tested: the preview captured as a picture (a test image as stretch, fit on a colour, center, repeatX, repeat at 50%
+  opacity, and tiled under a dark tint as the menu's background), the editor's self-test (an image background read
+  and written back, its defaults left out), the field in the headless harness.

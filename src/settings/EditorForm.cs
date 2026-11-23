@@ -345,6 +345,18 @@ sealed class EditorForm : Form, IThemed
             case "previewKind":
                 if (Kinds.Any(x => x.Kind == Str("kind"))) { kind = Str("kind"); FillItems(); Live(); Reload(); }
                 break;
+            case "pickImage":
+                // a background image's file (plan 03 3.4), for the colour field that asked
+                using (var dialog = new OpenFileDialog
+                {
+                    Title = "A background image",
+                    Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff;*.ico|All files|*.*"
+                })
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK) break;
+                    Post(new { type = "pickedImage", path = dialog.FileName });
+                }
+                break;
             case "pickFolder":
                 using (var dialog = new FolderBrowserDialog { SelectedPath = folder ?? "", Description = "The folder in which the preview's right-click is" })
                 {
