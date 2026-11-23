@@ -1587,6 +1587,7 @@ $("addSearch").addEventListener("click", () => {
 });
 $("addDivider").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(layout, linesOf(), null)); });
+$("addGroup").addEventListener("click", () => { if (layout) addAndFocus(M.addGroup(layout, linesOf())); });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("collapseAll").addEventListener("click", () => {
   if (!layout) return;

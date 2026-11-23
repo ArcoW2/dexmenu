@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-23: draft.
 - 2026-11-23: partly executed: step 1, the DLL and format 2; the conversion script.
+- 2026-11-23: partly executed: step 2, the editor; the shipped layouts; the user's layouts converted.
 
 Builds on plan 02 (`executed/02-PLAN-own-menu.md`): lines of cards, a card with a menu, a card placing what it
 found (3.3), items as buttons in a card (3.3, 6.1), the editor's cards view (3.5); plan 03 (`03-PLAN-menu-look.md`):
@@ -51,17 +52,17 @@ shipped layouts are written in it.
 | Placement | holders, found items inside a card or in a submenu, limits, "More", rest, shownWhen, templates by place or rule | 3.2; 3.3; 6.1 |
 | Measure and draw | measuring recursive through holders; holders' frames, titles (also as a divider), hover inside; square | 3.4; 6.1 |
 | Keys and hit tests | through the boxes in their order at any depth; a holder no stop | 3.4; 6.1 |
-| Conversion script | written and checked on the user's layouts (the same menus); not yet run on them | 3.7; 6.1 |
+| Conversion | written, checked and run on the user's layouts (a backup kept; the same menus, box for box) | 3.7; 6.1; 6.2 |
+| Shipped layouts | Default A - D and the base layout in format 2 | 3.6; 6.2 |
+| Editor: tree | format 2 only; the cards view draws holders and rows; drops above, below, beside (a plain row made) and into a card; a click in the gutter selects a row; "+ Group" | 3.5; 6.2 |
+| Editor: panel | Shows, per row, rows, per column, columns, the rest, shown when, templates picked, title shown as, square; templates as dashed cards edited as cards; a rule's template | 3.5; 6.2 |
+| Tests | unit tests, the editor's self-test, the compare on the user's layouts | 3.8; 6.1; 6.2 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Shipped layouts | Default A - D in format 2 | Format | 3.6 |
-| Conversion run | the user's layouts converted once to format 2 (a backup kept), after both steps are published | Editor: panel | 3.7 |
-| Editor: tree | the cards view shows the tree: a card's content inside it; dragging into a card, beside a card, above or below it | Format | 3.5 |
-| Editor: panel | the card panel's Inside: Shows, per row, rows, per column, columns, the rest, shown when; Names: Title shown as; Templates picked by; the templates cards in the cards view, edited as cards; a rule's template | Editor: tree | 3.5 |
-| Tests | 3.8 | -- | 3.8 |
+| By hand | the user's "First" at a right-click and in the editor; dragging holders and rows; templates edited | -- | 3.8 |
 
 Moved in: all of plan 07 (groups), as holders without a style and their `shownWhen`.
 
@@ -223,3 +224,21 @@ None.
   place and by rule, More and its submenu, rest none, a column per column, found items in a submenu, shownWhen at a
   right-click and in the preview, square, errors); `--compare` on the user's five layouts: the same boxes in every
   kind, in the preview and at a right-click.
+
+### 6.2 Step 2: the editor, the shipped layouts, the conversion run
+
+- The editor's model works on containers (the menu's `content`, a card's `content`): `cards`, `find` (with the
+  container and the holding card), `moveCard` (into a container at a place), `moveCardNext` (above or below: in the
+  target's container, a card in a plain row standing for the row; beside: into the target's row, or a new plain row
+  of the two), `dropOnCard` (into a holder; a card with rules becomes a card with a submenu, its rules in a first
+  card), `takeOut` (a plain row left with one card is that card again; a submenu left empty a card with rules).
+- An older layout (format 1) is not opened: the cards view says it is converted once with the script. New layouts
+  start from the DLL's base layout, now format 2.
+- The cards view: a plain row is drawn as the line it was (selected from the gutter, then dragged by the grip beside
+  it); other holders as cards with what they hold inside (a row side by side, else under each other); a card with
+  rules shown in a row, column or submenu shows its templates as dashed cards ("+ Template", "x"), each selected as
+  `<card id>~t<n>` and edited in the card panel (Names, Layout, Style).
+- The shipped layouts converted with the same script; the user's five layouts converted (the old ones in
+  `%APPDATA%\Dexmenu\layouts-format1-backup`) and compared: the same boxes in every kind.
+- Tested: the editor's self-test, its fixtures written as format 2 (every move, drop, delete, divider and paste check
+  as before, the older form refused); the unit tests; the editor rendered with the converted "First"; `--compare`.
