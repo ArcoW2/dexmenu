@@ -48,7 +48,7 @@ type
   // How a card lower than its line fits it (plan 03 3.5): as the line says (cfDefault), as tall as the line, or at its
   // own height at the line's top, centre or bottom.
   TCardFit = (cfDefault, cfStretch, cfTop, cfCenter, cfBottom);
-  // How a card shows what it found or holds (docs/plans/11-PLAN-cards-hold-content.md 3.1): as its own item (several
+  // How a card shows what it found or holds (docs/plans/executed/11-PLAN-cards-hold-content.md 3.1): as its own item (several
   // found: the card multiplied), in a submenu, side by side inside it, under each other inside it. csDefault: its
   // rules: item; a format 1 "menu": submenu; format 2 "content": column.
   TCardShow = (csDefault, csItem, csSubmenu, csRow, csColumn);

@@ -1,15 +1,16 @@
 # Plan 11: Cards hold content: one item, a submenu, or cards arranged inside them; lines and groups become cards
 
-Status: partly executed; see Status.
+Status: executed; see Status.
 
 - 2026-11-23: draft.
 - 2026-11-23: partly executed: step 1, the DLL and format 2; the conversion script.
 - 2026-11-23: partly executed: step 2, the editor; the shipped layouts; the user's layouts converted.
+- 2026-11-23: executed.
 
-Builds on plan 02 (`executed/02-PLAN-own-menu.md`): lines of cards, a card with a menu, a card placing what it
-found (3.3), items as buttons in a card (3.3, 6.1), the editor's cards view (3.5); plan 03 (`03-PLAN-menu-look.md`):
-a card's size on its line (3.5), its own look (3.6); plan 09 (`executed/09-PLAN-used-rules.md`): used rules, which
-often find several items; plan 13 (`executed/13-PLAN-card-panel-tabs.md`): the card panel's panels. Takes in what was
+Builds on plan 02 (`02-PLAN-own-menu.md`): lines of cards, a card with a menu, a card placing what it
+found (3.3), items as buttons in a card (3.3, 6.1), the editor's cards view (3.5); plan 03 (`../03-PLAN-menu-look.md`):
+a card's size on its line (3.5), its own look (3.6); plan 09 (`09-PLAN-used-rules.md`): used rules, which
+often find several items; plan 13 (`13-PLAN-card-panel-tabs.md`): the card panel's panels. Takes in what was
 plan 07 (groups: cards that belong together, shown or left out together).
 
 ## 1. What this is about
@@ -50,6 +51,7 @@ shipped layouts are written in it.
 
 | Part | What | Reference |
 |---|---|---|
+| By hand | the user's "First" at a right-click and in the editor; dragging holders and rows; templates edited: looks good (the user) | 3.8 |
 | Format | format 2 read by the DLL (format 1 too, onto the same cards) | 3.1; 6.1 |
 | Placement | holders, found items inside a card or in a submenu, limits, "More", rest, shownWhen, templates by place or rule | 3.2; 3.3; 6.1 |
 | Measure and draw | measuring recursive through holders; holders' frames, titles (also as a divider), hover inside; square | 3.4; 6.1 |
@@ -62,10 +64,6 @@ shipped layouts are written in it.
 | The menu card | the menu the base card of every layout (id `menu`): its Shows, columns, submenus default and style read by the DLL and set in the editor; drawn as the fixed outer card; every layout given it (the user's, the shipped, the base layout, the conversion) | 3.9; 6.4 |
 
 ### Not yet built
-
-| Part | What | Waits for | Reference |
-|---|---|---|---|
-| By hand | the user's "First" at a right-click and in the editor; dragging holders and rows; templates edited | -- | 3.8 |
 
 Moved in: all of plan 07 (groups), as holders without a style and their `shownWhen`.
 

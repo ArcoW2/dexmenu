@@ -1,4 +1,4 @@
-# One-time conversion of Dexmenu's layouts to format 2 (docs/plans/11-PLAN-cards-hold-content.md 3.7). Not part of the
+# One-time conversion of Dexmenu's layouts to format 2 (docs/plans/executed/11-PLAN-cards-hold-content.md 3.7). Not part of the
 # settings app or the DLL: run once, by hand.
 #
 #   python tools/convert-layouts-to-format-2.py [layouts folder] [--to <folder>]

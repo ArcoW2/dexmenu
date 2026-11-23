@@ -29,7 +29,7 @@ type
   // vkNote: a note card (Card), no button; vkBack: "<<" at the top of a submenu that replaced its menu (plan 02 3.7)
   // vkCommand: Dexmenu's own item at the end of the menu ("Windows' menu", "Edit menu...", plan 02 3.6, 3.11)
   // vkSearch: the search's own line ("Search: ..."), a text, nothing to choose (plan 02 3.6)
-  // vkGroup: a card showing cards inside it (Inner; docs/plans/11-PLAN-cards-hold-content.md): the cards it holds, or
+  // vkGroup: a card showing cards inside it (Inner; docs/plans/executed/11-PLAN-cards-hold-content.md): the cards it holds, or
   // inner cards for what its rules found; itself no button
   TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand, vkSearch, vkGroup);
   TCommand = (ccNone, ccWindowsMenu, ccEditMenu);

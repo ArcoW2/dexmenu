@@ -1,4 +1,4 @@
-// The layout as the editor changes it (docs/plans/11-PLAN-cards-hold-content.md 3.1, 3.5; plan 02 3.3, 3.5): pure
+// The layout as the editor changes it (docs/plans/executed/11-PLAN-cards-hold-content.md 3.1, 3.5; plan 02 3.3, 3.5): pure
 // functions on the parsed layout, no page. A layout (format 2): { format: 2, menu: { content: [ ... ] } }, the menu one
 // card holding the others. A container (the menu's content, a card's content) is a list of entries: cards, dividers
 // ({ id, divider }) and the search box ({ id, search: true }). A card: { id, card (its name), rules: [ ... ] }, or

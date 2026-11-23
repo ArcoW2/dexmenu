@@ -1576,7 +1576,7 @@ begin
         Result := Result + [C];
 end;
 
-// Cards holding content (docs/plans/11-PLAN-cards-hold-content.md): format 2; holders in a row and a column, with
+// Cards holding content (docs/plans/executed/11-PLAN-cards-hold-content.md): format 2; holders in a row and a column, with
 // limits and the rest in "More" or left out; shownWhen; templates by position and by rule; found items in a submenu;
 // square; the holder's boxes inside.
 procedure TestHolders;
