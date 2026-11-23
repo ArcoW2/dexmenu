@@ -1836,6 +1836,28 @@ $("pvPick").addEventListener("click", () => post({ type: "pickFolder" }));
 $("pvNoFolder").addEventListener("click", () => post({ type: "noFolder" }));
 $("pvItem").addEventListener("change", () => post({ type: "pickItems", names: [$("pvItem").value] }));
 $("pvLast").addEventListener("click", () => post({ type: "last" }));
+// Tab and Shift+Tab in the card panel: leaving a field writes it, which draws the panel anew (the field left is
+// replaced), so the browser has no field to go on from. The field's place in the panel is kept, and focus goes to the
+// field after it (Shift+Tab: before it) in the panel as drawn now.
+function focusables(box) {
+  return [...box.querySelectorAll("input, select, textarea, button")].filter(x => !x.disabled && x.offsetParent !== null);
+}
+document.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const box = $("card"), from = document.activeElement;
+  if (!box.contains(from)) return;
+  const place = focusables(box).indexOf(from);
+  if (place < 0) return;
+  const back = e.shiftKey;
+  setTimeout(() => {
+    const now = document.activeElement;
+    if (now && now !== document.body && now.isConnected) return;   // nothing drawn anew: the browser went on itself
+    const fields = focusables($("card"));
+    const to = fields[Math.max(0, Math.min(fields.length - 1, place + (back ? -1 : 1)))];
+    if (to) { to.focus(); if (to.select && to.type === "text") to.select(); }
+  }, 0);
+}, true);
+
 // Where the last click was: Delete removes the selected card only when that was in the cards view (a Delete meant for
 // a field's text, with the field not focused, then deletes nothing).
 let lastClickInCards = false;

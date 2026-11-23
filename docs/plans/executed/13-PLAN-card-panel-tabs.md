@@ -143,3 +143,6 @@ None.
   a set left with one tab, a tab's name with panels not shown, an arrangement read back, the marks); the panel
   rendered in a browser as first arranged and with Rules | Inside | Layout/Style as tabs. Dragging tried by hand: not
   yet.
+- Later: Tab and Shift+Tab keep their way through the panel's fields although writing a field draws the panel anew:
+  the field's place is kept and focus goes to the field after (before) it in the panel as drawn now. Tested in the
+  editor page in a browser (a field written, then on to the next and back to the one before).
