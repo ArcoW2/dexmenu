@@ -1212,6 +1212,19 @@ begin
   Expect(Shows('[ { "line": [ { "note": "About" }, { "card": "Edit it...", "own": "editMenu" }, ' +
     '{ "card": "Windows", "own": "windowsMenu" } ] } ]'), 'N:About | C:Edit it... | C:Windows',
     'Dexmenu''s own items as cards, titled by the layout');
+  // Dexmenu's own items found by rules (plan 12): in any card, among other items, as buttons; tagged as commands
+  Expect(Shows('[ ' + Card('Ed', '{ "own": "editMenu" }') + ' ]'), 'C:Edit menu...', 'an own rule: Dexmenu''s item, its own text');
+  Expect(Shows('[ ' + Card('Ed', '{ "own": "editMenu" }', ', "title": "Change this menu"') + ' ]'), 'C:Change this menu',
+    'an own rule: the card''s title on it');
+  Expect(Shows('[ ' + Card('Mix', '{ "name": { "equals": "Cut" }, "priority": 1 }, { "own": "windowsMenu", "priority": 2 }') + ' ]'),
+    'I:Cut / C:Windows'' menu', 'an own rule beside a rule by name: several found, in the priority order');
+  Expect(Shows('[ ' + Card('Mix', '{ "name": { "equals": "Cut" }, "priority": 2 }, { "own": "windowsMenu", "priority": 1 }') + ' ]'),
+    'C:Windows'' menu / I:Cut', '... the other way round');
+  Expect(Shows('[ ' + Card('Two', '{ "own": "editMenu" }, { "own": "editMenu" }') + ' ]'), 'C:Edit menu... / C:Edit menu...',
+    'two rules with the same tag: the item twice');
+  Expect(Shows('[ ' + Card('Bad', '{ "own": "somethingElse" }') + ' ]'), '', 'an unknown tag: the rule invalid, nothing found');
+  Expect(Shows('[ ' + Card('Bad', '{ "own": "editMenu", "name": { "equals": "Cut" } }') + ' ]'), '',
+    'an own rule with a name too: invalid');
   Expect(Shows('[ { "line": [ { "card": "X", "own": "nothing" } ] } ]'), 'LAYOUT: test "X": "own" is "windowsMenu" or "editMenu"',
     'an unknown own item: the layout refused');
   Expect(Shows('[ { "line": [ { "note": "Pick one" } ] }, { "line": [ { "card": "X", "rules": [ { "name": { "equals": "Cut" } } ] }, ' +
@@ -1509,6 +1522,54 @@ end;
 
 // Items as buttons in a card (plan 02 3.3): a found submenu unfolded, its title the item's; found items without one
 // buttons themselves, the card's title; the buttons inside their card, side by side; hit tests reach the buttons only.
+// Dexmenu's own items found by rules (plan 12): tagged with what the DLL starts; a button in a card with buttons; an own
+// card of an earlier layout read as a card with an own rule.
+procedure TestOwnRules;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error, Titles: string;
+  P: TPlacement;
+  Level: TViewLevel;
+  B: TViewCard;
+begin
+  Layout := ParseLayout('{ "format": 1, "lines": [ { "line": [ ' +
+    '{ "card": "LexPen", "buttons": true, "rules": [ { "name": { "endsWith": "in LexPen" } }, { "own": "editMenu" } ] } ] }, ' +
+    '{ "line": [ { "card": "Back", "own": "windowsMenu" } ] }, ' +
+    '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  Check(Layout <> nil, 'a layout with own rules and an own card read: ' + Error);
+  if Layout = nil then
+    Exit;
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      Check((Level.Lines.Count >= 2) and (Level.Lines[0].Cards[0].Kind = vkGroup), 'the buttons card: ' + Describe(Level));
+      if (Level.Lines.Count < 2) or (Level.Lines[0].Cards[0].Kind <> vkGroup) then
+        Exit;
+      Titles := '';
+      for B in Level.Lines[0].Cards[0].Buttons do
+        Titles := Titles + B.Title + ';';
+      B := Level.Lines[0].Cards[0].Buttons[Level.Lines[0].Cards[0].Buttons.Count - 1];
+      Check((Titles = 'Edit in LexPen;View in LexPen;Edit menu...;') and (B.Kind = vkCommand) and (B.Command = ccEditMenu) and B.Enabled,
+        'an own rule in a card with buttons: Dexmenu''s item a button, tagged editMenu: ' + Titles);
+      B := Level.Lines[1].Cards[0];
+      Check((B.Kind = vkCommand) and (B.Command = ccWindowsMenu) and (B.Title = 'Back') and (B.Rule <> nil),
+        'an own card of an earlier layout: a card with an own rule, its name its title, tagged windowsMenu');
+      Check(Pos('Edit menu', Describe(Level)) = 0, 'an own item is no item of Windows'': not among the remaining items');
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 procedure TestButtons;
 var
   Menu: HMENU;
@@ -1612,6 +1673,7 @@ begin
   TestSeen;
   TestLinesAndCards;
   TestButtons;
+  TestOwnRules;
   if Failures = 0 then
     Writeln('OK')
   else

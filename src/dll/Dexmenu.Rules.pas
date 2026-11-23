@@ -17,6 +17,9 @@ unit Dexmenu.Rules;
 // high to low ("3-1") the same items in reverse order. The match kind, caseSensitive, scope and path have no function
 // there. A rank of 0 or lower, or one that is no number or range, makes the rule invalid.
 //
+// Or Dexmenu's own item (docs/plans/12-PLAN-own-rules.md): { "own": "editMenu" | "windowsMenu" } finds that item, once,
+// tagged so that, chosen, the DLL starts what the tag names; only its priority has a function there.
+//
 // A rule with both a scope and a path, an unknown match kind or a regex that does not compile is invalid: it finds
 // nothing (the editor outlines its card red).
 
@@ -54,6 +57,7 @@ type
     Priority: Integer;   // -1: none given
     Used: TUsedKind;     // ukNone: a rule by name
     RankFrom, RankTo: Integer;   // the ranks a used rule finds, from 1; RankFrom > RankTo: in reverse; 0: all
+    Own: string;         // a rule finding Dexmenu's own item: its tag, "editMenu" or "windowsMenu"; '' none
   end;
 
 function ParseRule(Obj: TJSONObject): TRuleSpec;
@@ -208,6 +212,25 @@ begin
   if Obj.GetValue('verb') <> nil then
   begin
     Result.Problem := 'a rule on the verb: not yet possible (the verb cannot be read from the menu yet)';
+    Exit;
+  end;
+  V := Obj.GetValue('own');
+  if V <> nil then
+  begin
+    if (Obj.GetValue('name') <> nil) or (Obj.GetValue('used') <> nil) then
+    begin
+      Result.Problem := 'a rule finds by "own", "name" or "used": one of them';
+      Exit;
+    end;
+    if not (V is TJSONString) or ((V.Value <> 'editMenu') and (V.Value <> 'windowsMenu')) then
+    begin
+      Result.Problem := '"own" is "editMenu" or "windowsMenu"';
+      Exit;
+    end;
+    Result.Own := V.Value;
+    if Obj.GetValue('priority') is TJSONNumber then
+      Result.Priority := TJSONNumber(Obj.GetValue('priority')).AsInt;
+    Result.Valid := True;
     Exit;
   end;
   V := Obj.GetValue('used');

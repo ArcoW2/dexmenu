@@ -393,13 +393,24 @@ begin
     end;
     if Obj.GetValue('own') is TJSONString then
     begin
-      Card.Own := Obj.GetValue('own').Value;
-      if (Card.Own <> 'windowsMenu') and (Card.Own <> 'editMenu') then
+      // Dexmenu's own item as a card of its own (earlier layouts): read as a card with one rule finding that item,
+      // titled with the card's name (docs/plans/12-PLAN-own-rules.md 3.3)
+      if (Obj.GetValue('own').Value <> 'windowsMenu') and (Obj.GetValue('own').Value <> 'editMenu') then
       begin
         Error := Where + ' "' + Card.Title + '": "own" is "windowsMenu" or "editMenu"';
         Exit;
       end;
-      Exit(True);   // Dexmenu's own item: no rules, no menu
+      Rule := TRule.Create;
+      Rule.Card := Card;
+      Rule.Index := 0;
+      Card.Rules.Add(Rule);
+      Rule.Kind := rkMatch;
+      Rule.Raw := TJSONObject.Create;
+      Rule.Raw.AddPair('own', Obj.GetValue('own').Value);
+      Rule.Spec := ParseRule(Rule.Raw);
+      if Card.ShownTitle = '' then
+        Card.ShownTitle := Card.Title;
+      Exit(True);
     end;
     Rules := Obj.GetValue('rules');
     Menu := Obj.GetValue('menu');

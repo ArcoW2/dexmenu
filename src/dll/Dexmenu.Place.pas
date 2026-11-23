@@ -34,8 +34,9 @@ type
   TCommand = (ccNone, ccWindowsMenu, ccEditMenu);
 
   TFound = record
-    Node: TNode;
+    Node: TNode;        // nil for Dexmenu's own item
     Rule: TRule;
+    Own: TCommand;      // Dexmenu's own item an own rule found (plan 12), its tag; ccNone for Windows' items
   end;
 
   TViewCard = class
@@ -154,7 +155,7 @@ uses
 
 function TPlacement.Hides(Node: TNode): Boolean;
 begin
-  Result := (Empty <> nil) and (Node.SubMenu <> 0) and Empty.ContainsKey(Node.SubMenu);
+  Result := (Node <> nil) and (Empty <> nil) and (Node.SubMenu <> 0) and Empty.ContainsKey(Node.SubMenu);
 end;
 
 function SubmenuModeOf(V: TViewCard; const Settings: TMenuSettings): TSubmenuMode;
@@ -281,7 +282,20 @@ begin
           end;
       end;
     vkNote: Result := Card.NoteText;
-    vkBack, vkCommand, vkSearch, vkGroup: Result := BackTitle;
+    vkCommand:
+      begin
+        // Dexmenu's own item: the card's title for it alone, else its own; the card's rename on it (plan 12 3.1)
+        if (Card <> nil) and (Card.ShownTitle <> '') and not Several then
+          Exit(Card.ShownTitle);
+        Result := BackTitle;
+        if (Card <> nil) and (Card.RenameFrom <> '') then
+          try
+            Result := TRegEx.Replace(Result, Card.RenameFrom, Card.RenameTo);
+          except
+            // a rename that does not compile: its own text
+          end;
+      end;
+    vkBack, vkSearch, vkGroup: Result := BackTitle;
     vkMenu:
       if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
@@ -631,11 +645,12 @@ var
     Twice := R.Spec.SkipDuplicates and Names.ContainsKey(AnsiLowerCase(N.Name));
     if not Twice and R.Card.SkipDuplicates then
       for F in List do
-        if SameText(F.Node.Name, N.Name) then
+        if (F.Node <> nil) and SameText(F.Node.Name, N.Name) then
           Twice := True;
     Names.AddOrSetValue(AnsiLowerCase(N.Name), True);
     Found.Node := N;
     Found.Rule := R;
+    Found.Own := ccNone;
     if not Twice then
       List.Add(Found);
     if R.Spec.Consume and not FTaken.ContainsKey(KeyOf(N)) then
@@ -657,6 +672,23 @@ var
       if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
         Visit(N.Children, R, Names);
     end;
+  end;
+
+  // An own rule (plan 12 3.1): Dexmenu's own item, once, in the rule's card; it takes nothing of Windows'
+  procedure TakeOwn(R: TRule);
+  var
+    List: TList<TFound>;
+    F: TFound;
+  begin
+    if not FFound.TryGetValue(R.Card, List) then
+    begin
+      List := TList<TFound>.Create;
+      FFound.Add(R.Card, List);
+    end;
+    F.Node := nil;
+    F.Rule := R;
+    F.Own := CommandOf(R.Spec.Own);
+    List.Add(F);
   end;
 
   // A used rule (docs/plans/executed/09-PLAN-used-rules.md 3.1): the items of this menu with a use, at any depth, in its states,
@@ -786,7 +818,9 @@ begin
     begin
       Names := TDictionary<string, Boolean>.Create;
       try
-        if R.Spec.Used <> ukNone then
+        if R.Spec.Own <> '' then
+          TakeOwn(R)
+        else if R.Spec.Used <> ukNone then
           TakeUsed(R, Names)
         else
           Visit(Top, R, Names);
@@ -804,6 +838,23 @@ begin
 end;
 
 // ---- the levels ------------------------------------------------------------------------------------------------
+
+// Dexmenu's own item an own rule found (plan 12 3.2): a card that, chosen, has the DLL start what its tag names
+// (Command); its text Dexmenu's own, the card's title and rename on it (TViewCard.Title). Several: one of several the
+// card found.
+function OwnView(const F: TFound; Card: TCard; Several: Boolean): TViewCard;
+begin
+  Result := TViewCard.Create;
+  Result.Kind := vkCommand;
+  Result.Command := F.Own;
+  if F.Own = ccWindowsMenu then
+    Result.BackTitle := 'Windows'' menu'
+  else
+    Result.BackTitle := 'Edit menu...';
+  Result.Card := Card;
+  Result.Rule := F.Rule;
+  Result.Several := Several;
+end;
 
 function PlaceLines(P: TPlacement; Lines: TLines): TViewLevel;
 var
@@ -861,14 +912,6 @@ begin
           V.Kind := vkNote;
           V.Card := Card;
         end
-        else if Card.Own <> '' then
-        begin
-          V := TViewCard.Create;   // Dexmenu's own item, where the layout puts it
-          V.Kind := vkCommand;
-          V.Command := CommandOf(Card.Own);
-          V.BackTitle := Card.Title;
-          V.Card := Card;
-        end
         else if Card.Buttons then
         begin
           // what it found as buttons inside it (plan 02 3.3): a found submenu unfolded into its items
@@ -882,6 +925,15 @@ begin
           Shown := 0;
           for F in List do
           begin
+            if F.Node = nil then
+            begin
+              // Dexmenu's own item: a button of its own
+              Inc(Shown);
+              B := OwnView(F, Card, True);
+              B.InGroup := True;
+              V.Buttons.Add(B);
+              Continue;
+            end;
             if P.Hides(F.Node) or F.Node.IsSeparator then
               Continue;
             Inc(Shown);
@@ -950,6 +1002,8 @@ begin
           V.Card := Card;
           V.EmptyMenu := Nothing;
         end
+        else if P.FFound.TryGetValue(Card, List) and (List.Count = 1) and (List[0].Node = nil) then
+          V := OwnView(List[0], Card, False)   // Dexmenu's own item, the card's one item
         else if P.FFound.TryGetValue(Card, List) and (List.Count = 1) and not P.Hides(List[0].Node) then
         begin
           V := TViewCard.Create;
@@ -962,7 +1016,9 @@ begin
         begin
           Out := nil;   // several found: each takes a line of its own, as the remaining card's items
           for F in List do
-            if not P.Hides(F.Node) then
+            if F.Node = nil then
+              NewLine(Result).Cards.Add(OwnView(F, Card, True))
+            else if not P.Hides(F.Node) then
               AddNodeLine(Result, F.Node, Card, F.Rule, True);
           Continue;
         end;
@@ -1026,7 +1082,8 @@ begin
   begin
     Sum := 0;
     for F in Pair.Value do
-      Inc(Sum, Total(F.Node));
+      if F.Node <> nil then
+        Inc(Sum, Total(F.Node));
     if Sum > 0 then
       Result.AddOrSetValue(Pair.Key.Id, Sum);
   end;
