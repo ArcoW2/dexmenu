@@ -253,6 +253,7 @@ sealed class EditorForm : Form, IThemed
         PostPreviewBar();
         PostCounts();
         PostPalette();
+        PostFonts();
         if (editedText is not null)
         {
             Post(new { type = "preview", error });
@@ -277,6 +278,22 @@ sealed class EditorForm : Form, IThemed
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or System.Text.Json.JsonException) { }
         // what a rule without states of its own takes (the main window's General): the rule panel shows it
         Post(new { type = "ruleStates", states = DataFolder.Menu()["states"]?.GetValue<string>() ?? "both" });
+    }
+
+    // The installed font families (as LexPen lists them), for a note's font (plan 03 3.6): once per window.
+    static string[]? fontFamilies;
+    bool fontsSent;
+    void PostFonts()
+    {
+        if (fontsSent) return;
+        fontsSent = true;
+        if (fontFamilies is null)
+        {
+            using var installed = new System.Drawing.Text.InstalledFontCollection();
+            fontFamilies = installed.Families.Select(f => f.Name).Where(n => !n.StartsWith('@'))   // not the vertical East Asian variants
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+        Post(new { type = "fonts", fonts = fontFamilies });
     }
 
     void Placed(int previewEvent, string cardId, int rule) =>

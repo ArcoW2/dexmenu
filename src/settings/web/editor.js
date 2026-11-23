@@ -784,6 +784,18 @@ function shadowFields(card) {
   return rows;
 }
 
+let fonts = [];   // the installed font families, from the settings app
+
+// A font family as a dropdown of the installed ones (as LexPen's), each in its own font; empty: the items' font. A
+// family the layout names that is not installed stays, marked so.
+function familyRow(value, onChange) {
+  const options = [["", "(the items' font)"], ...fonts.map(f => [f, f])];
+  if (value && !fonts.includes(value)) options.splice(1, 0, [value, value + " (not installed)"]);
+  const row = selectRow("Family", options, value || "", onChange);
+  for (const o of row.querySelector("select").options) if (o.value) o.style.fontFamily = '"' + o.value.replace(/"/g, "") + '"';
+  return row;
+}
+
 // A note's font (plan 03 3.6): the items' text, the smaller extra text, or its own (family, size, bold, italic; empty:
 // the items'). Plain text only.
 function fontFields(card) {
@@ -794,7 +806,7 @@ function fontFields(card) {
   })];
   if (kind !== "own") return rows;
   const f = card.font;
-  rows.push(textField("Family", f.family || "", v => { if (v.trim()) f.family = v.trim(); else delete f.family; changed(); }, "(the items' font)"),
+  rows.push(familyRow(f.family, v => { if (v) f.family = v; else delete f.family; changed(); }),
     textField("Size", f.size === undefined ? "" : String(f.size), v => {
       const n = Number(v.trim());
       if (v.trim() && n >= 4) f.size = Math.min(72, n); else delete f.size;
@@ -2059,4 +2071,5 @@ chrome.webview.addEventListener("message", e => {
     if (JSON.stringify(next) !== JSON.stringify(palette)) { palette = next; renderCardPane(); }
   }
   else if (m.type === "saved") { dirty = false; $("dirty").hidden = true; }
+  else if (m.type === "fonts") { fonts = m.fonts || []; renderCardPane(); }
 });
