@@ -25,8 +25,9 @@ The icons are found by probing Windows from the settings app, not by asking Expl
 app asks Windows for the real menus of a set of right-clicks, as its preview already does, and keeps every item's
 bitmap; items that still have none get the icon their registration names (a verb's `Icon` value, a packaged
 extension's own icon). The DLL at a right-click uses an item's kept icon when the item has no bitmap of its own. The
-editor gets an icon picker for a card: the glyphs, the kept icons and an icon from a file. The owner-draw probe in the
-DLL is removed.
+editor gets an icon picker for a card: the icon themes' icons, the glyphs, the kept icons and an icon from a file.
+Dexmenu ships a set of icons for Windows' own items and common tasks in several icon themes; a card names an icon,
+and the icon theme in use draws it. The owner-draw probe in the DLL is removed.
 
 ## Status
 
@@ -42,9 +43,10 @@ DLL is removed.
 | Kept icons in the menu | at a right-click, an item without a bitmap drawn with the icon kept for its key | -- | 3.1 |
 | Probing menus | the settings app asks Windows for the real menus of a set of right-clicks and keeps every bitmap | -- | 3.2 |
 | Probing registrations | items still without an icon: the `Icon` of their verb's registration, a packaged extension's icon | Probing menus | 3.3 |
-| Icon picker | in the card panel: choose a glyph, a kept icon or an icon in a file | -- | 3.4 |
+| Icon themes | shipped icons for Windows' own items and common tasks, by name, in several icon themes; the icon theme chosen per light and dark | -- | 3.6 |
+| Icon picker | in the card panel: choose an icon theme's icon, a glyph, a kept icon or an icon in a file | Icon themes | 3.4 |
 | Owner-draw probe removed | the DLL's opt-in probe (ProbeIcons) and its code taken out | -- | 3.5 |
-| Tests | 3.6 | -- | 3.6 |
+| Tests | 3.7 | -- | 3.7 |
 
 ## 3. Details
 
@@ -79,7 +81,7 @@ DLL is removed.
 ### 3.4 Icon picker
 
 - In the editor's card panel, beside the Icon field: "Select an icon...", and where a card shows no icon in the
-  preview the same choice on the card. A dialog with three tabs: the glyphs of Segoe Fluent Icons (searchable by
+  preview the same choice on the card. A dialog with four tabs: the icon themes' icons by name (3.6), the glyphs of Segoe Fluent Icons (searchable by
   name), the kept icons (by the items' names), and an icon in a file (`path,index`, the file's icons shown).
 - A kept icon chosen is written as the card's `icon` by its file, so it stays when the item's own icon changes (where
   that file lives: Open question 2).
@@ -89,13 +91,31 @@ DLL is removed.
 - The DLL's probe (`ProbeOwnerDrawn`, `ProbingIcons`, HKCU Software Dexmenu ProbeIcons) gave nothing in Explorer; it is
   taken out with its log lines and the `probe` folder's use.
 
-### 3.6 Tests
+### 3.6 Icon themes
+
+- A set of icons by name for Windows' own items and common tasks (`cut`, `copy`, `paste`, `rename`, `delete`,
+  `properties`, `open`, `openWith`, `share`, `archive`, `versionControl`, `terminal`, `edit`, `search`, Dexmenu's own
+  `editMenu` and `windowsMenu`, ...), shipped in several icon themes, each drawn in one style (for example outlined
+  glyphs, filled glyphs, coloured): [not yet checked] which styles and how many icons each.
+- An icon theme is a folder of its own: one image per name (SVG or PNG at a few sizes) and a small JSON with its name;
+  shipped in the DLL's `icons` folder, the user's own in `%APPDATA%\Dexmenu\icons`, as the colour themes are (plan 03).
+- A card names an icon (`"icon": "cut"`); the icon theme in use draws it. A name the theme lacks falls back to the
+  default icon theme. Glyph code points and `path,index` keep working.
+- Chosen in the main window beside the colour themes, per light and dark; a colour theme may name an icon theme to
+  go with it.
+- The shipped layouts use the names, so they follow the icon theme; plan 03's own cards' icons (Edit menu...,
+  Windows' menu) become names in this set.
+
+### 3.7 Tests
 
 - Kept icons in the menu: an item without a bitmap and with a kept icon drawn with it; one with a bitmap keeps its
   own; a card's icon wins over both.
 - Probing menus: the set of right-clicks built, icons kept, a second run writes nothing new.
 - Probing registrations: a verb registered with an `Icon` found by its text.
-- The icon picker in the editor's self-test: a glyph, a kept icon and a file icon chosen and written.
+- The icon picker in the editor's self-test: an icon theme's icon, a glyph, a kept icon and a file icon chosen and
+  written.
+- Icon themes: a card's named icon drawn from the theme in use, a name the theme lacks from the default, a user's
+  icon theme read, the theme switched per light and dark.
 - By hand in Explorer: a right-click after "Find icons" shows the extensions' icons.
 
 ## 4. Open questions
