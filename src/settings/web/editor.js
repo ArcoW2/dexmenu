@@ -1061,7 +1061,8 @@ function renderCardPane() {
     return;
   }
   if (div) {
-    // a divider: its text and where the text goes; its look (height, colours) comes with the themes
+    // a divider: its text and where the text goes; its own look over the theme's (plan 03 3.8): height, background,
+    // line colour (none: no line), label colour and font
     $("cardHeading").textContent = "A divider";
     const box = $("card");
     box.replaceChildren(textField("Text", div.entry.divider, v => { div.entry.divider = v; changed(); }, "(none: a plain line)"));
@@ -1071,7 +1072,18 @@ function renderCardPane() {
     align.value = div.entry.align || "left";
     align.addEventListener("change", () => { if (align.value === "left") delete div.entry.align; else div.entry.align = align.value; changed(); });
     row.append(el("span", "", "Text aligned"), align);
-    box.append(row);
+    const e = div.entry;
+    const own = name => ({ get: () => e[name], set: v => { if (v === undefined) delete e[name]; else e[name] = v; } });
+    box.append(row,
+      textField("Height", e.height === undefined ? "" : String(e.height), v => {
+        const n = Number(v.trim());
+        if (v.trim() && n > 0) e.height = n; else delete e.height;
+        changed();
+      }, "(the theme's) in DIP"),
+      colorField("Background", own("background").get, own("background").set, true, true),
+      colorField("Line colour", own("border").get, own("border").set, false, true),
+      colorField("Text colour", own("foreground").get, own("foreground").set),
+      ...fontFields(e));
     return;
   }
   // a template (plan 11 3.1): its texts that apply to every item, its layout and its style

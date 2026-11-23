@@ -26,6 +26,16 @@ type
   TLine = class;
   TCard = class;
 
+  // A text's "font" (plan 03 3.6, 3.8; a note's, a divider's label): "text" (the items' text, the default), "extra" (a
+  // card's smaller extra text), or its own { "family", "size", "bold", "italic" } (Own; what it does not give the
+  // items'). Plain text only.
+  TFontSpec = record
+    Extra, Own: Boolean;
+    Family: string;
+    Size: Single;
+    Bold, Italic: Boolean;
+  end;
+
   TRuleKind = (rkRemaining, rkMatch);
 
   TRule = class
@@ -100,12 +110,7 @@ type
     IsNote: Boolean;
     NoteText: string;
     NoteAlign: TNoteAlign;   // "align": left (default), text (with the items' text), center, right
-    // A note's "font" (plan 03 3.6): "text" (the items' text, the default), "extra" (a card's smaller extra text), or
-    // its own { "family", "size", "bold", "italic" } (FontOwn; what is not given the items'); plain text only
-    FontExtra, FontOwn: Boolean;
-    FontFamily: string;
-    FontSize: Single;
-    FontBold, FontItalic: Boolean;
+    Font: TFontSpec;   // a note's "font" (plan 03 3.6)
     SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
     // Its size on a line (plan 03 3.5): "weight", its share of the line's width (1 when not set); "minWidth" (DIP; 0
     // none); "height", in lines of text (0: auto, from its content); "cardFit", how it fits a taller line.
@@ -160,6 +165,11 @@ type
     IsDivider: Boolean;
     DividerText: string;
     DividerAlign: TDividerAlign;
+    // a divider's own look (plan 03 3.8): its height (DIP; 0 the default), its background, line colour ("border") and
+    // label colour ("foreground") as a card's look (owned; nil none), its label's font
+    DividerHeight: Single;
+    DividerLook: TJSONObject;
+    DividerFont: TFontSpec;
     IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
     CardFit: TCardFit;     // "cardFit" of a line of cards: how its lower cards fit it (cfDefault: stretched)
     constructor Create;
@@ -365,6 +375,7 @@ end;
 
 destructor TLine.Destroy;
 begin
+  DividerLook.Free;
   Cards.Free;
   inherited;
 end;
@@ -495,6 +506,48 @@ begin
 end;
 
 // A card's extra text and its own look (plan 03 3.6).
+function ParseFont(V: TJSONValue): TFontSpec;
+var
+  O: TJSONObject;
+begin
+  Result := Default(TFontSpec);
+  if V is TJSONString then
+    Result.Extra := V.Value = 'extra'
+  else if V is TJSONObject then
+  begin
+    O := TJSONObject(V);
+    Result.Own := True;
+    if O.GetValue('family') is TJSONString then
+      Result.Family := Trim(O.GetValue('family').Value);
+    if (O.GetValue('size') is TJSONNumber) and (TJSONNumber(O.GetValue('size')).AsDouble >= 4) then
+      Result.Size := Min(72, TJSONNumber(O.GetValue('size')).AsDouble);
+    if O.GetValue('bold') is TJSONBool then
+      Result.Bold := TJSONBool(O.GetValue('bold')).AsBoolean;
+    if O.GetValue('italic') is TJSONBool then
+      Result.Italic := TJSONBool(O.GetValue('italic')).AsBoolean;
+  end;
+end;
+
+// A divider's own look (plan 03 3.8): "height" (DIP), "background", "border" (its line's colour; "none": no line),
+// "foreground" (its label's colour) as a card's colours, "font".
+procedure ParseDividerLook(Obj: TJSONObject; Line: TLine);
+const
+  Props: array[0..2] of string = ('background', 'border', 'foreground');
+var
+  P: string;
+begin
+  if (Obj.GetValue('height') is TJSONNumber) and (TJSONNumber(Obj.GetValue('height')).AsDouble > 0) then
+    Line.DividerHeight := Min(200, TJSONNumber(Obj.GetValue('height')).AsDouble);
+  for P in Props do
+    if Obj.GetValue(P) <> nil then
+    begin
+      if Line.DividerLook = nil then
+        Line.DividerLook := TJSONObject.Create;
+      Line.DividerLook.AddPair(P, TJSONValue(Obj.GetValue(P).Clone));
+    end;
+  Line.DividerFont := ParseFont(Obj.GetValue('font'));
+end;
+
 procedure ParseCardLook(Obj: TJSONObject; Card: TCard);
 const
   Props: array[0..9] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed',
@@ -569,23 +622,7 @@ begin
     ParseCardSize(Obj, Card);
     // its style as a card's, and its font (plan 03 3.6)
     ParseCardLook(Obj, Card);
-    if Obj.GetValue('font') is TJSONString then
-      Card.FontExtra := Obj.GetValue('font').Value = 'extra'
-    else if Obj.GetValue('font') is TJSONObject then
-    begin
-      Card.FontOwn := True;
-      with TJSONObject(Obj.GetValue('font')) do
-      begin
-        if GetValue('family') is TJSONString then
-          Card.FontFamily := Trim(GetValue('family').Value);
-        if (GetValue('size') is TJSONNumber) and (TJSONNumber(GetValue('size')).AsDouble >= 4) then
-          Card.FontSize := Min(72, TJSONNumber(GetValue('size')).AsDouble);
-        if GetValue('bold') is TJSONBool then
-          Card.FontBold := TJSONBool(GetValue('bold')).AsBoolean;
-        if GetValue('italic') is TJSONBool then
-          Card.FontItalic := TJSONBool(GetValue('italic')).AsBoolean;
-      end;
-    end;
+    Card.Font := ParseFont(Obj.GetValue('font'));
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then
       Card.Id := Obj.GetValue('id').Value
@@ -761,6 +798,8 @@ begin
       Line.IsDivider := True;
       if TJSONObject(Entry).GetValue('divider') is TJSONString then
         Line.DividerText := TJSONObject(Entry).GetValue('divider').Value;
+      // its own look (plan 03 3.8): height, background, line colour ("border"), label colour ("foreground"), font
+      ParseDividerLook(TJSONObject(Entry), Line);
       Line.DividerAlign := daLeft;
       if TJSONObject(Entry).GetValue('align') is TJSONString then
         if TJSONObject(Entry).GetValue('align').Value = 'center' then

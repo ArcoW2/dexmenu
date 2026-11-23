@@ -293,36 +293,42 @@ end;
 var
   NoteFormats: TDictionary<string, IDWriteTextFormat>;   // a note's own font's format, by its font (made once)
 
-// A note's text format (plan 03 3.6): the items' font, a card's smaller extra text, or its own (family, size, bold,
-// italic; the items' for what it does not give); wrapping, from the top.
-function NoteFormatOf(V: TViewCard): IDWriteTextFormat;
+// A text format for a font (plan 03 3.6, 3.8): the items' font, a card's smaller extra text, or its own (family, size,
+// bold, italic; the items' for what it does not give). Wrap: wrapping, from the top (a note); else one line (a
+// divider's label). Made once per font.
+function FontFormat(const F: TFontSpec; Wrap: Boolean): IDWriteTextFormat;
 var
   Family, Key: string;
   Size: Single;
   Weight: DWRITE_FONT_WEIGHT;
   Style: DWRITE_FONT_STYLE;
+  Plain: IDWriteTextFormat;
 begin
-  Result := NoteFormat;
-  if (V.Card = nil) or not (V.Card.FontExtra or V.Card.FontOwn) then
+  if Wrap then
+    Plain := NoteFormat
+  else
+    Plain := NormalFormat;
+  Result := Plain;
+  if not (F.Extra or F.Own) then
     Exit;
   Family := TextFont;
   Size := FontSize;
   Weight := DWRITE_FONT_WEIGHT_NORMAL;
   Style := DWRITE_FONT_STYLE_NORMAL;
-  if V.Card.FontExtra then
+  if F.Extra then
     Size := ExtraSize
   else
   begin
-    if V.Card.FontFamily <> '' then
-      Family := V.Card.FontFamily;
-    if V.Card.FontSize > 0 then
-      Size := V.Card.FontSize;
-    if V.Card.FontBold then
+    if F.Family <> '' then
+      Family := F.Family;
+    if F.Size > 0 then
+      Size := F.Size;
+    if F.Bold then
       Weight := DWRITE_FONT_WEIGHT_SEMI_BOLD;
-    if V.Card.FontItalic then
+    if F.Italic then
       Style := DWRITE_FONT_STYLE_ITALIC;
   end;
-  Key := Format('%s|%g|%d|%d', [Family, Size, Ord(Weight), Ord(Style)]);
+  Key := Format('%s|%g|%d|%d|%s', [Family, Size, Ord(Weight), Ord(Style), BoolToStr(Wrap, True)]);
   FactoryLock.Enter;
   try
     if NoteFormats = nil then
@@ -331,13 +337,47 @@ begin
       Exit;
     if Failed(DWrite.CreateTextFormat(PWideChar(Family), nil, Weight, Style, DWRITE_FONT_STRETCH_NORMAL, Size, 'en-us',
       Result)) then
-      Exit(NoteFormat);   // a font that is not there: the items' font
-    Result.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
-    Result.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+      Exit(Plain);   // a font that is not there: the items' font
+    if Wrap then
+    begin
+      Result.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+      Result.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    end
+    else
+    begin
+      Result.SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+      Result.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    end;
     NoteFormats.Add(Key, Result);
   finally
     FactoryLock.Leave;
   end;
+end;
+
+// A note's text format: its font, wrapping.
+function NoteFormatOf(V: TViewCard): IDWriteTextFormat;
+begin
+  if V.Card = nil then
+    Exit(NoteFormat);
+  Result := FontFormat(V.Card.Font, True);
+end;
+
+// A divider label's text format: its font, one line.
+function DividerFormat(D: TLine): IDWriteTextFormat;
+begin
+  Result := FontFormat(D.DividerFont, False);
+end;
+
+// A divider's height: its own, else one with a label (as high as its font needs) or a plain line's.
+function DividerHeightOf(D: TLine): Single;
+begin
+  if (D <> nil) and (D.DividerHeight > 0) then
+    Exit(D.DividerHeight);
+  if (D = nil) or (D.DividerText = '') then
+    Exit(SeparatorHeight);
+  Result := DividerTextHeight;
+  if D.DividerFont.Own and (D.DividerFont.Size > 0) then
+    Result := Max(Result, D.DividerFont.Size * 1.4 + 8);
 end;
 
 // A note's text laid out in its box (width), aligned as the layout says; nil when it has no text.
@@ -460,7 +500,7 @@ begin
   if V.Kind = vkGroup then
     Result := GroupNeed(V)
   else if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
-    Result := TextWidth(V.Divider.DividerText, NormalFormat) + 48
+    Result := TextWidth(V.Divider.DividerText, DividerFormat(V.Divider)) + 48
   else if V.Kind = vkNote then
     Result := NoteWidth(V) + NoteLeft(V) - NotePad
   else if V.Kind <> vkSeparator then
@@ -775,9 +815,7 @@ begin
       // the line as high as its highest card
       if (N = 1) and (Row[0].Kind = vkSeparator) then
       begin
-        H := SeparatorHeight;
-        if (Row[0].Divider <> nil) and (Row[0].Divider.DividerText <> '') then
-          H := DividerTextHeight;
+        H := DividerHeightOf(Row[0].Divider);
       end
       else
       begin
@@ -1117,7 +1155,8 @@ begin
 end;
 
 // A divider with a text: the text left, in the middle or right, the line on the rest of the width.
-procedure DrawDividerText(T: ID2D1RenderTarget; D: TLine; const R: TD2D1RectF; Y: Single; Line, Text: ID2D1SolidColorBrush);
+procedure DrawDividerText(T: ID2D1RenderTarget; D: TLine; const R: TD2D1RectF; Y: Single; Line, Text: ID2D1SolidColorBrush;
+  Fmt: IDWriteTextFormat = nil);
 const
   Pad = 8;
   Gap = 6;
@@ -1126,18 +1165,20 @@ var
   Label_: string;
 begin
   Label_ := D.DividerText;
-  W := Min(TextWidth(Label_, NormalFormat), R.right - R.left - 4 * Pad);
+  if Fmt = nil then
+    Fmt := NormalFormat;
+  W := Min(TextWidth(Label_, Fmt), R.right - R.left - 4 * Pad);
   case D.DividerAlign of
     daCenter: X := (R.left + R.right - W) / 2;
     daRight: X := R.right - Pad - W;
   else
     X := R.left + Pad;
   end;
-  if X - Gap > R.left + Pad then
+  if (Line <> nil) and (X - Gap > R.left + Pad) then
     T.DrawLine(D2D1PointF(R.left + Pad, Y), D2D1PointF(X - Gap, Y), Line, 1);
-  if X + W + Gap < R.right - Pad then
+  if (Line <> nil) and (X + W + Gap < R.right - Pad) then
     T.DrawLine(D2D1PointF(X + W + Gap, Y), D2D1PointF(R.right - Pad, Y), Line, 1);
-  T.DrawText(PWideChar(Label_), Length(Label_), NormalFormat, D2D1RectF(X, R.top, X + W + 1, R.bottom), Text,
+  T.DrawText(PWideChar(Label_), Length(Label_), Fmt, D2D1RectF(X, R.top, X + W + 1, R.bottom), Text,
     D2D1_DRAW_TEXT_OPTIONS_CLIP);
 end;
 
@@ -1155,6 +1196,7 @@ procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer;
   const Look: TLook; const Marked: string; Editing: Boolean);
 var
   Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
+  DivLine, DivText: ID2D1SolidColorBrush;   // a divider's line and label, its own or the theme's
   Clear_: Boolean;                 // a see-through menu (no background): each card on an opaque base of its own
   Base: ID2D1SolidColorBrush;      // that base: the theme's card background, opaque
   BaseColor: TRGBA;
@@ -1258,11 +1300,34 @@ begin
     end;
     if V.Kind = vkSeparator then
     begin
+      // a divider: its own look over the theme's "divider" (plan 03 3.8): its background, its line's colour ("none":
+      // no line), its label's colour and font
       Y := Round((R.top + R.bottom) / 2) + 0.5;
+      DivLine := Sep;
+      DivText := LabelBrush;
+      if (V.Divider <> nil) and (V.Divider.DividerLook <> nil) then
+      begin
+        Own := V.Divider.DividerLook;
+        FillBackground(T, Theme, 'divider', 'normal', D2D1RectF(R.left + 2, R.top, R.right - 2, R.bottom),
+          Theme.Number('divider', 'normal', 'radius', 0, Own), Own, True);
+        if Own.GetValue('border') <> nil then
+        begin
+          BorderColor := Theme.Color('divider', 'normal', 'border', RGBA(0, 0, 0, 0), Own);
+          if BorderColor.A > 0 then
+            T.CreateSolidColorBrush(ToD2D(BorderColor), nil, DivLine)
+          else
+            DivLine := nil;
+        end;
+        if Own.GetValue('foreground') <> nil then
+          T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0), Own)), nil, DivText);
+      end;
       if (V.Divider = nil) or (V.Divider.DividerText = '') then
-        T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1)
+      begin
+        if DivLine <> nil then
+          T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), DivLine, 1);
+      end
       else
-        DrawDividerText(T, V.Divider, R, Y, Sep, LabelBrush);
+        DrawDividerText(T, V.Divider, R, Y, DivLine, DivText, DividerFormat(V.Divider));
       Continue;
     end;
     // a card's look (plan 03 3.6, 3.7): the theme's "item" when alone on its line, else its "card"; its own look from

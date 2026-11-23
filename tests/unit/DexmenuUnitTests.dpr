@@ -98,15 +98,23 @@ begin
     '{ "note": "b", "font": { "family": "Georgia", "size": 13, "italic": true }, "background": "#ffeecc" }, { "note": "c" }, ' +
     '{ "card": "D", "rules": [ { "name": { "equals": "x" } } ], "border3d": { "style": "inset" }, "shadow": { "blur": 4 } } ] }, ' +
     '{ "line": [ ' + Remaining + ' ] } ] }', 'test', NoteError);
-  Check((NoteLayout <> nil) and NoteLayout.Lines('')[0].Cards[0].FontExtra and not NoteLayout.Lines('')[0].Cards[0].FontOwn and
-    NoteLayout.Lines('')[0].Cards[1].FontOwn and (NoteLayout.Lines('')[0].Cards[1].FontFamily = 'Georgia') and
-    (NoteLayout.Lines('')[0].Cards[1].FontSize = 13) and NoteLayout.Lines('')[0].Cards[1].FontItalic and
-    not NoteLayout.Lines('')[0].Cards[1].FontBold and (NoteLayout.Lines('')[0].Cards[1].Look <> nil) and
-    not NoteLayout.Lines('')[0].Cards[2].FontExtra and not NoteLayout.Lines('')[0].Cards[2].FontOwn,
+  Check((NoteLayout <> nil) and NoteLayout.Lines('')[0].Cards[0].Font.Extra and not NoteLayout.Lines('')[0].Cards[0].Font.Own and
+    NoteLayout.Lines('')[0].Cards[1].Font.Own and (NoteLayout.Lines('')[0].Cards[1].Font.Family = 'Georgia') and
+    (NoteLayout.Lines('')[0].Cards[1].Font.Size = 13) and NoteLayout.Lines('')[0].Cards[1].Font.Italic and
+    not NoteLayout.Lines('')[0].Cards[1].Font.Bold and (NoteLayout.Lines('')[0].Cards[1].Look <> nil) and
+    not NoteLayout.Lines('')[0].Cards[2].Font.Extra and not NoteLayout.Lines('')[0].Cards[2].Font.Own,
     'a note''s font read: the extra text, its own (family, size, italic), the items'' when not given; its style kept');
   Check((NoteLayout <> nil) and (NoteLayout.Lines('')[0].Cards[3].Look <> nil) and
     (NoteLayout.Lines('')[0].Cards[3].Look.GetValue('border3d') <> nil) and (NoteLayout.Lines('')[0].Cards[3].Look.GetValue('shadow') <> nil),
     'a card''s 3D border and shadow kept in its look');
+  // a divider's own look (plan 03 3.8)
+  NoteLayout := ParseLayout('{ "format": 1, "lines": [ { "divider": "A", "height": 30, "border": "none", "foreground": "#ff0000", ' +
+    '"font": { "size": 14, "bold": true } }, { "divider": "" }, { "line": [ ' + Remaining + ' ] } ] }', 'test', NoteError);
+  Check((NoteLayout <> nil) and (NoteLayout.Lines('')[0].DividerHeight = 30) and (NoteLayout.Lines('')[0].DividerLook <> nil) and
+    (NoteLayout.Lines('')[0].DividerLook.GetValue('border') <> nil) and NoteLayout.Lines('')[0].DividerFont.Own and
+    (NoteLayout.Lines('')[0].DividerFont.Size = 14) and NoteLayout.Lines('')[0].DividerFont.Bold and
+    (NoteLayout.Lines('')[1].DividerHeight = 0) and (NoteLayout.Lines('')[1].DividerLook = nil) and
+    not NoteLayout.Lines('')[1].DividerFont.Own, 'a divider''s own height, colours and font read; none when not given');
   // a note's date and time placeholders (plan 03 3.6), at a fixed moment
   When := EncodeDate(2026, 11, 23) + EncodeTime(14, 5, 9, 0);
   Check(FillNote('{date:yyyy-MM-dd} {time:HH:mm}', When) = '2026-11-23 14:05', 'a note: {date:...} and {time:...} in Windows'' pictures');
