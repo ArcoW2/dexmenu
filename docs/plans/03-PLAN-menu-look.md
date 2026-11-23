@@ -250,7 +250,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 - **`next`:** a panel next to the card, its top level with the card's top, on the other side when there is no room;
   its own width (the level's), its own background from the theme's `panel`.
-- **`under`:** a panel below the card, starting at the card's middle, over the lines below it; the card it belongs to
+- **`under`:** a panel below the card, starting at the card's bottom edge, over the lines below it; the card it belongs to
   stays marked.
 - **`replace`:** the menu's own window shows the submenu: `<<` at the top, the level's width; the window resizes from
   its top-left corner.

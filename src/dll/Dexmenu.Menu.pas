@@ -445,9 +445,11 @@ begin
       SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(L.Opener.Node.SubMenu), 0);
     if L.Replaces then
     begin
-      // the level it replaced shows again
+      // the level it replaced shows again, and is active again when this one was
       ShowWindow(FLevels[I - 1].Wnd, SW_SHOWNOACTIVATE);
       FLevels[I - 1].Redraw;
+      if GetActiveWindow = L.Wnd then
+        SetActiveWindow(FLevels[I - 1].Wnd);
     end;
     FLevels.Delete(I);
   end;
@@ -526,17 +528,16 @@ begin
   if L.Replaces then
     AddBackLine(L.View, V);
   FLevels.Add(L);
-  L.Wnd := MakeWindow(L.Index, False);
+  L.Wnd := MakeWindow(L.Index, L.Replaces);   // one in place of the menu takes the activation over (below)
   SetWindowLongPtr(L.Wnd, GWLP_USERDATA, LONG_PTR(L));
 
-  // where it opens (plan 02 3.7): next to its card, under it from its middle (over the lines below), or in place of
-  // the menu
+  // where it opens (plan 02 3.7): next to its card, under it (over the lines below), or in place of the menu
   R := Parent.Geometry.Boxes[Box].Rect;
   case Mode of
     smUnder:
       begin
         X := Parent.Pos.X + Round((R.left + 16) * Parent.Scale);
-        Y := Parent.Pos.Y + Round(((R.top + R.bottom) / 2 - Parent.ScrollY) * Parent.Scale);
+        Y := Parent.Pos.Y + Round((R.bottom - Parent.ScrollY) * Parent.Scale);
       end;
     smReplace:
       begin
@@ -554,12 +555,18 @@ begin
   L.Scale := Dpi / 96 * FTextSize;
   L.Geometry := Measure(L.View, L.Index);
   FitOnScreen(L, X, Y, False, False, Parent.Pos.X + Round(R.left * Parent.Scale) + 2);
-  if L.Replaces then
-    ShowWindow(Parent.Wnd, SW_HIDE);
   if SelectFirst then
     MoveSelection(L, 1);
   L.Redraw;
   ShowWindow(L.Wnd, SW_SHOWNOACTIVATE);
+  if L.Replaces then
+  begin
+    // hiding the active level would hand the activation outside the menu, and that closes it (WM_ACTIVATE): the
+    // level in its place is made active first
+    if GetActiveWindow = Parent.Wnd then
+      SetActiveWindow(L.Wnd);
+    ShowWindow(Parent.Wnd, SW_HIDE);
+  end;
 end;
 
 procedure TMenuSession.MoveSelection(L: TLevelWindow; Delta: Integer);
@@ -1028,7 +1035,7 @@ function WndProc(Wnd: HWND; Msg: UINT; WP: WPARAM; LP: LPARAM): LRESULT; stdcall
 var
   L: TLevelWindow;
   S: TMenuSession;
-  Box, Delay: Integer;
+  Box, Delay, I: Integer;
   X, Y: Single;
   TME: TTrackMouseEvent;
   V: TViewCard;
@@ -1046,21 +1053,34 @@ begin
         X := SmallInt(LP and $FFFF) / L.Scale;
         Y := SmallInt((LP shr 16) and $FFFF) / L.Scale;
         Box := BoxAt(L.Geometry, X, Y, L.ScrollY);
+        // in a submenu: a change waiting in a level above is off, and the cards that opened it stay selected
+        if (S.FHoverTimerLevel >= 0) and (S.FHoverTimerLevel < L.Index) then
+        begin
+          KillTimer(S.FLevels[S.FHoverTimerLevel].Wnd, HoverTimer);
+          S.FHoverTimerLevel := -1;
+        end;
+        for I := 0 to L.Index - 1 do
+          if S.FLevels[I].Selected <> S.FLevels[I].BoxOfCard(S.FLevels[I + 1].Opener) then
+          begin
+            S.FLevels[I].Selected := S.FLevels[I].BoxOfCard(S.FLevels[I + 1].Opener);
+            S.FLevels[I].Redraw;
+          end;
         if Box <> L.Selected then
         begin
           L.Selected := Box;
           L.Redraw;
           S.HoverTip(L, Box);
           KillTimer(Wnd, HoverTimer);
-          if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu and S.OpensOnHover(L.Geometry.Boxes[Box].Card) then
+          // a submenu opens after the delay, and an open one closes only after it, so the mouse can cross another
+          // card on its way to the open submenu
+          if (Box >= 0) and ((L.Geometry.Boxes[Box].Card.HasSubmenu and S.OpensOnHover(L.Geometry.Boxes[Box].Card)) or
+            (S.FLevels.Count > L.Index + 1)) then
           begin
             Delay := 400;
             SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, @Delay, 0);
             S.FHoverTimerLevel := L.Index;
             SetTimer(Wnd, HoverTimer, Max(Delay, 1), nil);
-          end
-          else if (Box >= 0) and (S.FLevels.Count > L.Index + 1) then
-            S.CloseFrom(L.Index + 1);
+          end;
         end;
         TME.cbSize := SizeOf(TME);
         TME.dwFlags := TME_LEAVE;
@@ -1084,8 +1104,12 @@ begin
       else if WP = HoverTimer then
       begin
         KillTimer(Wnd, HoverTimer);
-        if (L.Selected >= 0) and L.Geometry.Boxes[L.Selected].Card.HasSubmenu then
-          S.Open(L.Index, L.Selected, False);
+        S.FHoverTimerLevel := -1;
+        if (L.Selected >= 0) and L.Geometry.Boxes[L.Selected].Card.HasSubmenu and
+          S.OpensOnHover(L.Geometry.Boxes[L.Selected].Card) then
+          S.Open(L.Index, L.Selected, False)
+        else if (L.Selected >= 0) and (S.FLevels.Count > L.Index + 1) then
+          S.CloseFrom(L.Index + 1);
       end;
     WM_LBUTTONUP:
       begin

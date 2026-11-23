@@ -54,7 +54,7 @@ the preview is the result.
 | Rules | cards with rules and cards with a menu; name, scope or path, match kinds, states, subitems following an item, the priority list, several found at the card's place, `also`, `consume`, `skipDuplicates`, hidden cards, the remaining card; submenus filled only when opened opened first for rules that look inside | 3.3; plan 00 6.5 |
 | Layout editing | the cards view and the rules view (priority list, draggable); dragging cards and dividers (onto a card, beside, above or below), the remaining card; preview and editor tied; comments, hints | 3.5; plan 00 6.5; plan 05 6.3 |
 | Layouts | saved under a name, JSON with comments, one menu per layout; which kinds use which layout: plan 05 | 3.4; 3.5; plan 05 |
-| Submenus | `next` (beside the card), `under` (from the card's middle, over the lines below), `replace` (in place of the menu, "<<" back, on a click only); on hover or only on a click; set for every menu (main window, settings.json `menu`) or per card (`submenus`); the same in the preview | 3.4; 3.7 |
+| Submenus | `next` (beside the card), `under` (below the card, over the lines below), `replace` (in place of the menu, "<<" back, on a click only); on hover or only on a click; set for every menu (main window, settings.json `menu`) or per card (`submenus`); the same in the preview | 3.4; 3.7 |
 | Edit menu | "Edit menu..." as a card a layout places (`"own": "editMenu"`; "+ Dexmenu" in the editor): the menu closes, the last right-click is written, the settings app starts on the layout in use (its editor, the preview on this right-click) | 3.6 |
 | Windows' menu | Shift held while right-clicking shows Windows' own menu (in Explorer its extended menu); "Windows' menu" as a card a layout places (`"own": "windowsMenu"`) closes Dexmenu's and shows Windows' at the same place; a layout that cannot be read: Windows' menu | 3.11 |
 | Global settings | in the main window, settings.json `menu`: how submenus open, only on a click, the marks (a submenu's: the chevron unless set; an item's: none unless set), a rule's default states (a change reads every layout again), the width per level (the menu, a first submenu, deeper: min and max). The most used row: with the use counts. Animation and the themes: plan 03 | 3.4 |
@@ -185,7 +185,7 @@ in the layout is where its items show.
 The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmenu\settings.json`.
 
 - **Opening submenus:** `next` (next to the item, as a classic menu), `under` (below the item, starting at its
-  middle, over the lines below it) or `replace` (the submenu takes the place of the menu; only on a click; a `<<`
+  bottom edge, over the lines below it) or `replace` (the submenu takes the place of the menu; only on a click; a `<<`
   item at its top goes back, as Esc does). A card or item can overrule it.
 - **Only on click:** submenus open only on a click, never on hover. `replace` is always on click.
 - **Marks:** the character shown on an action and the one shown on an item or card with a submenu (for example none
@@ -309,7 +309,7 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 
 - Three ways, from the global settings or a card's own (3.4):
   - `next`: a panel next to the item, as a classic menu.
-  - `under`: below the item, starting at the item's middle, lying over the lines below it.
+  - `under`: below the item, starting at the item's bottom edge, lying over the lines below it.
   - `replace`: the submenu takes the place of the menu, on a click only, with `<<` at the top; `<<` and Esc go back a
     level. The path can show at the top.
 - On hover or on click: on hover unless "only on click" is set; `replace` always on click.

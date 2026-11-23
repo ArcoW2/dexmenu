@@ -39,7 +39,7 @@ type
   end;
 
   TNoteAlign = (naLeft, naText, naCenter, naRight);   // a note's text: left, with the items' text, center, right
-  // How a submenu opens (plan 02 3.4, 3.7): as the global setting, next to its card, under it (from its middle), or
+  // How a submenu opens (plan 02 3.4, 3.7): as the global setting, next to its card, under it, or
   // in place of the menu (with "<<" back)
   TSubmenuMode = (smDefault, smNext, smUnder, smReplace);
 

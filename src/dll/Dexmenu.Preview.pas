@@ -66,6 +66,7 @@ type
     Opener: TViewCard;
     Replaces: Boolean;     // opened in place of the level before it (that one not shown; "<<" back)
     destructor Destroy; override;
+    function BoxOfCard(V: TViewCard): Integer;
   end;
 
   TPreview = class
@@ -85,6 +86,7 @@ type
     Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): the most used row
     Tip: TTip;
     TipLevel, TipBox: Integer;
+    HoverLevel: Integer;   // the level whose submenu change waits for the hover timer; -1: none
     function Hidden(Index: Integer): Boolean;
     procedure ShowTip;
     constructor Create;
@@ -110,10 +112,21 @@ begin
   inherited;
 end;
 
+function TPreviewLevel.BoxOfCard(V: TViewCard): Integer;
+var
+  I: Integer;
+begin
+  for I := 0 to High(Geometry.Boxes) do
+    if Geometry.Boxes[I].Card = V then
+      Exit(I);
+  Result := -1;
+end;
+
 constructor TPreview.Create;
 begin
   inherited;
   Levels := TObjectList<TPreviewLevel>.Create;
+  HoverLevel := -1;
 end;
 
 destructor TPreview.Destroy;
@@ -229,7 +242,7 @@ begin
     ReadChildren(V.Node);
     L.View := Placement.SubmenuLevel(V.Node);
   end;
-  // as at a right-click (Dexmenu.Menu): next to its card, under it from its middle, or in place of the menu
+  // as at a right-click (Dexmenu.Menu): next to its card, under it, or in place of the menu
   Mode := SubmenuModeOf(V, Settings);
   L.Replaces := Mode = smReplace;
   if L.Replaces then
@@ -240,7 +253,7 @@ begin
     smUnder:
       begin
         L.X := Parent.X + R.left + 16;
-        L.Y := Parent.Y + (R.top + R.bottom) / 2;
+        L.Y := Parent.Y + R.bottom;
       end;
     smReplace:
       begin
@@ -413,7 +426,7 @@ var
   PS: TPaintStruct;
   DC: HDC;
   X, Y, S: Single;
-  Index, Box, Delay: Integer;
+  Index, Box, Delay, I: Integer;
   L: TPreviewLevel;
   TME: TTrackMouseEvent;
 begin
@@ -440,6 +453,19 @@ begin
           if Index < 0 then
             Exit;
           L := P.Levels[Index];
+          // in a submenu: a change waiting in a level above is off, and the cards that opened it stay selected
+          // (as at a right-click, Dexmenu.Menu)
+          if (P.HoverLevel >= 0) and (P.HoverLevel < Index) then
+          begin
+            KillTimer(Wnd, HoverTimer);
+            P.HoverLevel := -1;
+          end;
+          for I := 0 to Index - 1 do
+            if P.Levels[I].Selected <> P.Levels[I].BoxOfCard(P.Levels[I + 1].Opener) then
+            begin
+              P.Levels[I].Selected := P.Levels[I].BoxOfCard(P.Levels[I + 1].Opener);
+              Redraw(P);
+            end;
           if Box <> L.Selected then
           begin
             L.Selected := Box;
@@ -453,15 +479,17 @@ begin
             if (Box >= 0) and Assigned(P.Callback) then
               P.Callback(1, PWideChar(L.Geometry.Boxes[Box].Card.CardId), L.Geometry.Boxes[Box].Card.RuleIndex);
             KillTimer(Wnd, HoverTimer);
-            if (Box >= 0) and L.Geometry.Boxes[Box].Card.HasSubmenu and not P.Settings.OnClickOnly and
-              (SubmenuModeOf(L.Geometry.Boxes[Box].Card, P.Settings) <> smReplace) then
+            P.HoverLevel := -1;
+            // a submenu opens after the delay, and an open one closes only after it, so the mouse can cross another
+            // card on its way to the open submenu
+            if (Box >= 0) and ((L.Geometry.Boxes[Box].Card.HasSubmenu and not P.Settings.OnClickOnly and
+              (SubmenuModeOf(L.Geometry.Boxes[Box].Card, P.Settings) <> smReplace)) or (P.Levels.Count > Index + 1)) then
             begin
               Delay := 400;
               SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, @Delay, 0);
+              P.HoverLevel := Index;
               SetTimer(Wnd, HoverTimer, Max(Delay, 1), nil);
-            end
-            else if Box >= 0 then
-              P.CloseFrom(Index + 1);
+            end;
             Redraw(P);
           end;
           TME.cbSize := SizeOf(TME);
@@ -485,15 +513,17 @@ begin
         else
         begin
           KillTimer(Wnd, HoverTimer);
-          for Index := P.Levels.Count - 1 downto 0 do
+          Index := P.HoverLevel;
+          P.HoverLevel := -1;
+          if (Index >= 0) and (Index < P.Levels.Count) and (P.Levels[Index].Selected >= 0) then
           begin
             L := P.Levels[Index];
-            if (L.Selected >= 0) and L.Geometry.Boxes[L.Selected].Card.HasSubmenu then
-            begin
-              P.Open(Index, L.Selected);
-              Redraw(P);
-              Break;
-            end;
+            if L.Geometry.Boxes[L.Selected].Card.HasSubmenu and not P.Settings.OnClickOnly and
+              (SubmenuModeOf(L.Geometry.Boxes[L.Selected].Card, P.Settings) <> smReplace) then
+              P.Open(Index, L.Selected)
+            else
+              P.CloseFrom(Index + 1);
+            Redraw(P);
           end;
         end;
       WM_LBUTTONUP:
