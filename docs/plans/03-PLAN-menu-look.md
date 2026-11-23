@@ -61,6 +61,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
 | Preview marks | striped unavailable items, new | -- | 3.10 |
 | Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient | Menu window | 3.6 |
+| Note style | a note's own style (background, text colour, border, radius, as a card's) and its font: the items' text, the smaller extra text, or a font of its own (family, size, bold, italic) | -- | 3.6 |
 | 3D border | a card's border raised (outset) or sunk (inset), lit from an angle, and a shadow at a distance in a colour; in the card panel's Style | -- | 3.6 |
 | Tests | 3.11 | -- | 3.11 |
 
@@ -244,6 +245,12 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - **An action or a submenu:** the same card; the mark and the click differ (an item, or a card with a menu or an
   item with a Windows submenu).
 
+- **A note's style:** a note (plan 02 3.3) gets what a card has of its look: background, text colour (now always
+  the dim colour), border, radius, and 3D border and shadow when they come; and its font: `"font": "text"` (the
+  items' text, the default), `"extra"` (the smaller text of a card's extra text) or its own
+  (`{ "family": "Segoe UI", "size": 11, "bold": true, "italic": false }`, each part optional, the items' font for
+  what is not given). In the card panel a note gets the Style panel and a Font field beside its text; its style is
+  copied and pasted as a card's.
 - **A 3D border:** besides a flat border, a card's border can look raised (`outset`) or sunk (`inset`): its edges
   on the light side drawn in a light colour, those on the other side in a shadow colour, the light coming from an
   angle (degrees, 135 when not given: from the top left). And a shadow: the card's shape in a colour, at a distance
@@ -332,6 +339,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
    Windows' classic buttons), with the shadow apart (the card's shape under it at a distance), as planned; or as
    shadows (an outer shadow for outset, an inner one for inset, as CSS box-shadow)?
 2. The shadow's blur (soft edges): wanted, or a sharp shadow only?
+3. A note's own font: family, size, bold and italic, as planned; or more (a colour per note is in its style
+   already, underline, letter spacing)?
 
 ## 6. As built
 
