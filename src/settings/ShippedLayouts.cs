@@ -318,6 +318,7 @@ static class ShippedLayouts
                   {
                     "id": "archive",
                     "card": "Archive",
+                    "title": "Archive",
                     "rules": [
                       {
                         "name": {
@@ -330,6 +331,7 @@ static class ShippedLayouts
                   {
                     "id": "code",
                     "card": "Code",
+                    "title": "Code",
                     "rules": [
                       {
                         "name": {
@@ -350,6 +352,7 @@ static class ShippedLayouts
                   {
                     "id": "git",
                     "card": "Git",
+                    "title": "Git",
                     "rules": [
                       {
                         "name": {
@@ -362,6 +365,7 @@ static class ShippedLayouts
                   {
                     "id": "svn",
                     "card": "SVN",
+                    "title": "SVN",
                     "rules": [
                       {
                         "name": {

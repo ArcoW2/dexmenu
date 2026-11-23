@@ -92,6 +92,10 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
     `"actionItem"` (something in it does something when chosen: an item, a card with a submenu holding one; not a
     note). Dividers never count. Not shown, the card and all it holds are left out. A card with rules that finds
     nothing and holds nothing is not shown, as now, whatever this says.
+  - A card showing its found items or the cards it holds inside it (`row`, `column`) has a title above them only
+    when it has one (`title`); its name is never shown in its place. In the editor the title starts as its name when
+    the card is set to show them inside it, and follows the name while the two are the same; an empty title shows
+    none.
   - A card holding cards (`row`, `column`) has every style a card has: background (a colour, a gradient), text
     colour, border, radius, and its `hover` and `pressed` looks; its `hover` look shows while the mouse is over
     anything inside it. Its title, when it has one (`title`), stands above its content: as a card's title, or with
@@ -242,3 +246,16 @@ None.
   `%APPDATA%\Dexmenu\layouts-format1-backup`) and compared: the same boxes in every kind.
 - Tested: the editor's self-test, its fixtures written as format 2 (every move, drop, delete, divider and paste check
   as before, the older form refused); the unit tests; the editor rendered with the converted "First"; `--compare`.
+
+### 6.3 Later changes
+
+- A card's title above what it shows inside it: only its own `title` (the name no longer stands in, nor the item it
+  unfolded); the editor fills the title from the name when Shows is set to side by side or under each other, and a
+  title equal to the name follows a new name. Default B's program cards got their names as titles (shipped and the
+  user's copy).
+- The editor has Undo and Redo (buttons, Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) over every change of the window's session;
+  Delete removes the selected card only after a click in the cards view.
+- A template has its own right-click menu (Copy style, Paste style) and is the target of Ctrl+Shift+C / V when
+  selected; before, the menu was its card's and pasted there.
+- Tested: the unit tests (no title without one); the editor page in a browser (delete, undo, redo; a style pasted
+  onto a template; a renamed name followed by its title).

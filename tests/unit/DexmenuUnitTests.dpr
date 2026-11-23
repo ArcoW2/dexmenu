@@ -1826,14 +1826,14 @@ begin
       Titles := '';
       for B in InnerOf(Zip) do
         Titles := Titles + B.Title + ';';
-      Check((Zip.Title = '7-Zip') and (Titles = 'Add to archive...;Extract here;CRC SHA;'),
-        '7-Zip unfolded into its items, the card titled with it: ' + Zip.Title + ' ' + Titles);
+      Check((Zip.Title = '') and (Titles = 'Add to archive...;Extract here;CRC SHA;'),
+        '7-Zip unfolded into its items; no title of its own, none shown (not its name): ' + Zip.Title + ' ' + Titles);
       Check((Length(InnerOf(Zip)) = 3) and InnerOf(Zip)[2].HasSubmenu and not InnerOf(Zip)[0].HasSubmenu,
         'a button with a submenu of its own opens it');
       Titles := '';
       for B in InnerOf(Lex) do
         Titles := Titles + B.Title + ';';
-      Check((Lex.Title = 'LexPen') and (Titles = 'Edit in LexPen;View in LexPen;'),
+      Check((Lex.Title = '') and (Titles = 'Edit in LexPen;View in LexPen;'),
         'found items without a submenu: each a button, the card''s title: ' + Lex.Title + ' ' + Titles);
       Check(not Zip.Enabled and (Zip.LookCard <> nil) and (InnerOf(Zip)[0].LookCard = nil),
         'the card is no button; its buttons take the theme''s look, not the card''s');
@@ -1854,8 +1854,8 @@ begin
       Inside := BoxAt(G, (G.Boxes[ZipBox + 1].Rect.left + G.Boxes[ZipBox + 1].Rect.right) / 2,
         (G.Boxes[ZipBox + 1].Rect.top + G.Boxes[ZipBox + 1].Rect.bottom) / 2, 0);
       Check(Inside = ZipBox + 1, 'a point on a button hits the button');
-      Check(BoxAt(G, G.Boxes[ZipBox].Rect.left + 8, G.Boxes[ZipBox].Rect.top + 8, 0) = -1,
-        'a point on the card''s title hits nothing');
+      Check(BoxAt(G, G.Boxes[ZipBox].Rect.left + 2, G.Boxes[ZipBox].Rect.top + 2, 0) = -1,
+        'a point on the card''s own edge (around its buttons) hits nothing');
     finally
       Level.Free;
     end;

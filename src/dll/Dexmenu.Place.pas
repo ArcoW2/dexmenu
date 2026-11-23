@@ -1165,9 +1165,8 @@ begin
   Result.BackTitle := Card.ShownTitle;
 end;
 
-// What a card's rules found shown inside it as inner cards (plan 11 3.1): nil when it found nothing. Framed, its title
-// above them: its own title, else the item it unfolded when that was all it found, else its name (as format 1's
-// buttons).
+// What a card's rules found shown inside it as inner cards (plan 11 3.1): nil when it found nothing. Framed; its title
+// above them only when it has one ("title"; its name is not shown).
 function FoundView(P: TPlacement; Card: TCard): TViewCard;
 var
   Cards: TObjectList<TViewCard>;
@@ -1185,12 +1184,7 @@ begin
   Result.Card := Card;
   Result.Inner := Arrange(Card, Cards, True);
   Result.Framed := True;
-  if Card.ShownTitle <> '' then
-    Result.BackTitle := Card.ShownTitle
-  else if Unfolded <> nil then
-    Result.BackTitle := Unfolded.Name
-  else
-    Result.BackTitle := Card.Title;
+  Result.BackTitle := Card.ShownTitle;
 end;
 
 function PlaceLines(P: TPlacement; Lines: TLines): TViewLevel;

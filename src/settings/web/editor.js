@@ -93,7 +93,45 @@ function changed() {
   $("dirty").hidden = false;
   const text = JSON.stringify(layout, null, 2);
   if (text !== lastSent) { lastSent = text; post({ type: "edit", layout: text }); }
+  remember(text);
   render();
+}
+
+// ---- undo and redo: every change kept (the layout as text), this window's session -----------------------------------
+
+let history = [];   // the layout after each change, the last the current one
+let future = [];    // what Undo took back, for Redo
+const historySize = 200;
+
+function remember(text) {
+  if (history[history.length - 1] === text) return;
+  history.push(text);
+  if (history.length > historySize) history.shift();
+  future = [];
+}
+
+// The layout as it was (Undo) or again (Redo): drawn, sent to the preview, not saved until Save.
+function restore(text) {
+  layout = JSON.parse(text);
+  lastSent = text;
+  dirty = true;
+  $("dirty").hidden = false;
+  post({ type: "edit", layout: text });
+  if (selectedId && !M.find(linesOf(), selectedId.replace(/~t\d+$/, ""))) selectedId = null;
+  render();
+}
+
+function undo() {
+  if (!layout || history.length < 2) return;
+  future.push(history.pop());
+  restore(history[history.length - 1]);
+}
+
+function redo() {
+  if (!layout || !future.length) return;
+  const text = future.pop();
+  history.push(text);
+  restore(text);
 }
 
 // ---- the cards view --------------------------------------------------------------------------------------------
@@ -245,6 +283,17 @@ function renderTemplates(card) {
     });
     chip.append(x);
     chip.addEventListener("click", e => { e.stopPropagation(); select(id, -1); });
+    // its own right-click menu (not its card's): its style copied, or a copied style pasted onto it
+    chip.addEventListener("contextmenu", async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      select(id, -1);
+      const x = e.clientX, y = e.clientY;
+      const type = await clipboardType();
+      showContextMenu(x, y, [
+        ["Copy style", "This template's background, text colour, border, radius, hover look, height, square, wrap and fit (Ctrl+Shift+C)", copyStyle],
+        ["Paste style", "The copied style onto this template: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style"]]);
+    });
     box.append(chip);
   });
   const add = el("button", "", "+ Template");
@@ -957,7 +1006,9 @@ function cardTop(card) {
   const top = el("div", "card-top");
   const own = M.isOwn(card);
   const name = textField(own ? "Title" : "Name", card.card, v => {
+    const before = card.card;
     card.card = v || (own ? (card.own === "windowsMenu" ? "Windows' menu" : "Edit menu...") : "Card");
+    if (card.title !== undefined && card.title === before) card.title = card.card;   // a title that was the name follows it
     changed();
   });
   top.append(name);
@@ -1221,7 +1272,11 @@ function showFields(card, withRules) {
     ? [["", "each a card of its own (the card multiplied)"], ["submenu", "in a submenu"], ["row", "side by side inside it"], ["column", "under each other inside it"]]
     : [["submenu", "in a submenu"], ["row", "side by side inside it"], ["column", "under each other inside it"]];
   fields.push(select("Shows", withRules ? "How what its rules find shows" : "How the cards it holds show", shows,
-    card.show || (withRules ? "" : "column"), v => { if (v) card.show = v; else delete card.show; }));
+    card.show || (withRules ? "" : "column"), v => {
+      if (v) card.show = v; else delete card.show;
+      // shown inside it: its title above them is its own; it starts as its name (an empty title shows none)
+      if ((v === "row" || v === "column") && card.title === undefined) card.title = card.card;
+    }));
   const number = (key, label, placeholder) => textField(label, card[key] === undefined ? "" : String(card[key]), v => {
     const n = Math.round(Number(v.trim()));
     if (v.trim() && n >= 1) card[key] = n; else delete card[key];
@@ -1265,6 +1320,12 @@ function extraAtField(card) {
 
 // The selected card (not the remaining card, which has no style of its own), or null.
 function styledCard() {
+  // a template selected (plan 11): the template itself, not its card
+  const tm = /^(.*)~t(\d+)$/.exec(selectedId || "");
+  if (tm) {
+    const holder = M.find(linesOf(), tm[1]);
+    return holder && Array.isArray(holder.card.templates) ? holder.card.templates[+tm[2]] || null : null;
+  }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
   return at && !M.isRemaining(at.card) ? at.card : null;
 }
@@ -1535,6 +1596,8 @@ function load(state) {
   dirty = false;
   $("dirty").hidden = true;
   lastSent = JSON.stringify(layout, null, 2);
+  history = [lastSent];   // a layout opened (or read again): Undo goes back no further
+  future = [];
   if (older) {
     // an older file brought to the current form: a change, written with the next Save (nothing else rewrites it)
     lastSent = "";
@@ -1735,10 +1798,18 @@ $("pvPick").addEventListener("click", () => post({ type: "pickFolder" }));
 $("pvNoFolder").addEventListener("click", () => post({ type: "noFolder" }));
 $("pvItem").addEventListener("change", () => post({ type: "pickItems", names: [$("pvItem").value] }));
 $("pvLast").addEventListener("click", () => post({ type: "last" }));
+// Where the last click was: Delete removes the selected card only when that was in the cards view (a Delete meant for
+// a field's text, with the field not focused, then deletes nothing).
+let lastClickInCards = false;
+document.addEventListener("mousedown", e => { lastClickInCards = !!e.target.closest("#cardsPane"); }, true);
+$("undo").addEventListener("click", undo);
+$("redo").addEventListener("click", redo);
 document.addEventListener("keydown", async e => {
   const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
-  if (typing || !layout) return;
-  if (e.key === "Delete" && selectedId && M.deleteCard(linesOf(), selectedId)) {
+  if (typing || !layout) return;   // in a field its own undo (Ctrl+Z) and Delete
+  if (e.ctrlKey && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if (e.ctrlKey && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
+  if (e.key === "Delete" && lastClickInCards && selectedId && M.deleteCard(linesOf(), selectedId)) {
     selectedId = null;
     changed();
     return;
