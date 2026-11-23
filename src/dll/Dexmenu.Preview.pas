@@ -816,15 +816,71 @@ begin
     StrPLCopy(Buffer, Text, Chars - 1);
 end;
 
+// The cards holding a layout card in a submenu, from the top down (each a card showing what it holds in a submenu);
+// False when the card is not in these lines.
+function SubmenuPath(Lines: TLines; const Id: string; Path: TList<TCard>): Boolean;
+var
+  Line: TLine;
+  Card: TCard;
+begin
+  Result := False;
+  if Lines = nil then
+    Exit;
+  for Line in Lines do
+    for Card in Line.Cards do
+    begin
+      if Card.Id = Id then
+        Exit(True);
+      if Card.Menu <> nil then
+      begin
+        if Card.Shows = csSubmenu then
+          Path.Add(Card);
+        if SubmenuPath(Card.Menu, Id, Path) then
+          Exit(True);
+        if Card.Shows = csSubmenu then
+          Path.Delete(Path.Count - 1);
+      end;
+    end;
+end;
+
 procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;
 var
   P: TPreview;
+  Path: TList<TCard>;
+  I, B, Found: Integer;
 begin
   P := PreviewOf(Wnd);
   if P = nil then
     Exit;
   P.Marked := CardId;
-  InvalidateRect(Wnd, nil, False);
+  // a card inside a submenu (in a card showing what it holds in a submenu): the submenus on the way to it opened, as
+  // a click on each would (one open already stays); nothing closed for a card at the top
+  if (P.Layout <> nil) and (P.Levels.Count > 0) and (P.Search = '') then
+  begin
+    Path := TList<TCard>.Create;
+    try
+      if SubmenuPath(P.Layout.Lines(P.Kind), CardId, Path) then
+        for I := 0 to Path.Count - 1 do
+        begin
+          if I >= P.Levels.Count then
+            Break;
+          if (P.Levels.Count > I + 1) and (P.Levels[I + 1].Opener <> nil) and (P.Levels[I + 1].Opener.Card = Path[I]) and
+            not P.Levels[I + 1].Opener.IsMore then
+            Continue;   // open already
+          Found := -1;
+          for B := 0 to High(P.Levels[I].Geometry.Boxes) do
+            with P.Levels[I].Geometry.Boxes[B] do
+              if (Card.Kind = vkMenu) and (Card.Card = Path[I]) and not Card.IsMore then
+                Found := B;
+          if Found < 0 then
+            Break;   // not shown (left out, or the menu searched)
+          P.Open(I, Found);
+        end;
+    finally
+      Path.Free;
+    end;
+  end;
+  Redraw(P);   // as after a click: the preview drawn again, its size following the levels open
 end;
 
 end.

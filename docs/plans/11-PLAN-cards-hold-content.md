@@ -297,3 +297,7 @@ None.
   another card with rules (the card's right-click menu "Paste template", or Ctrl+V with the card or one of its
   templates selected): a copy added to that card's templates, through the clipboard, so also in another layout.
   Tested in the editor's self-test (pasted as a copy; not onto the remaining card or a card holding cards).
+- A card selected in the editor that sits inside a submenu (in cards showing what they hold in a submenu) has the
+  preview open the submenus on the way to it (`DexmenuPreviewMark`), as clicks on them would; one open already stays,
+  and nothing closes for a card at the top. Tested by driving the preview from a script: a card two submenus deep
+  marked, both submenus open and the card shown in the third level.
