@@ -52,6 +52,8 @@ const
   Margin = 16;   // DIP around the menu in the preview
   HoverTimer = 1;
   TipTimer = 2;
+  BlinkTimer = 3;   // the selected card's outline on and off, half a second each
+  BlinkMs = 500;
   SPI_GETMENUSHOWDELAY = $006A;
 
 function GetDpiForWindow(Wnd: HWND): UINT; stdcall; external user32 name 'GetDpiForWindow';
@@ -80,6 +82,7 @@ type
     Levels: TObjectList<TPreviewLevel>;
     Callback: TPreviewCallback;
     Marked: string;
+    MarkOn: Boolean;   // the outline's blink: shown now
     Settings: TMenuSettings;   // how submenus open (settings.json "menu"), read at each rebuild
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
     Search: string;                       // typed into the preview's search (plan 02 3.6); '' : none
@@ -385,7 +388,10 @@ begin
         finally
           P.Free;
         end;
-      P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked, True);
+      if MarkOn then
+        P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked, True)
+      else
+        P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, '', True);
       try
         P.PaintOnto(MemDC, Round(L.X * S), Round(L.Y * S));
       finally
@@ -578,7 +584,12 @@ begin
             P.Tip.Hide;
         end;
       WM_TIMER:
-        if WP = TipTimer then
+        if WP = BlinkTimer then
+        begin
+          P.MarkOn := not P.MarkOn;
+          InvalidateRect(Wnd, nil, False);
+        end
+        else if WP = TipTimer then
         begin
           KillTimer(Wnd, TipTimer);
           P.ShowTip;
@@ -915,12 +926,19 @@ procedure TPreview.OpenTo(const CardId: string);
 var
   Path: TList<TCard>;
   I, B, Found: Integer;
+  Id: string;
+  Template: Boolean;
 begin
   if (Layout = nil) or (Levels.Count = 0) or (Search <> '') then
     Exit;
+  // a template ("<card id>~t<n>"): the way to its card, and the card's own submenu when what it found shows there
+  Id := CardId;
+  Template := Pos('~t', CardId) > 0;
+  if Template then
+    Id := Copy(CardId, 1, Pos('~t', CardId) - 1);
   Path := TList<TCard>.Create;
   try
-    if SubmenuPath(Layout.Lines(Kind), CardId, Path) then
+    if SubmenuPath(Layout.Lines(Kind), Id, Path) then
       for I := 0 to Path.Count - 1 do
       begin
         if I >= Levels.Count then
@@ -937,6 +955,18 @@ begin
           Break;   // not shown (left out, or the menu searched)
         Open(I, Found);
       end;
+    if Template and (Levels.Count = Path.Count + 1) then
+    begin
+      I := Levels.Count - 1;
+      for B := 0 to High(Levels[I].Geometry.Boxes) do
+        with Levels[I].Geometry.Boxes[B] do
+          if (Card.Kind = vkMenu) and (Card.CardId = Id) and not Card.IsMore and not Card.InGroup then
+          begin
+            if not ((Levels.Count > I + 1) and (Levels[I + 1].Opener = Card)) then
+              Open(I, B);
+            Break;
+          end;
+    end;
   finally
     Path.Free;
   end;
@@ -950,6 +980,12 @@ begin
   if P = nil then
     Exit;
   P.Marked := CardId;
+  // the outline blinks, starting shown (a new selection at once in view)
+  P.MarkOn := True;
+  if P.Marked <> '' then
+    SetTimer(Wnd, BlinkTimer, BlinkMs, nil)
+  else
+    KillTimer(Wnd, BlinkTimer);
   P.OpenTo(CardId);
   Redraw(P);   // as after a click: the preview drawn again, its size following the levels open
 end;

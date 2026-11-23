@@ -568,9 +568,13 @@ None.
 
 ### 6.15 The preview's outline of the selected card; sub-options as a tree
 
-- The card selected in the editor is outlined in the preview in red (the theme's `card.marked.border`), 2.5 DIP
-  outside each of its boxes on every side (5 wider and higher than the card), clear of the card's own border; drawn
-  after every card and outside the cards' clip, so no card covers it. Checked in the preview captured as a picture.
+- What is selected in the editor is outlined in the preview in red (the theme's `card.marked.border`), 5 DIP outside
+  each box on every side, clear of the card's own border; drawn after every card and outside the cards' clip, so no
+  card covers it. A card: only its own boxes, not the inner cards made for what it found. A template (the editor marks
+  `<card id>~t<n>`): the inner cards that follow it; the preview opens the way to its card and the card's own submenu
+  when its items show there. The outline blinks, half a second on and half off, starting on at a new selection.
+  Checked by driving the preview from a script: the row card outlined alone; its second template outlined on the one
+  inner card that uses it; the outline's red pixels sampled over 1.6 s, on, off and on again.
 - In the card panel every option with options of its own shows them under it with a tree line: Shows (per row, rows,
   the rest, templates picked), Rename (replace with), Extra text (placed), Hint regex (replace with), Font (family,
   size, bold, italic), 3D border, Shadow.

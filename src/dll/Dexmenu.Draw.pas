@@ -938,6 +938,7 @@ end;
 // away from the light, under the card; a blur softens its edge over that many DIP (rings of growing size, each adding
 // a little of the colour). Drawn inside the menu's clip only: never outside the menu window's background.
 const
+  MarkGap = 5;    // the editor's selected card outlined this far outside it in the preview (DIP)
   MaxBlur = 16;   // a shadow's blur at most (DIP): one ring per DIP
 
 procedure DrawShadow(T: ID2D1RenderTarget; Theme: TTheme; Own: TJSONObject; const R: TD2D1RectF; Radius: Single);
@@ -1366,6 +1367,8 @@ var
   Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
   DivLine, DivText: ID2D1SolidColorBrush;   // a divider's line and label, its own or the theme's
   Outline: ID2D1SolidColorBrush;            // the editor's selected card's outline (the preview)
+  MarkId: string;                           // its card's id
+  MarkTemplate: Integer;                    // the template selected (its index), or -1: the card itself
   Track, Thumb: Single;                     // the scrollbar of a level taller than shown
   Clear_: Boolean;                 // a see-through menu (no background): each card on an opaque base of its own
   Base: ID2D1SolidColorBrush;      // that base: the theme's card background, opaque
@@ -1751,15 +1754,31 @@ begin
     T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(G.Width - 6, Y, G.Width - 3, Y + Thumb), 1.5, 1.5), Dim);
     Dim.SetOpacity(1);
   end;
-  // the boxes of the card selected in the settings app's editor (the preview only): a red outline around each, 2.5 DIP
+  // what is selected in the settings app's editor (the preview only): a card, its own boxes (not the inner cards made
+  // for what it found); a template ("<card id>~t<n>"), the inner cards that follow it. A red outline around each, 5 DIP
   // outside it on every side, so it stays clear of the card's own border; drawn after every card, so none covers it
   if Marked <> '' then
   begin
     T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'marked', 'border', RGBA($E0, $20, $20), nil)), nil, Outline);
+    MarkId := Marked;
+    MarkTemplate := -1;
+    if Pos('~t', Marked) > 0 then
+    begin
+      MarkId := Copy(Marked, 1, Pos('~t', Marked) - 1);
+      MarkTemplate := StrToIntDef(Copy(Marked, Pos('~t', Marked) + 2, MaxInt), -1);
+    end;
     for I := 0 to High(G.Boxes) do
     begin
       V := G.Boxes[I].Card;
-      if V.CardId <> Marked then
+      if V.CardId <> MarkId then
+        Continue;
+      if MarkTemplate < 0 then
+      begin
+        if V.InGroup then
+          Continue;   // an inner card: the template's, not the card's own
+      end
+      else if not V.InGroup or (V.Template = nil) or (V.Card.Templates = nil) or
+        (MarkTemplate >= V.Card.Templates.Count) or (V.Template <> V.Card.Templates[MarkTemplate]) then
         Continue;
       R := G.Boxes[I].Rect;
       R.top := R.top - ScrollY;
@@ -1769,9 +1788,9 @@ begin
       Own := nil;
       if V.LookCard <> nil then
         Own := V.LookCard.Look;
-      CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius, Own) + 2.5;
-      T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2 - 2.5, R.top + 1 - 2.5, R.right - 2 + 2.5,
-        R.bottom - 1 + 2.5), CardRadius, CardRadius), Outline, 1.5);
+      CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius, Own) + MarkGap;
+      T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2 - MarkGap, R.top + 1 - MarkGap, R.right - 2 + MarkGap,
+        R.bottom - 1 + MarkGap), CardRadius, CardRadius), Outline, 1.5);
     end;
   end;
 end;
