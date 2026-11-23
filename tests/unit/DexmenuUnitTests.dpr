@@ -1535,6 +1535,207 @@ begin
         Result := Result + [C];
 end;
 
+// Cards holding content (docs/plans/11-PLAN-cards-hold-content.md): format 2; holders in a row and a column, with
+// limits and the rest in "More" or left out; shownWhen; templates by position and by rule; found items in a submenu;
+// square; the holder's boxes inside.
+procedure TestHolders;
+const
+  Rest = '{ "card": "Rest", "rules": [ "remaining" ] }';
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Error: string;
+
+  // the top level of a format 2 layout with this content (and the remaining card), at a right-click or in the preview
+  function Level(const Content: string; out P: TPlacement; AtRightClick: Boolean = True): TViewLevel;
+  var
+    Layout: ILayout;
+  begin
+    Result := nil;
+    P := nil;
+    Layout := ParseLayout('{ "format": 2, "menu": { "content": [ ' + Content + ', ' + Rest + ' ] } }', 'test', Error);
+    if Layout = nil then
+      Exit;
+    P := TPlacement.Create(Layout, 'default', Top);
+    P.AtRightClick := AtRightClick;
+    Result := P.TopLevel;
+  end;
+
+  function Titles(const Cards: TArray<TViewCard>): string;
+  var
+    C: TViewCard;
+  begin
+    Result := '';
+    for C in Cards do
+      Result := Result + C.Title + ';';
+  end;
+
+  function Card(const Name, Rule: string; const More: string = ''): string;
+  begin
+    Result := '{ "card": "' + Name + '", "rules": [ ' + Rule + ' ]' + More + ' }';
+  end;
+
+var
+  P: TPlacement;
+  L, Sub: TViewLevel;
+  V: TViewCard;
+  G: TGeometry;
+  I, Box: Integer;
+  Inside: Boolean;
+begin
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  try
+    // a row holder without a style: what a line was; its cards side by side inside it, drawn as nothing itself
+    L := Level('{ "card": "Row", "show": "row", "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" } }') + ', ' +
+      Card('Copy', '{ "name": { "equals": "Copy" } }') + ' ] }', P);
+    try
+      Check((L <> nil) and (L.Lines[0].Cards[0].Kind = vkGroup) and not L.Lines[0].Cards[0].Framed and
+        (Titles(InnerOf(L.Lines[0].Cards[0])) = 'Cut;Copy;') and (L.Lines[0].Cards[0].Inner.Lines.Count = 1),
+        'format 2: a row holder without a style, its cards side by side, no frame: ' + Error);
+      G := Measure(L);
+      Box := -1;
+      for I := 0 to High(G.Boxes) do
+        if G.Boxes[I].Card = L.Lines[0].Cards[0] then
+          Box := I;
+      Inside := (Box >= 0) and (Box + 2 <= High(G.Boxes)) and (G.Boxes[Box + 1].Rect.top >= G.Boxes[Box].Rect.top) and
+        (G.Boxes[Box + 2].Rect.left > G.Boxes[Box + 1].Rect.left) and (G.Boxes[Box + 2].Rect.right <= G.Boxes[Box].Rect.right + 0.5);
+      Check(Inside, 'its cards'' boxes follow its own, side by side inside it: ' + IntToStr(Box) + ' ' +
+        Format('%.0f,%.0f,%.0f,%.0f / %.0f,%.0f,%.0f,%.0f / %.0f,%.0f,%.0f,%.0f', [G.Boxes[Box].Rect.left, G.Boxes[Box].Rect.top,
+        G.Boxes[Box].Rect.right, G.Boxes[Box].Rect.bottom, G.Boxes[Box + 1].Rect.left, G.Boxes[Box + 1].Rect.top,
+        G.Boxes[Box + 1].Rect.right, G.Boxes[Box + 1].Rect.bottom, G.Boxes[Box + 2].Rect.left, G.Boxes[Box + 2].Rect.top,
+        G.Boxes[Box + 2].Rect.right, G.Boxes[Box + 2].Rect.bottom]));
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // a styled holder with a title: framed
+    L := Level('{ "card": "Box", "title": "Edit", "background": "#ff0000", "content": [ ' +
+      Card('Cut', '{ "name": { "equals": "Cut" } }') + ' ] }', P);
+    try
+      Check((L <> nil) and L.Lines[0].Cards[0].Framed and (L.Lines[0].Cards[0].Title = 'Edit'),
+        'a holder with a style and a title: its frame and title (a column by default)');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // found items inside a card in a row: templates by position, cycling
+    L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "templates": [ ' +
+      '{ "background": "#ff0000" }, { "background": "#00ff00", "rename": { "regex": " in LexPen", "replace": "" } } ]'), P);
+    try
+      V := L.Lines[0].Cards[0];
+      Check((V.Kind = vkGroup) and V.Framed and (Titles(InnerOf(V)) = 'Edit in LexPen;View;') and
+        (InnerOf(V)[0].LookCard = V.Card.Templates[0]) and (InnerOf(V)[1].LookCard = V.Card.Templates[1]),
+        'found items inside a card: each its template by position (the second renamed by its own): ' + Titles(InnerOf(V)));
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // templates by rule
+    L := Level(Card('T', '{ "name": { "equals": "Cut" }, "template": 2 }, { "name": { "equals": "Copy" } }',
+      ', "show": "row", "templatesBy": "rule", "templates": [ { "radius": 1 }, { "radius": 2 } ]'), P);
+    try
+      V := L.Lines[0].Cards[0];
+      Check((Titles(InnerOf(V)) = 'Cut;Copy;') and (InnerOf(V)[0].LookCard = V.Card.Templates[1]) and
+        (InnerOf(V)[1].LookCard = V.Card.Templates[0]), 'templates by rule: a rule''s own, else the first');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // limits: a row 1 per row, 1 row: the last place "More" with the rest; rest none: left out
+    L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "perRow": 1, "rows": 1'), P);
+    try
+      V := InnerOf(L.Lines[0].Cards[0])[0];
+      Check(V.IsMore and V.HasSubmenu and (V.Title = 'More'), 'more found than fit: the last place "More"');
+      Sub := P.LevelOf(V);
+      try
+        Check(Describe(Sub) = 'I:Edit in LexPen / I:View in LexPen', '"More" opens the rest: ' + Describe(Sub));
+      finally
+        Sub.Free;
+      end;
+    finally
+      L.Free;
+      P.Free;
+    end;
+    L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "perRow": 1, "rows": 1, "rest": "none"'), P);
+    try
+      Check(Titles(InnerOf(L.Lines[0].Cards[0])) = 'Edit in LexPen;', 'rest none: the rest left out');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // a column with 2 per column: filled column by column
+    L := Level(Card('Col', '{ "name": { "any": [ "Cut", "Copy", "Delete" ] } }', ', "show": "column", "perColumn": 2'), P);
+    try
+      V := L.Lines[0].Cards[0];
+      Check((V.Inner.Lines.Count = 2) and (V.Inner.Lines[0].Cards.Count = 2) and (V.Inner.Lines[0].Cards[1].Title = 'Delete') and
+        (V.Inner.Lines[1].Cards[0].Title = 'Copy'), 'a column of 2 per column: the third in the second column');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // found items as a submenu
+    L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "submenu"'), P);
+    try
+      V := L.Lines[0].Cards[0];
+      Sub := P.LevelOf(V);
+      try
+        Check((V.Kind = vkMenu) and (V.Title = 'Lex') and (Describe(Sub) = 'I:Edit in LexPen / I:View in LexPen'),
+          'found items as a submenu: the card its title, the items in it');
+      finally
+        Sub.Free;
+      end;
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // shownWhen: a holder of only a note, left out at a right-click (action items only), shown with anyItem
+    L := Level('{ "card": "Notes", "content": [ { "note": "about" } ] }', P);
+    try
+      Check((L.Lines.Count > 0) and (L.Lines[0].Cards[0].Kind <> vkGroup), 'a holder of only a note: left out (action items only)');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    L := Level('{ "card": "Notes", "shownWhen": "anyItem", "content": [ { "note": "about" } ] }', P);
+    try
+      Check(L.Lines[0].Cards[0].Kind = vkGroup, '... shown with anyItem');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    L := Level('{ "card": "Notes", "content": [ { "note": "about" } ] }', P, False);
+    try
+      Check((L.Lines[0].Cards[0].Kind = vkGroup) and L.Lines[0].Cards[0].Sometimes, '... in the preview shown, striped');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // square: a template's inner cards as high as wide
+    L := Level(Card('Sq', '{ "name": { "equals": "Cut" } }', ', "show": "row", "perRow": 2, "templates": [ { "square": true } ]'), P);
+    try
+      G := Measure(L);
+      Inside := False;
+      for I := 0 to High(G.Boxes) do
+        if G.Boxes[I].Card.InGroup then
+          Inside := Abs((G.Boxes[I].Rect.bottom - G.Boxes[I].Rect.top) - (G.Boxes[I].Rect.right - G.Boxes[I].Rect.left)) < 1;
+      Check(Inside, 'a square template: its inner card as high as wide');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // errors
+    Check(Pos('"show"', ErrorOf('{ "format": 2, "menu": { "content": [ { "card": "X", "show": "grid", "rules": [] }, ' + Rest + ' ] } }')) > 0,
+      'an unknown show: the layout refused');
+    Check(Pos('not both', ErrorOf('{ "format": 2, "menu": { "content": [ { "card": "X", "rules": [], "content": [] }, ' + Rest + ' ] } }')) > 0,
+      'rules and content together: the layout refused');
+    Check(Pos('"menu"', ErrorOf('{ "format": 2, "lines": [] }')) > 0, 'format 2 without its menu: refused');
+  finally
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 // Dexmenu's own items found by rules (plan 12): tagged with what the DLL starts; a button in a card with buttons; an own
 // card of an earlier layout read as a card with an own rule.
 procedure TestOwnRules;
@@ -1687,6 +1888,7 @@ begin
   TestLinesAndCards;
   TestButtons;
   TestOwnRules;
+  TestHolders;
   if Failures = 0 then
     Writeln('OK')
   else

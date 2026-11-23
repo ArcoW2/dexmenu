@@ -398,7 +398,8 @@ end;
 // A card's extra text and its own look (plan 03 3.6).
 procedure ParseCardLook(Obj: TJSONObject; Card: TCard);
 const
-  Props: array[0..6] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed');
+  Props: array[0..7] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed',
+    'disabled');
 var
   P: string;
 begin

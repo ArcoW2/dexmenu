@@ -1016,10 +1016,11 @@ begin
 end;
 
 // Cards arranged as a card shows them (plan 11 3.1, 3.4), into lines measured as a level's: a row perRow to a line
-// (not set: one line, wrapping where they do not fit); a column one to a line, or with perColumn a grid filled column
+// (not set: one line; found items flow, each as wide as its content, wrapping where they do not fit; held cards share
+// the width as a line's cards do); a column one to a line, or with perColumn a grid filled column
 // by column (the columns sharing the width). Beyond the capacity: the last place a "More" card holding the rest as its
 // submenu, or (rest "none") the rest left out. Takes the cards over (the list is freed, its cards owned by the level).
-function Arrange(Card: TCard; Cards: TObjectList<TViewCard>): TViewLevel;
+function Arrange(Card: TCard; Cards: TObjectList<TViewCard>; Found: Boolean): TViewLevel;
 var
   Cap, I, Per, Lines, L: Integer;
   More: TViewCard;
@@ -1060,8 +1061,8 @@ begin
         begin
           Line := TViewLine.Create;
           Line.CardFit := Card.CardFit;
-          Line.Inner := True;
-          Line.Flows := Card.PerRow <= 0;
+          Line.Inner := Found;
+          Line.Flows := Found and (Card.PerRow <= 0);
           Result.Lines.Add(Line);
         end;
         Result.Lines.Last.Cards.Add(Cards[I]);
@@ -1078,7 +1079,7 @@ begin
       begin
         Line := TViewLine.Create;
         Line.CardFit := Card.CardFit;
-        Line.Inner := True;
+        Line.Inner := Found;
         Result.Lines.Add(Line);
       end;
       // column by column: line L holds the L-th card of each column
@@ -1130,7 +1131,7 @@ begin
   if (Card.Shows = csColumn) and (Card.PerColumn = 0) and (Capacity(Card) = 0) then
     Inner := PlaceLines(P, Card.Menu)   // under each other as placed: its dividers kept
   else
-    Inner := Arrange(Card, HeldCards(P, Card));
+    Inner := Arrange(Card, HeldCards(P, Card), False);
   if not HolderShows(Card, Inner) and P.AtRightClick then
   begin
     Inner.Free;
@@ -1163,7 +1164,7 @@ begin
   Result := TViewCard.Create;
   Result.Kind := vkGroup;
   Result.Card := Card;
-  Result.Inner := Arrange(Card, Cards);
+  Result.Inner := Arrange(Card, Cards, True);
   Result.Framed := True;
   if Card.ShownTitle <> '' then
     Result.BackTitle := Card.ShownTitle

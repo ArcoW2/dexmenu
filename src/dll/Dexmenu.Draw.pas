@@ -898,6 +898,8 @@ var
   Inner: TD2D1RectF;
   BorderColor, Foreground: TRGBA;
   CardBorder, ExtraBrush, MarkBrush: ID2D1SolidColorBrush;
+  GroupState: string;
+  TitleLine: TLine;
 begin
   // every colour and radius from the theme for light or dark (plan 03 3.2; Dexmenu.Theme)
   Theme := CurrentTheme(Look.Dark);
@@ -960,12 +962,27 @@ begin
       Element := 'card';
     if V.Kind = vkGroup then
     begin
-      // a card with buttons (plan 02 3.3): its background and a frame (its border, else the dividers' colour), its
-      // title at the top; its buttons are boxes of their own, drawn after it
+      // a card holding cards (plan 11 3.4): without a frame nothing of its own (what a line or a group was); with
+      // one its background and its frame (its border, else the dividers' colour), its own hover look while the mouse
+      // is over anything inside it, its title at the top as a title or as a divider; the cards inside it are boxes of
+      // their own, drawn after it
       CardRadius := Theme.Number(Element, 'normal', 'radius', ItemRadius, Own);
       Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
+      if Editing and V.Sometimes then
+        DrawStripes(T, Inner, Stripe);   // not shown at a right-click (shownWhen)
+      if not V.Framed then
+        Continue;
       FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
-      BorderColor := Theme.Color(Element, 'normal', 'border', RGBA(0, 0, 0, 0), Own);
+      GroupState := 'normal';
+      if (Own <> nil) and (Own.GetValue('hover') <> nil) and (Selected >= 0) and (Selected <= High(G.Boxes)) and
+        (Selected <> I) and (G.Boxes[Selected].Rect.left >= G.Boxes[I].Rect.left) and
+        (G.Boxes[Selected].Rect.right <= G.Boxes[I].Rect.right) and (G.Boxes[Selected].Rect.top >= G.Boxes[I].Rect.top) and
+        (G.Boxes[Selected].Rect.bottom <= G.Boxes[I].Rect.bottom) then
+      begin
+        GroupState := 'hover';
+        FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True);
+      end;
+      BorderColor := Theme.Color(Element, GroupState, 'border', RGBA(0, 0, 0, 0), Own);
       if BorderColor.A > 0 then
         T.CreateSolidColorBrush(ToD2D(BorderColor), nil, CardBorder)
       else
@@ -975,9 +992,22 @@ begin
       if (Marked <> '') and (V.CardId = Marked) then
         T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
           CardRadius, CardRadius), Accent, 1.5);
-      T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, 'normal', 'foreground', RGBA($1B, $1B, $1B), Own)), nil, Brush);
+      T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, GroupState, 'foreground', RGBA($1B, $1B, $1B), Own)), nil, Brush);
       Title := V.Title;
-      if Title <> '' then
+      if (Title <> '') and (V.Card <> nil) and V.Card.TitleAsDivider then
+      begin
+        // its title as a divider: a line with the text, in the dividers' look
+        TitleLine := TLine.Create;
+        try
+          TitleLine.DividerText := Title;
+          Y := Round(R.top + GroupPad + DividerTextHeight / 2) + 0.5;
+          DrawDividerText(T, TitleLine, D2D1RectF(R.left + GroupPad, R.top + GroupPad, R.right - GroupPad,
+            R.top + GroupPad + DividerTextHeight), Y, Sep, LabelBrush);
+        finally
+          TitleLine.Free;
+        end;
+      end
+      else if Title <> '' then
         T.DrawText(PWideChar(Title), Length(Title), BoldFormat, D2D1RectF(R.left + GroupPad + 4, R.top + GroupPad,
           R.right - GroupPad, R.top + GroupPad + TitleHeight), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       Continue;
