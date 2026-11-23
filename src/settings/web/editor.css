@@ -120,6 +120,12 @@ h2 button { white-space: nowrap; }
 /* the selected card */
 .field { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; margin: 3px 0; }
 .field input[type=text], .field textarea { width: 100%; box-sizing: border-box; }
+/* a field that belongs to the one above it (a note's own font): its label indented, a tree line to its parent */
+.field.sub { margin: 0; }
+.field.sub > span:first-child { position: relative; padding-left: 20px; align-self: stretch; display: flex; align-items: center; }
+.field.sub > span:first-child::before { content: ""; position: absolute; left: 6px; top: -4px; bottom: 0; border-left: 1px solid var(--dim); }
+.field.sub.last > span:first-child::before { bottom: 50%; }
+.field.sub > span:first-child::after { content: ""; position: absolute; left: 6px; width: 9px; top: 50%; border-top: 1px solid var(--dim); }
 /* the cards' right-click menu (Copy style, Paste style) */
 .context-menu { position: fixed; z-index: 10; display: flex; flex-direction: column; min-width: 140px; padding: 4px;
   background: var(--card); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }

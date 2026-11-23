@@ -794,19 +794,21 @@ function fontFields(card) {
   })];
   if (kind !== "own") return rows;
   const f = card.font;
-  rows.push(textField("Font family", f.family || "", v => { if (v.trim()) f.family = v.trim(); else delete f.family; changed(); }, "(the items' font)"),
-    textField("Font size", f.size === undefined ? "" : String(f.size), v => {
+  rows.push(textField("Family", f.family || "", v => { if (v.trim()) f.family = v.trim(); else delete f.family; changed(); }, "(the items' font)"),
+    textField("Size", f.size === undefined ? "" : String(f.size), v => {
       const n = Number(v.trim());
       if (v.trim() && n >= 4) f.size = Math.min(72, n); else delete f.size;
       changed();
     }, "(the items' size, in DIP)"),
     checkRow("Bold", f.bold, on => { if (on) f.bold = true; else delete f.bold; changed(); }),
     checkRow("Italic", f.italic, on => { if (on) f.italic = true; else delete f.italic; changed(); }));
+  // its own font's parts under Font, indented with a tree line to it
+  rows.slice(1).forEach((r, i, all) => r.classList.add("sub", ...(i === all.length - 1 ? ["last"] : [])));
   return rows;
 }
 
 // A card's own look over the theme's (plan 03 3.6): its colours as pickers (colorField), the hover background the
-// same; the radius a number; its 3D border and shadow. A note: no hover.
+// same; the radius a number; its 3D border and shadow. A note: its font after its text colour, no hover.
 function lookFields(card, note = false) {
   const own = name => ({ get: () => card[name], set: v => { if (v === undefined) delete card[name]; else card[name] = v; } });
   const hover = {
@@ -818,6 +820,7 @@ function lookFields(card, note = false) {
   };
   return [colorField("Background", own("background").get, own("background").set, true, true),
     colorField("Text colour", own("foreground").get, own("foreground").set),
+    ...(note ? fontFields(card) : []),
     colorField("Border", own("border").get, own("border").set, false, true),
     textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
       const n = Number(v.trim());
@@ -1112,7 +1115,7 @@ function renderCardPane() {
     place.addEventListener("change", () => { if (place.value === "left") delete card.align; else card.align = place.value; changed(); });
     const placeRow = el("label", "field");
     placeRow.append(el("span", "", "Text placed"), place);
-    $("card").replaceChildren(row, placeRow, ...fontFields(card), ...sizeFields(card), ...lookFields(card, true),
+    $("card").replaceChildren(row, placeRow, ...sizeFields(card), ...lookFields(card, true),
       el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
     return;
   }
