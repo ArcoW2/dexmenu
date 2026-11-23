@@ -1105,7 +1105,7 @@ function renderCardPane() {
     wayRow.title = "How submenus open in this layout, unless a card says otherwise";
     wayRow.append(el("span", "", "Submenus open"), way);
     $("card").replaceChildren(el("div", "hint", "The menu itself, holding every card of the layout. It is not moved, copied or deleted."),
-      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: lookFields(root) }));
+      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: [...lookFields(root), ...(root.background === "none" ? [el("div", "hint", "No background: the menu is see-through, only its cards, dividers and rows drawn; each card on an opaque base (a card cannot be see-through then).")] : [])] }));
     return;
   }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;

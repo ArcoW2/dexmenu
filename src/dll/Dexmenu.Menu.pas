@@ -35,8 +35,11 @@ type
     VisibleHeight: Single;
     Opener: TViewCard;   // the card in the level above that opened it; nil at the top
     Replaces: Boolean;   // opened in place of the level above (that one hidden until this one closes; "<<" back)
+    ShadowWnd: HWND;     // the menu's own shadow (plan 03 3.4): a window behind it taking no mouse; 0 until needed
     destructor Destroy; override;
     procedure Redraw;
+    // Its shadow drawn and shown behind it while it is shown, hidden while it is not.
+    procedure UpdateShadow;
     function BoxOfCard(V: TViewCard): Integer;
   end;
 
@@ -159,6 +162,8 @@ end;
 
 destructor TLevelWindow.Destroy;
 begin
+  if ShadowWnd <> 0 then
+    DestroyWindow(ShadowWnd);
   if Wnd <> 0 then
   begin
     SetWindowLongPtr(Wnd, GWLP_USERDATA, 0);
@@ -171,7 +176,24 @@ end;
 procedure TLevelWindow.Redraw;
 begin
   Present(Wnd, Pos, Geometry, Selected, ScrollY, Scale, VisibleHeight);
+  UpdateShadow;
   Session.Dump;
+end;
+
+procedure TLevelWindow.UpdateShadow;
+begin
+  if (Wnd = 0) or not IsWindowVisible(Wnd) then
+  begin
+    if ShadowWnd <> 0 then
+      ShowWindow(ShadowWnd, SW_HIDE);
+    Exit;
+  end;
+  if ShadowWnd = 0 then
+    // owned by the level, so it goes with it; layered and transparent to the mouse, never active
+    ShadowWnd := CreateWindowEx(WS_EX_LAYERED or WS_EX_TRANSPARENT or WS_EX_TOPMOST or WS_EX_TOOLWINDOW or
+      WS_EX_NOACTIVATE, 'Static', '', WS_POPUP, 0, 0, 1, 1, Wnd, 0, HInstance, nil);
+  if ShadowWnd <> 0 then
+    PresentShadow(ShadowWnd, Wnd, Pos, Geometry, Scale, VisibleHeight);
 end;
 
 function TLevelWindow.BoxOfCard(V: TViewCard): Integer;
@@ -359,6 +381,7 @@ begin
   PlaceTop(X, Y, Params);
   L.Redraw;
   ShowWindow(L.Wnd, SW_SHOW);
+  L.UpdateShadow;
   SetForegroundWindow(L.Wnd);
   SetFocus(L.Wnd);
 
@@ -563,6 +586,7 @@ begin
     MoveSelection(L, 1);
   L.Redraw;
   ShowWindow(L.Wnd, SW_SHOWNOACTIVATE);
+  L.UpdateShadow;
   if L.Replaces then
   begin
     // hiding the active level would hand the activation outside the menu, and that closes it (WM_ACTIVATE): the
@@ -570,6 +594,7 @@ begin
     if GetActiveWindow = Parent.Wnd then
       SetActiveWindow(L.Wnd);
     ShowWindow(Parent.Wnd, SW_HIDE);
+    Parent.UpdateShadow;
   end;
 end;
 

@@ -50,6 +50,12 @@ procedure Present(Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Select
 // (TViewCard.Sometimes) drawn with diagonal stripes; never at a right-click.
 function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single;
   const Marked: string = ''; Editing: Boolean = False): TPicture;
+// The menu's own shadow (plan 03 3.4; the menu card's "shadow"), as a picture to show behind the level: its window
+// is Margin pixels larger on each side than the level's. Width 0: no shadow (none set, or a see-through menu).
+function RenderShadow(const G: TGeometry; Scale, VisibleHeight: Single; out Margin: Integer): TPicture;
+// The menu's shadow shown in its own window (layered, taking no mouse) just behind the level's window Wnd at
+// ScreenPos; hidden when there is none.
+procedure PresentShadow(ShadowWnd, Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Scale, VisibleHeight: Single);
 // The look light or dark as told (the settings app's theme switch, plan 05 3.3): 0 as Windows' apps are, 1 light,
 // 2 dark. Only the settings app calls it; a right-click follows Windows.
 procedure DexmenuSetTheme(Mode: Integer); stdcall;
@@ -1135,10 +1141,23 @@ begin
     D2D1_DRAW_TEXT_OPTIONS_CLIP);
 end;
 
+// Whether the menu has no background of its own (plan 03 3.4: see-through; only its cards drawn).
+function SeeThrough(Theme: TTheme; MenuOwn: TJSONObject): Boolean;
+var
+  Stops: TArray<TRGBA>;
+  Angle: Single;
+begin
+  Result := not Theme.Background('menu', 'normal', Stops, Angle, MenuOwn) and
+    (Theme.Color('menu', 'normal', 'background', RGBA(0, 0, 0, -1), MenuOwn).A = 0);
+end;
+
 procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer; ScrollY, VisibleHeight: Single;
   const Look: TLook; const Marked: string; Editing: Boolean);
 var
   Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
+  Clear_: Boolean;                 // a see-through menu (no background): each card on an opaque base of its own
+  Base: ID2D1SolidColorBrush;      // that base: the theme's card background, opaque
+  BaseColor: TRGBA;
   Theme: TTheme;
   MenuRadius, CardRadius: Single;
   I: Integer;
@@ -1183,9 +1202,22 @@ begin
   MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius, MenuOwn);
   T.Clear(D2D1ColorF(0, 0, 0, 0));
   R := D2D1RectF(0.5, 0.5, G.Width - 0.5, VisibleHeight - 0.5);
-  if not FillBackground(T, Theme, 'menu', 'normal', R, MenuRadius, MenuOwn) then
-    T.FillRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Bg);
-  T.DrawRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Border, 1);
+  // a see-through menu (plan 03 3.4): no background and no border of its own, only its cards, each made opaque
+  Clear_ := SeeThrough(Theme, MenuOwn);
+  if Clear_ then
+  begin
+    BaseColor := Theme.Color('card', 'normal', 'background', Theme.Color('menu', 'normal', 'background', RGBA($F9, $F9, $F9)));
+    if BaseColor.A <= 0 then
+      BaseColor := RGBA($F9, $F9, $F9);
+    BaseColor.A := 1;
+    T.CreateSolidColorBrush(ToD2D(BaseColor), nil, Base);
+  end
+  else
+  begin
+    if not FillBackground(T, Theme, 'menu', 'normal', R, MenuRadius, MenuOwn) then
+      T.FillRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Bg);
+    T.DrawRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Border, 1);
+  end;
   T.PushAxisAlignedClip(D2D1RectF(1, OuterPad, G.Width - 1, VisibleHeight - OuterPad), D2D1_ANTIALIAS_MODE_ALIASED);
   for I := 0 to High(G.Boxes) do
   begin
@@ -1202,12 +1234,14 @@ begin
       Own := nil;
       if V.Card <> nil then
         Own := V.Card.Look;
-      if Own <> nil then
+      if (Own <> nil) or Clear_ then
       begin
         CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius, Own);
         Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
         DrawShadow(T, Theme, Own, Inner, CardRadius);
-        if Own.GetValue('background') <> nil then
+        if Clear_ then
+          T.FillRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), Base);
+        if (Own <> nil) and (Own.GetValue('background') <> nil) then
           FillBackground(T, Theme, 'card', 'normal', Inner, CardRadius, Own, True);
         DrawBorder(T, Theme, 'card', 'normal', Own, Inner, CardRadius, nil);
       end;
@@ -1259,6 +1293,8 @@ begin
       if not V.Framed then
         Continue;
       DrawShadow(T, Theme, Own, Inner, CardRadius);
+      if Clear_ then
+        T.FillRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), Base);
       FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
       GroupState := 'normal';
       if (Own <> nil) and (Own.GetValue('hover') <> nil) and (Selected >= 0) and (Selected <= High(G.Boxes)) and
@@ -1304,10 +1340,13 @@ begin
       State := 'normal';
     CardRadius := Theme.Number(Element, 'normal', 'radius', ItemRadius, Own);
     Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
-    if V.Kind in [vkItem, vkMenu, vkCommand] then
+    if V.Kind in [vkItem, vkMenu, vkCommand, vkBack, vkSearch] then
     begin
       DrawShadow(T, Theme, Own, Inner, CardRadius);
-      FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
+      if Clear_ then
+        T.FillRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), Base);
+      if V.Kind in [vkItem, vkMenu, vkCommand] then
+        FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
     end;
     if Editing and V.Sometimes then
       DrawStripes(T, Inner, Stripe);
@@ -1471,19 +1510,18 @@ begin
   T.PopAxisAlignedClip;
 end;
 
-function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single;
-  const Marked: string; Editing: Boolean): TPicture;
+// A picture of a size (pixels) and a render target on it at a scale; Target nil when Direct2D failed.
+function NewPicture(Width, Height: Integer; Scale: Single; out Target: ID2D1DCRenderTarget): TPicture;
 var
   BMI: TBitmapInfo;
   Bits: Pointer;
   ScreenDC: HDC;
   Props: TD2D1RenderTargetProperties;
-  Target: ID2D1DCRenderTarget;
   Rect: TRect;
 begin
   EnsureFactories;
-  Result.Width := Max(1, Ceil(G.Width * Scale));
-  Result.Height := Max(1, Ceil(VisibleHeight * Scale));
+  Result.Width := Max(1, Width);
+  Result.Height := Max(1, Height);
   FillChar(BMI, SizeOf(BMI), 0);
   BMI.bmiHeader.biSize := SizeOf(BMI.bmiHeader);
   BMI.bmiHeader.biWidth := Result.Width;
@@ -1501,10 +1539,89 @@ begin
   begin
     Rect := System.Types.Rect(0, 0, Result.Width, Result.Height);
     Target.BindDC(Result.DC, Rect);
+  end
+  else
+    Target := nil;
+end;
+
+function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHeight: Single;
+  const Marked: string; Editing: Boolean): TPicture;
+var
+  Target: ID2D1DCRenderTarget;
+begin
+  Result := NewPicture(Ceil(G.Width * Scale), Ceil(VisibleHeight * Scale), Scale, Target);
+  if Target <> nil then
+  begin
     DrawScale := Scale;
     Target.BeginDraw;
     DrawLevel(Target, G, Selected, ScrollY, VisibleHeight, TLook.Current, Marked, Editing);
     Target.EndDraw;
+  end;
+end;
+
+function RenderShadow(const G: TGeometry; Scale, VisibleHeight: Single; out Margin: Integer): TPicture;
+var
+  Theme: TTheme;
+  MenuOwn, S: TJSONObject;
+  Target: ID2D1DCRenderTarget;
+  M, Radius: Single;
+begin
+  Result := Default(TPicture);
+  Margin := 0;
+  if (G.MenuCard = nil) or not (G.MenuCard.Look is TJSONObject) then
+    Exit;
+  MenuOwn := G.MenuCard.Look;
+  if not (MenuOwn.GetValue('shadow') is TJSONObject) then
+    Exit;
+  EnsureFactories;
+  Theme := CurrentTheme(TLook.Current.Dark);
+  if SeeThrough(Theme, MenuOwn) then
+    Exit;   // no window to shade: the cards' own shadows
+  S := TJSONObject(MenuOwn.GetValue('shadow'));
+  // room for the shadow: its distance and half its blur, a little more
+  M := Max(0, Theme.Number('card', 'normal', 'distance', 3, S)) + Max(0, Theme.Number('card', 'normal', 'blur', 0, S)) / 2 + 2;
+  Margin := Ceil(M * Scale);
+  Radius := Theme.Number('menu', 'normal', 'radius', WindowRadius, MenuOwn);
+  Result := NewPicture(Ceil(G.Width * Scale) + 2 * Margin, Ceil(VisibleHeight * Scale) + 2 * Margin, Scale, Target);
+  if Target = nil then
+    Exit;
+  Target.BeginDraw;
+  Target.Clear(D2D1ColorF(0, 0, 0, 0));
+  DrawShadow(Target, Theme, MenuOwn, D2D1RectF(Margin / Scale + 0.5, Margin / Scale + 0.5,
+    Margin / Scale + G.Width - 0.5, Margin / Scale + VisibleHeight - 0.5), Radius);
+  Target.EndDraw;
+end;
+
+function BlendFunction: TBlendFunction; forward;
+
+procedure PresentShadow(ShadowWnd, Wnd: HWND; const ScreenPos: TPoint; const G: TGeometry; Scale, VisibleHeight: Single);
+var
+  P: TPicture;
+  Margin: Integer;
+  ScreenDC: HDC;
+  Blend: TBlendFunction;
+  Pos, Src: TPoint;
+  Size: TSize;
+begin
+  P := RenderShadow(G, Scale, VisibleHeight, Margin);
+  if P.Width = 0 then
+  begin
+    ShowWindow(ShadowWnd, SW_HIDE);
+    Exit;
+  end;
+  ScreenDC := GetDC(0);
+  try
+    Blend := BlendFunction;
+    Pos := Point(ScreenPos.X - Margin, ScreenPos.Y - Margin);
+    Src := Point(0, 0);
+    Size.cx := P.Width;
+    Size.cy := P.Height;
+    UpdateLayeredWindow(ShadowWnd, ScreenDC, @Pos, @Size, P.DC, @Src, 0, @Blend, ULW_ALPHA);
+    // just behind its level
+    SetWindowPos(ShadowWnd, Wnd, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW);
+  finally
+    ReleaseDC(0, ScreenDC);
+    P.Free;
   end;
 end;
 

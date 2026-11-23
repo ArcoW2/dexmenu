@@ -356,7 +356,7 @@ var
   Bmp, Old: HBITMAP;
   Brush: HBRUSH;
   L: TPreviewLevel;
-  I: Integer;
+  I, ShadowMargin: Integer;
   P: TPicture;
   S: Single;
 begin
@@ -377,6 +377,14 @@ begin
       L := Levels[I];
       if Hidden(I) then
         Continue;
+      // the menu's own shadow behind it (plan 03 3.4)
+      P := RenderShadow(L.Geometry, S, L.Geometry.Height, ShadowMargin);
+      if P.Width > 0 then
+        try
+          P.PaintOnto(MemDC, Round(L.X * S) - ShadowMargin, Round(L.Y * S) - ShadowMargin);
+        finally
+          P.Free;
+        end;
       P := Render(L.Geometry, L.Selected, 0, S, L.Geometry.Height, Marked, True);
       try
         P.PaintOnto(MemDC, Round(L.X * S), Round(L.Y * S));

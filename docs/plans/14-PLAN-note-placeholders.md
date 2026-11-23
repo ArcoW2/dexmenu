@@ -16,9 +16,9 @@ today's to-do. The menu must stay as crisp and fast as it is: no markup, no wait
 ## 2. The solution, in brief
 
 A note's text may hold `{file:<path>}`, filled in each time the menu opens with what the file holds, as plain text,
-at most a set number of bytes. A file is read only from a local drive, through a small cache that reads it again
-only when it changed; a file that cannot be read shows nothing. The editor's note gets a button to pick a file and a
-field for the byte limit; the preview shows the note filled in.
+at most 320 characters (a small paragraph). A file is read only from a local drive, through a small cache that reads it again
+only when it changed; a file that cannot be read shows nothing. The editor's note gets a button to pick a file;
+the preview shows the note filled in.
 
 ## Status
 
@@ -28,9 +28,9 @@ field for the byte limit; the preview shows the note filled in.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| File | `{file:<path>}` in `FillNote`: environment variables in the path, a local drive only, at most the note's byte limit, decoded as UTF-8 or UTF-16 by its BOM, cut at a whole line or character, `...` when cut | -- | 3.1 |
+| File | `{file:<path>}` in `FillNote`: environment variables in the path, a local drive only, at most 320 characters, decoded as UTF-8 or UTF-16 by its BOM, cut at a whole line or character, `...` when cut | -- | 3.1 |
 | Cache | each file's text kept by its path, time written and size; read again only when those changed | File | 3.2 |
-| Editor | a "File..." button inserting `{file:<path>}`; a "File bytes" field | File | 3.3 |
+| Editor | a "File..." button inserting `{file:<path>}` | File | 3.3 |
 | Tests | 3.5 | -- | 3.5 |
 
 ## 3. Details
@@ -40,9 +40,10 @@ field for the byte limit; the preview shows the note filled in.
 - `{file:<path>}` in a note's text: the file's text in its place, filled by `FillNote` beside `{date}` and `{time}`
   (the same braces, `{{` and `}}`, as typed when unknown). The path may hold environment variables
   (`%APPDATA%\Reminders\today.txt`); a relative path is taken from the layouts folder.
-- At most the note's byte limit is read (`"fileBytes"` on the note; its default and maximum are an open question).
-  Decoded as UTF-16 when it starts with a UTF-16 BOM, else as UTF-8 (with or without BOM); bytes that are not UTF-8
-  show as the replacement character. When the file is longer than the limit, the text is cut at the last whole line
+- At most 320 characters are shown: a small paragraph, about four lines of 80. As bytes that is 320 for plain ASCII
+  and up to 1280 (UTF-8 takes 1 to 4 bytes a character, UTF-16 2 or 4), so the first 1280 bytes are read and counted
+  out in characters; no setting per note. Decoded as UTF-16 when it starts with a UTF-16 BOM, else as UTF-8 (with or without BOM); bytes that are not UTF-8
+  show as the replacement character. When the file holds more, the text is cut at the last whole line
   within it (or the last whole character when the first line is longer), followed by `...`.
 - Plain text: line breaks are kept, tabs become spaces, other control characters are left out. No markup.
 - Not read, the placeholder shows nothing: a file that is not there, cannot be opened (locked, no access), or is not
@@ -61,7 +62,6 @@ field for the byte limit; the preview shows the note filled in.
 - Beside the note's Text: a "File..." button that asks for a file (the settings app's file dialog) and inserts
   `{file:<path>}` at the cursor, the path with `%APPDATA%` or `%USERPROFILE%` in it where it starts with one. The
   Text field's hint names `{file:<path>}` beside the date and time.
-- A "File bytes" field: the byte limit, empty the default.
 - The cards view shows the note's text as typed; the preview shows it filled in.
 
 ### 3.4 What does not work, and why
@@ -69,23 +69,21 @@ field for the byte limit; the preview shows the note filled in.
 - Running a program or a script to make a note's text: left out; a right-click must never start a process. A program
   that wants its state in the menu writes a file, and the note shows it.
 - A note that follows its file while the menu stays open: left out; the file is read when the menu opens.
+- A timer or a countdown kept by Dexmenu: left out; the menu is not interactive and runs nothing. A timer another
+  program keeps writes its state to a file, and the note shows that file.
 
 ### 3.5 Tests
 
-- Unit tests: a file read (UTF-8 with and without BOM, UTF-16); cut at the byte limit on a whole line with `...`; a
-  first line longer than the limit cut on a whole character; environment variables and a relative path; a missing
+- Unit tests: a file read (UTF-8 with and without BOM, UTF-16); cut at 320 characters on a whole line with `...` (also
+  when its characters take 3 or 4 bytes each); a first line longer than that cut on a whole character; environment variables and a relative path; a missing
   file, a locked file and a network path giving nothing; the cache reading the file again only after it changed; a
   note's size following its filled text.
-- Editor self-test: the File... button's insert (a path under `%APPDATA%` written with the variable); the byte limit
-  field written and cleared.
+- Editor self-test: the File... button's insert (a path under `%APPDATA%` written with the variable).
 - By hand: a note with a reminder file at a right-click; the file changed and the next right-click showing it.
 
 ## 4. Open questions
 
-1. A "timer" in a note: is that a file another program keeps up to date (the note just shows it, as planned), or
-   should Dexmenu count down itself (a placeholder showing the time left until a moment)?
-2. The byte limit: what default and what maximum for `"fileBytes"`?
-3. A file on a network drive: always skipped (as planned, so a slow or lost connection never holds up a right-click),
+1. A file on a network drive: always skipped (as planned, so a slow or lost connection never holds up a right-click),
    or allowed per note with a short time limit?
 
 ## 5. Not used

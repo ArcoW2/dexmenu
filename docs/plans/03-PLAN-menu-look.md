@@ -9,6 +9,7 @@ Status: partly executed; see Status.
 - 2026-11-23: partly executed: a title that wraps.
 - 2026-11-23: partly executed: none; a note's style and font; the 3D border; the shadow.
 - 2026-11-23: partly executed: a note's date and time.
+- 2026-11-23: partly executed: the see-through menu; the menu's shadow.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -51,6 +52,8 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | 3D border | a card's border raised (outset) or sunk (inset) as Windows' classic buttons, lit from an angle, its width and light and dark edge colours; in the card panel's Style | 3.6; 6.10 |
 | Shadow | a card's shadow in a colour at a distance away from the light, its edge blurred, under the card and inside the menu only; in the card panel's Style | 3.6; 6.10 |
 | Menu window | at the mouse or the program's point, flipped at the work area's edges, on that point's monitor; as tall as the work area at most, then scrolling with the wheel; corners and border from the theme and the menu card | 3.4 |
+| See-through menu | the menu card's background `none`: no background or border of the menu's own, only its cards, dividers and rows; each card, framed holder and note on an opaque base; the editor says so | 3.4; 6.12 |
+| Menu shadow | the menu card's shadow around each level's window, in a window of its own behind it that takes no mouse; in the preview under each level | 3.4; 6.12 |
 | Submenu panels | `next`, `under` and `replace` (with `<<` and the path); opening on hover after Windows' menu delay, or on click only as the settings say; per card or for the layout | 3.9 |
 | Other elements | a divider with its label left, middle or right; the search box (plan 02 3.6); `<<`; the most used as cards with used rules (plan 09); an icon on top of a tall or square card (icon rows as rows of square cards, plan 11) | 3.8 |
 | States | hover, pressed, disabled, checked (a check mark), default (bold); unavailable stripes in the preview | 3.7; 3.10 |
@@ -63,8 +66,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | -- | 3.9 |
-| See-through menu | `menu.background: none`: only the cards, dividers and rows drawn, the rest see-through; cards then opaque, and the settings app saying so | -- | 3.4 |
-| Menu shadow | a shadow around the menu window itself | -- | 3.4 |
 | Scrollbar | a thin scrollbar on hover for a menu taller than the work area (it scrolls with the wheel already) | -- | 3.4 |
 | Divider look | a divider's own height, background, and label colour and font | -- | 3.8 |
 | Focus ring | the keyboard's focused card drawn with a ring, apart from the hover (the keys now move the hover) | -- | 3.7 |
@@ -529,3 +530,20 @@ None.
 - Tested: unit tests at a fixed moment (pictures for date, time and seconds; the short formats without braces left;
   `{{` and `}}`; an unknown placeholder and an unclosed brace as typed; a note without braces as it is), and the
   preview captured as a picture (the long date in the user's language, the time, the short date).
+
+### 6.12 The see-through menu, the menu's shadow
+
+- See-through: the menu has no background when its menu card's (or the theme's) background is `"none"` and no
+  gradient; then the menu's fill and border are left out, and every card (items, submenus, Dexmenu's own, `<<`, the
+  search box), framed holder and note gets an opaque base first, the theme's card background (else the menu's) with
+  full alpha, its own background over it. Gaps between them show what is behind the menu. In the editor the menu
+  card's Style says so when its background is none.
+- The menu's shadow is the menu card's `shadow` (its Style), drawn as a card's (`DrawShadow`) around the level's
+  rounded box, into a picture larger than the level by the shadow's distance and half its blur. At a right-click it is
+  shown in a window of its own (`PresentShadow`): layered, transparent to the mouse, never active, owned by the level's
+  window and placed just behind it; redrawn with the level, hidden while the level is hidden (a `replace` submenu over
+  it). A see-through menu gets no window shadow (its cards have their own). In the preview it is painted under each
+  level.
+- Tested: the preview captured as a picture (a see-through menu with a card's shadow, a divider and a framed row; the
+  menu's shadow in red to see it on the dark preview, soft to the lower right). The real menu window could not be run
+  here: the test host goes through the shell, which loads the installed DLL; checked by hand after publishing.
