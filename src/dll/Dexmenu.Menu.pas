@@ -510,7 +510,7 @@ begin
   L.Selected := -1;
   L.Opener := V;
   if V.Kind = vkMenu then
-    L.View := FPlacement.MenuLevel(V.Card)
+    L.View := FPlacement.LevelOf(V)
   else
   begin
     if Notify and not FEarly.Contains(V.Node.SubMenu) then   // one opened early is open already
@@ -889,6 +889,7 @@ var
   OldViews: TObjectList<TViewLevel>;
   SelectedId, OpenerId: UINT;
   OpenerCard: TCard;
+  OpenerMore: Boolean;   // the opener a holder's "More" (plan 11): not the holder's own card
   V, Found: TViewCard;
   Box: TBox;
 begin
@@ -919,6 +920,7 @@ begin
         Parent := FLevels[I - 1];
         OpenerId := 0;
         OpenerCard := nil;
+        OpenerMore := L.Opener.IsMore;
         if L.Opener.Kind = vkItem then
           OpenerId := L.Opener.Node.Id
         else
@@ -927,7 +929,7 @@ begin
         for Box in Parent.Geometry.Boxes do
         begin
           V := Box.Card;
-          if ((OpenerCard <> nil) and (V.Kind = vkMenu) and (V.Card.Id = OpenerCard.Id)) or
+          if ((OpenerCard <> nil) and (V.Kind = vkMenu) and (V.Card.Id = OpenerCard.Id) and (V.IsMore = OpenerMore)) or
             ((OpenerCard = nil) and (V.Kind = vkItem) and (V.Node.Id = OpenerId) and (V.Node.SubMenu <> 0)) then
             Found := V;
         end;
@@ -940,7 +942,7 @@ begin
         begin
           L.Opener := Found;
           if Found.Kind = vkMenu then
-            L.View := NewPlacement.MenuLevel(Found.Card)
+            L.View := NewPlacement.LevelOf(Found)
           else
           begin
             ReadChildren(Found.Node);

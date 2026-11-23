@@ -347,7 +347,7 @@ end;
 // not a button in a card with buttons.
 function Wraps(V: TViewCard): Boolean;
 begin
-  Result := (V.Card <> nil) and V.Card.Wrap and (V.Kind in [vkItem, vkMenu, vkCommand]) and not V.InGroup;
+  Result := (V.SizeCard <> nil) and V.SizeCard.Wrap and (V.Kind in [vkItem, vkMenu, vkCommand]);
 end;
 
 // The title laid out wrapping within Width (DIP) and Height (0: as high as it needs); nil when it has none.
@@ -430,173 +430,209 @@ begin
 end;
 
 const
-  GroupPad = 6;    // a card with buttons (plan 02 3.3): its buttons and title from its edges (DIP)
-  ButtonGap = 2;   // between its buttons, across and down
+  GroupPad = 6;    // a card holding cards with a frame (plan 11 3.4): what it holds and its title from its edges (DIP)
+  ButtonGap = 2;   // at least between the cards inside a framed card, across and down
 
-// A card with buttons laid out at a place: its buttons' boxes, side by side, each as wide as its content (at most the
-// card's inner width), wrapping onto the next row; the result is the card's height.
-function GroupLayout(V: TViewCard; Left, Top, Width: Single; out Rects: TArray<TD2D1RectF>): Single;
-var
-  I: Integer;
-  X, Y, W, Inner: Single;
+function LayLines(Level: TViewLevel; Left, Top, Width: Single; Collect: Boolean; var Boxes: TArray<TBox>;
+  WrapWidth: Single; Framed: Boolean): Single; forward;
+function CardMin(V: TViewCard): Single; forward;
+
+// A card holding cards (plan 11 3.4): the room around what it holds, at its sides and at its top (its padding and its
+// title, as a title or as a divider), none without a frame.
+function GroupSide(V: TViewCard): Single;
 begin
-  SetLength(Rects, V.Buttons.Count);
-  Inner := Max(1, Width - 2 * GroupPad);
-  X := 0;
-  Y := GroupPad + TitleHeight + ButtonGap;
-  for I := 0 to V.Buttons.Count - 1 do
-  begin
-    W := Min(Inner, CardNeed(V.Buttons[I]));
-    if (X > 0) and (X + W > Inner) then
-    begin
-      X := 0;
-      Y := Y + ItemHeight + ButtonGap;
-    end;
-    Rects[I] := D2D1RectF(Left + GroupPad + X, Top + Y, Left + GroupPad + X + W, Top + Y + ItemHeight);
-    X := X + W + ButtonGap;
-  end;
-  Result := Y + ItemHeight + GroupPad;
+  if V.Framed then
+    Result := GroupPad
+  else
+    Result := 0;
 end;
 
+function GroupTop(V: TViewCard): Single;
+begin
+  if not V.Framed then
+    Exit(0);
+  Result := GroupPad;
+  if V.BackTitle <> '' then
+    if (V.Card <> nil) and V.Card.TitleAsDivider then
+      Result := Result + DividerTextHeight
+    else
+      Result := Result + TitleHeight + ButtonGap;
+end;
+
+// The gaps between the cards on a line and between lines (plan 03 3.5): the theme's, none unless it gives them; inside
+// a framed card at least ButtonGap.
+procedure Gaps(Framed: Boolean; out CardGap, LineGap: Single);
+var
+  Theme: TTheme;
+begin
+  Theme := CurrentTheme(TLook.Current.Dark);
+  CardGap := Max(0, Theme.Number('card', 'normal', 'gap', 0));
+  LineGap := Max(0, Theme.Number('line', 'normal', 'gap', 0));
+  if Framed then
+  begin
+    CardGap := Max(CardGap, ButtonGap);
+    LineGap := Max(LineGap, ButtonGap);
+  end;
+end;
+
+// What a card holding cards needs across: its title, and its widest line (a line that flows: its widest card).
 function GroupNeed(V: TViewCard): Single;
 var
-  B: TViewCard;
+  Line: TViewLine;
+  C: TViewCard;
+  Sum, CardGap, LineGap: Single;
 begin
-  Result := TextWidth(V.Title, BoldFormat);
-  for B in V.Buttons do
-    Result := Max(Result, CardNeed(B));
-  Result := Result + 2 * GroupPad;
+  Result := 0;
+  if V.Framed and (V.BackTitle <> '') then
+    Result := TextWidth(V.BackTitle, BoldFormat) + 8;
+  if V.Inner = nil then
+    Exit(Result + 2 * GroupSide(V));
+  Gaps(V.Framed, CardGap, LineGap);
+  for Line in V.Inner.Lines do
+  begin
+    Sum := 0;
+    for C in Line.Cards do
+      if Line.Flows then
+        Sum := Max(Sum, Max(CardNeed(C), CardMin(C)))
+      else
+        Sum := Sum + Max(CardNeed(C), CardMin(C)) + CardGap;
+    if not Line.Flows and (Line.Cards.Count > 0) then
+      Sum := Sum - CardGap;
+    Result := Max(Result, Sum);
+  end;
+  Result := Result + 2 * GroupSide(V);
 end;
 
-// The layout card's size settings (plan 03 3.5); a view card without one (Windows' items in a submenu, the most used
-// row) has the defaults.
+// The layout card's size settings (plan 03 3.5; an inner card's template's, plan 11); a view card without one
+// (Windows' items in a submenu) has the defaults.
 function CardMin(V: TViewCard): Single;
 begin
   Result := 0;
-  if (V.Card <> nil) and (V.Kind <> vkSeparator) then
-    Result := V.Card.MinWidth;
+  if V.SizeCard <> nil then
+    Result := V.SizeCard.MinWidth;
 end;
 
 function CardWeight(V: TViewCard): Single;
 begin
   Result := 1;
-  if (V.Card <> nil) and (V.Kind <> vkSeparator) then
-    Result := V.Card.Weight;
+  if V.SizeCard <> nil then
+    Result := V.SizeCard.Weight;
 end;
 
-// A card's own height at a width: a note's wrapped text, a card with buttons its rows, a fixed height in lines, else
-// one line.
+// A card's own height at a width: a note's wrapped text, a card holding cards what it holds, a fixed height in lines,
+// a square card its width, else one line.
 function CardHeight(V: TViewCard; Width: Single): Single;
 var
-  Rects: TArray<TD2D1RectF>;
   Layout: IDWriteTextLayout;
   M: TDWriteTextMetrics;
+  None: TArray<TBox>;
 begin
   Result := ItemHeight;
   if V.Kind = vkGroup then
-    Exit(GroupLayout(V, 0, 0, Width, Rects))
+  begin
+    if V.Inner = nil then
+      Exit(GroupTop(V) + GroupSide(V));
+    Exit(GroupTop(V) + LayLines(V.Inner, 0, 0, Max(1, Width - 2 * GroupSide(V)), False, None, -1, V.Framed) +
+      GroupSide(V));
+  end
   else if V.Kind = vkNote then
     Result := NoteHeight(V, Width)
   else if (V.LookCard <> nil) and (V.LookCard.Extra <> '') then
     Result := ItemHeight + ExtraHeight;   // the title and its extra text
-  if Wraps(V) and (V.Card.Height <= 0) then
+  if Wraps(V) and (V.SizeCard.Height <= 0) then
   begin
     // as high as its wrapped title's lines, with a single line's room around them
     Layout := WrappedTitle(V.Title, TitleFormat(V), Width - TextLeft - MarkSpace(V), 0);
     if (Layout <> nil) and Succeeded(Layout.GetMetrics(M)) then
       Result := Result + Max(0, M.height - LineHeight);
   end;
-  if (V.Card <> nil) and (V.Kind <> vkSeparator) and (V.Card.Height > 0) then
-    Result := V.Card.Height * ItemHeight;
+  if (V.SizeCard <> nil) and (V.SizeCard.Height > 0) then
+    Result := V.SizeCard.Height * ItemHeight;
+  if (V.SizeCard <> nil) and V.SizeCard.Square then
+    Result := Width;
 end;
 
 function CardFitOf(V: TViewCard; Line: TViewLine): TCardFit;
 begin
   Result := cfDefault;
-  if (V.Card <> nil) and (V.Kind <> vkSeparator) then
-    Result := V.Card.CardFit;
+  if V.SizeCard <> nil then
+    Result := V.SizeCard.CardFit;
   if Result = cfDefault then
     Result := Line.CardFit;
   if Result = cfDefault then
     Result := cfStretch;
 end;
 
-function Measure(Level: TViewLevel; Depth: Integer): TGeometry;
+// A level's lines split into rows: a line whose cards do not fit side by side within WrapWidth wraps its last cards
+// onto a row of their own below it, in their order. At the menu's top a card counts its minimum width; inside a card
+// (an inner line) its content.
+procedure SplitRows(Level: TViewLevel; WrapWidth, CardGap: Single; Rows: TList<TArray<TViewCard>>;
+  RowLines: TList<TViewLine>);
 var
-  LevelMin, LevelMax, CardGap, LineGap: Single;
-  Theme: TTheme;
+  Line: TViewLine;
+  Row: TArray<TViewCard>;
+  V: TViewCard;
+  SumMin, Size: Single;
+begin
+  for Line in Level.Lines do
+  begin
+    Row := nil;
+    SumMin := 0;
+    for V in Line.Cards do
+    begin
+      if Line.Inner then
+        Size := Max(CardNeed(V), CardMin(V))
+      else
+        Size := CardMin(V);
+      if (Length(Row) > 0) and (SumMin + CardGap + Size > WrapWidth) then
+      begin
+        Rows.Add(Row);
+        RowLines.Add(Line);
+        Row := nil;
+        SumMin := 0;
+      end;
+      if Length(Row) > 0 then
+        SumMin := SumMin + CardGap;
+      SumMin := SumMin + Size;
+      Row := Row + [V];
+    end;
+    if Length(Row) > 0 then
+    begin
+      Rows.Add(Row);
+      RowLines.Add(Line);
+    end;
+  end;
+end;
+
+// A level's lines laid out from Left, Top at a width (DIP): each row's cards side by side sharing the width by their
+// weights (a card below its minimum gets it); a row that flows (a row without a set number per row) each card as wide
+// as its content, from the left. Collect: the boxes appended to Boxes, a card holding cards its own box then the
+// boxes inside it, recursively. The height used. WrapWidth: where a line wraps (-1: Width).
+function LayLines(Level: TViewLevel; Left, Top, Width: Single; Collect: Boolean; var Boxes: TArray<TBox>;
+  WrapWidth: Single; Framed: Boolean): Single;
+var
+  CardGap, LineGap: Single;
   Line: TViewLine;
   Rows: TList<TArray<TViewCard>>;
   Row: TArray<TViewCard>;
   Widths: TArray<Single>;
   Fixed: TArray<Boolean>;
   V: TViewCard;
-  W, Y, H, X, Need, SumMin, Avail, FreeWeight, OwnH, Top: Single;
+  Y, H, X, Avail, FreeWeight, OwnH, CardTop: Single;
   N, I, J: Integer;
   Changed, First: Boolean;
   Box: TBox;
   Fit: TCardFit;
   RowLines: TList<TViewLine>;
-  Rects: TArray<TD2D1RectF>;
-  K: Integer;
 begin
-  EnsureFactories;
-  LevelMin := MinWidth;
-  LevelMax := MaxWidth;
-  if Length(LevelWidths) > 0 then
-  begin
-    LevelMin := LevelWidths[Min(Depth, High(LevelWidths))].MinW;
-    LevelMax := LevelWidths[Min(Depth, High(LevelWidths))].MaxW;
-  end;
-  // the gaps between cards on a line and between lines (plan 03 3.5): the theme's, none unless it gives them
-  Theme := CurrentTheme(TLook.Current.Dark);
-  CardGap := Max(0, Theme.Number('card', 'normal', 'gap', 0));
-  LineGap := Max(0, Theme.Number('line', 'normal', 'gap', 0));
-
+  Gaps(Framed, CardGap, LineGap);
+  if WrapWidth < 0 then
+    WrapWidth := Width;
   Rows := TList<TArray<TViewCard>>.Create;
   RowLines := TList<TViewLine>.Create;
   try
-    // A line whose cards do not fit side by side at their minimum widths within the level's maximum: its last cards
-    // wrap onto a line of their own below it, in their order.
-    for Line in Level.Lines do
-    begin
-      Row := nil;
-      SumMin := 0;
-      for V in Line.Cards do
-      begin
-        if (Length(Row) > 0) and (SumMin + CardGap + CardMin(V) > LevelMax - 2 * OuterPad) then
-        begin
-          Rows.Add(Row);
-          RowLines.Add(Line);
-          Row := nil;
-          SumMin := 0;
-        end;
-        if Length(Row) > 0 then
-          SumMin := SumMin + CardGap;
-        SumMin := SumMin + CardMin(V);
-        Row := Row + [V];
-      end;
-      if Length(Row) > 0 then
-      begin
-        Rows.Add(Row);
-        RowLines.Add(Line);
-      end;
-    end;
-
-    // The width: the widest line's need (each card at least its minimum width), between the level's minimum and its
-    // maximum.
-    W := LevelMin;
-    for Row in Rows do
-    begin
-      Need := CardGap * (Length(Row) - 1);
-      for V in Row do
-        Need := Need + Max(CardNeed(V), CardMin(V));
-      W := Max(W, Need + 2 * OuterPad);
-    end;
-    W := Min(W, LevelMax);
-
-    Result.Boxes := nil;
-    Y := OuterPad;
+    SplitRows(Level, WrapWidth, CardGap, Rows, RowLines);
+    Y := Top;
     First := True;
     for I := 0 to Rows.Count - 1 do
     begin
@@ -606,33 +642,39 @@ begin
       if not First then
         Y := Y + LineGap;
       First := False;
-      // the cards share the width by their weights; one whose share is below its minimum gets its minimum, and the
-      // others share the rest
       SetLength(Widths, N);
       SetLength(Fixed, N);
-      for J := 0 to N - 1 do
-        Fixed[J] := False;
-      repeat
-        Changed := False;
-        Avail := W - 2 * OuterPad - CardGap * (N - 1);
-        FreeWeight := 0;
+      if Line.Flows then
         for J := 0 to N - 1 do
-          if Fixed[J] then
-            Avail := Avail - Widths[J]
-          else
-            FreeWeight := FreeWeight + CardWeight(Row[J]);
+          Widths[J] := Min(Width, Max(CardNeed(Row[J]), CardMin(Row[J])))
+      else
+      begin
+        // the cards share the width by their weights; one whose share is below its minimum gets its minimum, and the
+        // others share the rest
         for J := 0 to N - 1 do
-          if not Fixed[J] then
-          begin
-            Widths[J] := Max(0, Avail) * CardWeight(Row[J]) / Max(FreeWeight, 0.0001);
-            if Widths[J] < CardMin(Row[J]) then
+          Fixed[J] := False;
+        repeat
+          Changed := False;
+          Avail := Width - CardGap * (N - 1);
+          FreeWeight := 0;
+          for J := 0 to N - 1 do
+            if Fixed[J] then
+              Avail := Avail - Widths[J]
+            else
+              FreeWeight := FreeWeight + CardWeight(Row[J]);
+          for J := 0 to N - 1 do
+            if not Fixed[J] then
             begin
-              Widths[J] := CardMin(Row[J]);
-              Fixed[J] := True;
-              Changed := True;
+              Widths[J] := Max(0, Avail) * CardWeight(Row[J]) / Max(FreeWeight, 0.0001);
+              if Widths[J] < CardMin(Row[J]) then
+              begin
+                Widths[J] := CardMin(Row[J]);
+                Fixed[J] := True;
+                Changed := True;
+              end;
             end;
-          end;
-      until not Changed;
+        until not Changed;
+      end;
       // the line as high as its highest card
       if (N = 1) and (Row[0].Kind = vkSeparator) then
       begin
@@ -646,13 +688,12 @@ begin
         for J := 0 to N - 1 do
           H := Max(H, CardHeight(Row[J], Widths[J]));
       end;
-      X := OuterPad;
+      X := Left;
       for J := 0 to N - 1 do
       begin
         V := Row[J];
-        Box.Card := V;
         OwnH := H;
-        Top := Y;
+        CardTop := Y;
         if V.Kind <> vkSeparator then
         begin
           // a lower card: stretched to the line, or at its own height at the line's top, centre or bottom
@@ -661,25 +702,21 @@ begin
           begin
             OwnH := Min(H, CardHeight(V, Widths[J]));
             case Fit of
-              cfCenter: Top := Y + (H - OwnH) / 2;
-              cfBottom: Top := Y + H - OwnH;
+              cfCenter: CardTop := Y + (H - OwnH) / 2;
+              cfBottom: CardTop := Y + H - OwnH;
             end;
           end;
         end;
-        Box.Rect := D2D1RectF(X, Top, X + Widths[J], Top + OwnH);
-        Box.Alone := N = 1;
-        Result.Boxes := Result.Boxes + [Box];
-        // a card with buttons: its buttons' boxes follow its own, inside it
-        if V.Kind = vkGroup then
+        if Collect then
         begin
-          GroupLayout(V, X, Top, Widths[J], Rects);
-          for K := 0 to High(Rects) do
-          begin
-            Box.Card := V.Buttons[K];
-            Box.Rect := Rects[K];
-            Box.Alone := False;
-            Result.Boxes := Result.Boxes + [Box];
-          end;
+          Box.Card := V;
+          Box.Rect := D2D1RectF(X, CardTop, X + Widths[J], CardTop + OwnH);
+          Box.Alone := N = 1;
+          Boxes := Boxes + [Box];
+          // a card holding cards: the boxes inside it follow its own
+          if (V.Kind = vkGroup) and (V.Inner <> nil) then
+            LayLines(V.Inner, X + GroupSide(V), CardTop + GroupTop(V), Max(1, Widths[J] - 2 * GroupSide(V)), True, Boxes,
+              -1, V.Framed);
         end;
         X := X + Widths[J] + CardGap;
       end;
@@ -689,8 +726,48 @@ begin
     RowLines.Free;
     Rows.Free;
   end;
+  Result := Y - Top;
+end;
+
+function Measure(Level: TViewLevel; Depth: Integer): TGeometry;
+var
+  LevelMin, LevelMax, CardGap, LineGap, W, Need: Single;
+  Rows: TList<TArray<TViewCard>>;
+  RowLines: TList<TViewLine>;
+  Row: TArray<TViewCard>;
+  V: TViewCard;
+begin
+  EnsureFactories;
+  LevelMin := MinWidth;
+  LevelMax := MaxWidth;
+  if Length(LevelWidths) > 0 then
+  begin
+    LevelMin := LevelWidths[Min(Depth, High(LevelWidths))].MinW;
+    LevelMax := LevelWidths[Min(Depth, High(LevelWidths))].MaxW;
+  end;
+  Gaps(False, CardGap, LineGap);
+  // the width: the widest row's need (each card at least its minimum width), between the level's minimum and maximum
+  Rows := TList<TArray<TViewCard>>.Create;
+  RowLines := TList<TViewLine>.Create;
+  try
+    SplitRows(Level, LevelMax - 2 * OuterPad, CardGap, Rows, RowLines);
+    W := LevelMin;
+    for Row in Rows do
+    begin
+      Need := CardGap * (Length(Row) - 1);
+      for V in Row do
+        Need := Need + Max(CardNeed(V), CardMin(V));
+      W := Max(W, Need + 2 * OuterPad);
+    end;
+    W := Min(W, LevelMax);
+  finally
+    RowLines.Free;
+    Rows.Free;
+  end;
+  Result.Boxes := nil;
   Result.Width := W;
-  Result.Height := Y + OuterPad;
+  Result.Height := OuterPad + LayLines(Level, OuterPad, OuterPad, W - 2 * OuterPad, True, Result.Boxes,
+    LevelMax - 2 * OuterPad, False) + OuterPad;
   Result.Pressed := -1;
 end;
 

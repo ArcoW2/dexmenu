@@ -35,6 +35,9 @@ type
     Spec: TRuleSpec;     // rkMatch: the rule parsed (Dexmenu.Rules); Spec.Valid False: it finds nothing
     Card: TCard;         // the card it is on
     Index: Integer;      // its place on that card, from 0
+    // "template": which of its card's templates the items it finds follow when the card picks them by rule (from 0;
+    // -1: none named, the first)
+    TemplateIndex: Integer;
     destructor Destroy; override;
   end;
 
@@ -45,6 +48,17 @@ type
   // How a card lower than its line fits it (plan 03 3.5): as the line says (cfDefault), as tall as the line, or at its
   // own height at the line's top, centre or bottom.
   TCardFit = (cfDefault, cfStretch, cfTop, cfCenter, cfBottom);
+  // How a card shows what it found or holds (docs/plans/11-PLAN-cards-hold-content.md 3.1): as its own item (several
+  // found: the card multiplied), in a submenu, side by side inside it, under each other inside it. csDefault: its
+  // rules: item; a format 1 "menu": submenu; format 2 "content": column.
+  TCardShow = (csDefault, csItem, csSubmenu, csRow, csColumn);
+  TRestOf = (roMenu, roNone);   // "rest": what does not fit a row's or column's limits: in a "More" submenu, left out
+  // "shownWhen" of a card holding cards: only when something in it does something when chosen (the default), when
+  // anything in it shows, always
+  TShownWhen = (swActionItem, swAnyItem, swAlways);
+  // "templatesBy": how the inner cards pick one of several templates: by their place (cycling: the first card the
+  // first template, the second the second, ...) or by the rule that found them
+  TTemplatesBy = (tbPosition, tbRule);
 
   // A level's width (DIP): from its minimum, grown by its lines up to its maximum (plan 02 3.4).
   TLevelWidth = record
@@ -102,10 +116,29 @@ type
     // Its own look over the theme's (plan 03 3.6): "background", "foreground", "border", "borderWidth", "radius", and
     // the same per state in "hover" / "pressed"; nil when it has none. Owned.
     Look: TJSONObject;
-    // "buttons": what its rules found shown as buttons inside it, a found submenu unfolded (plan 02 3.3)
+    // "buttons" (format 1): what its rules found shown inside it side by side, a found submenu unfolded (plan 02 3.3);
+    // read as Show csRow
     Buttons: Boolean;
+    // What it shows and how (plan 11 3.1): Show; a row's "perRow" and "rows", a column's "perColumn" and "columns" (0:
+    // no limit); "rest"; "shownWhen"; "titleAs": "divider" its title drawn as a divider; "square": as high as wide;
+    // "templates": the cards its found items' inner cards follow (no rules, no content; owned; none: the theme's card),
+    // picked as "templatesBy" says
+    Show: TCardShow;
+    PerRow, Rows, PerColumn, Columns: Integer;
+    RestOf: TRestOf;
+    ShownWhen: TShownWhen;
+    TitleAsDivider: Boolean;
+    Square: Boolean;
+    Templates: TObjectList<TCard>;
+    TemplatesBy: TTemplatesBy;
     Rules: TObjectList<TRule>;
-    Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
+    // the cards it holds: a format 1 card's "menu", a format 2 card's "content" (a line per card, divider or search
+    // box); nil for a card with rules
+    Menu: TObjectList<TLine>;
+    // The template the inner card for its Position-th found item (from 0), found by Rule, follows; nil for none.
+    function TemplateFor(Position: Integer; Rule: TRule): TCard;
+    // How it shows its content or what it found, csDefault resolved (csItem for a card with rules)
+    function Shows: TCardShow;
     constructor Create;
     destructor Destroy; override;
     function IsRemaining: Boolean;
@@ -157,7 +190,8 @@ function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
 const
   MinTextSize = 0.6;   // the menu's text size (TMenuSettings.TextSize) from 60% to 250%
   MaxTextSize = 2.5;
-  FormatVersion = 1;   // the layout files' form this DLL writes and reads; older forms are read too
+  // the layout files' form this DLL reads (older forms are read too): 2, the menu one card holding cards (plan 11)
+  FormatVersion = 2;
   BaseLayout = '// the base layout: Windows'' menu as cards'#10 +
     '{ "format": 1, "lines": [ { "line": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } ] }';
 
@@ -196,7 +230,32 @@ begin
   Rules.Free;
   Menu.Free;
   Look.Free;
+  Templates.Free;
   inherited;
+end;
+
+function TCard.TemplateFor(Position: Integer; Rule: TRule): TCard;
+begin
+  Result := nil;
+  if (Templates = nil) or (Templates.Count = 0) then
+    Exit;
+  if TemplatesBy = tbRule then
+  begin
+    if (Rule <> nil) and (Rule.TemplateIndex >= 0) and (Rule.TemplateIndex < Templates.Count) then
+      Exit(Templates[Rule.TemplateIndex]);
+    Exit(Templates[0]);
+  end;
+  Result := Templates[Position mod Templates.Count];
+end;
+
+function TCard.Shows: TCardShow;
+begin
+  Result := Show;
+  if Result = csDefault then
+    if Menu <> nil then
+      Result := csSubmenu
+    else
+      Result := csItem;
 end;
 
 function TCard.IsRemaining: Boolean;
@@ -291,6 +350,49 @@ begin
   Card.CardFit := ParseCardFit(Obj.GetValue('cardFit'));
   if Obj.GetValue('wrap') is TJSONBool then
     Card.Wrap := TJSONBool(Obj.GetValue('wrap')).AsBoolean;
+  if Obj.GetValue('square') is TJSONBool then
+    Card.Square := TJSONBool(Obj.GetValue('square')).AsBoolean;
+end;
+
+function ParseCount(V: TJSONValue): Integer;
+begin
+  Result := 0;
+  if (V is TJSONNumber) and (TJSONNumber(V).AsDouble >= 1) then
+    Result := Trunc(TJSONNumber(V).AsDouble);
+end;
+
+// How a card shows what it found or holds, and its limits (plan 11 3.1). False with Error for an unknown "show".
+function ParseShow(Obj: TJSONObject; Card: TCard; const Where: string; var Error: string): Boolean;
+var
+  V: TJSONValue;
+begin
+  Result := False;
+  V := Obj.GetValue('show');
+  if V is TJSONString then
+    if V.Value = 'item' then Card.Show := csItem
+    else if V.Value = 'submenu' then Card.Show := csSubmenu
+    else if V.Value = 'row' then Card.Show := csRow
+    else if V.Value = 'column' then Card.Show := csColumn
+    else
+    begin
+      Error := Where + ' "' + Card.Title + '": "show" is item, submenu, row or column';
+      Exit;
+    end;
+  Card.PerRow := ParseCount(Obj.GetValue('perRow'));
+  Card.Rows := ParseCount(Obj.GetValue('rows'));
+  Card.PerColumn := ParseCount(Obj.GetValue('perColumn'));
+  Card.Columns := ParseCount(Obj.GetValue('columns'));
+  Card.RestOf := roMenu;
+  if (Obj.GetValue('rest') is TJSONString) and (Obj.GetValue('rest').Value = 'none') then
+    Card.RestOf := roNone;
+  Card.ShownWhen := swActionItem;
+  if Obj.GetValue('shownWhen') is TJSONString then
+    if Obj.GetValue('shownWhen').Value = 'always' then
+      Card.ShownWhen := swAlways
+    else if Obj.GetValue('shownWhen').Value = 'anyItem' then
+      Card.ShownWhen := swAnyItem;
+  Card.TitleAsDivider := (Obj.GetValue('titleAs') is TJSONString) and (Obj.GetValue('titleAs').Value = 'divider');
+  Result := True;
 end;
 
 // A card's extra text and its own look (plan 03 3.6).
@@ -312,10 +414,34 @@ begin
     end;
 end;
 
+function ParseContent(Value: TJSONValue; const Where: string; Parent: TCard; Lines: TLines; var Error: string): Boolean; forward;
+
+// A card's template (plan 11 3.1): what every inner card made for its found items follows: texts that apply to each
+// item, its layout and its style; no rules, no content.
+function ParseTemplate(Obj: TJSONObject; Holder: TCard; Index: Integer): TCard;
+begin
+  Result := TCard.Create;
+  Result.Title := 'Template ' + IntToStr(Index + 1);
+  Result.Id := Holder.Id + '.template' + IntToStr(Index + 1);
+  Result.Parent := Holder;
+  ParseCardSize(Obj, Result);
+  ParseCardLook(Obj, Result);
+  if Obj.GetValue('icon') is TJSONString then
+    Result.Icon := Trim(Obj.GetValue('icon').Value);
+  if (Obj.GetValue('rename') is TJSONObject) and (TJSONObject(Obj.GetValue('rename')).GetValue('regex') <> nil) then
+  begin
+    Result.RenameFrom := TJSONObject(Obj.GetValue('rename')).GetValue('regex').Value;
+    if TJSONObject(Obj.GetValue('rename')).GetValue('replace') <> nil then
+      Result.RenameTo := TJSONObject(Obj.GetValue('rename')).GetValue('replace').Value;
+  end;
+  if Obj.GetValue('hint') is TJSONString then
+    Result.HintText := Obj.GetValue('hint').Value;
+end;
+
 function ParseCard(Value: TJSONValue; const Where: string; Parent: TCard; out Card: TCard; var Error: string): Boolean;
 var
   Obj: TJSONObject;
-  Rules, Menu: TJSONValue;
+  Rules, Menu, Content: TJSONValue;
   Item: TJSONValue;
   Rule: TRule;
 begin
@@ -383,6 +509,20 @@ begin
       Card.SkipDuplicates := TJSONBool(Obj.GetValue('skipDuplicates')).AsBoolean;
     if Obj.GetValue('buttons') is TJSONBool then
       Card.Buttons := TJSONBool(Obj.GetValue('buttons')).AsBoolean;
+    if not ParseShow(Obj, Card, Where, Error) then
+      Exit;
+    if Card.Buttons and (Card.Show = csDefault) then
+      Card.Show := csRow;   // format 1's buttons: found items side by side inside it
+    if Obj.GetValue('templates') is TJSONArray then
+    begin
+      Card.Templates := TObjectList<TCard>.Create;
+      for Item in TJSONArray(Obj.GetValue('templates')) do
+        if Item is TJSONObject then
+          Card.Templates.Add(ParseTemplate(TJSONObject(Item), Card, Card.Templates.Count));
+    end;
+    Card.TemplatesBy := tbPosition;
+    if (Obj.GetValue('templatesBy') is TJSONString) and (Obj.GetValue('templatesBy').Value = 'rule') then
+      Card.TemplatesBy := tbRule;
     if Obj.GetValue('hidden') is TJSONBool then
       Card.Hidden := TJSONBool(Obj.GetValue('hidden')).AsBoolean;   // not for the remaining card (Dexmenu.Place)
     if (Obj.GetValue('rename') is TJSONObject) and (TJSONObject(Obj.GetValue('rename')).GetValue('regex') <> nil) then
@@ -414,9 +554,10 @@ begin
     end;
     Rules := Obj.GetValue('rules');
     Menu := Obj.GetValue('menu');
-    if (Rules <> nil) and (Menu <> nil) then
+    Content := Obj.GetValue('content');
+    if Ord(Rules <> nil) + Ord(Menu <> nil) + Ord(Content <> nil) > 1 then
     begin
-      Error := Where + ' "' + Card.Title + '": a card has either rules or a menu, not both';
+      Error := Where + ' "' + Card.Title + '": a card has either rules or what it holds, not both';
       Exit;
     end;
     if Rules <> nil then
@@ -439,6 +580,9 @@ begin
           Rule.Kind := rkMatch;
           Rule.Raw := TJSONObject(Item.Clone);
           Rule.Spec := ParseRule(Rule.Raw);
+          Rule.TemplateIndex := -1;
+          if (Rule.Raw.GetValue('template') is TJSONNumber) and (TJSONNumber(Rule.Raw.GetValue('template')).AsInt >= 1) then
+            Rule.TemplateIndex := TJSONNumber(Rule.Raw.GetValue('template')).AsInt - 1;
         end
         else
         begin
@@ -451,6 +595,15 @@ begin
     begin
       Card.Menu := TLines.Create;
       if not ParseLines(Menu, Where + ' > ' + Card.Title, Card, Card.Menu, Error) then
+        Exit;
+    end;
+    if Content <> nil then
+    begin
+      // format 2: the cards it holds, under each other unless it says otherwise
+      if Card.Show = csDefault then
+        Card.Show := csColumn;
+      Card.Menu := TLines.Create;
+      if not ParseContent(Content, Where + ' > ' + Card.Title, Card, Card.Menu, Error) then
         Exit;
     end;
     Result := True;
@@ -545,6 +698,49 @@ begin
   Result := True;
 end;
 
+// Format 2's content (plan 11 3.1): cards, dividers and the search box, each a line of its own (a card holding cards
+// side by side is a card with "show": "row").
+function ParseContent(Value: TJSONValue; const Where: string; Parent: TCard; Lines: TLines; var Error: string): Boolean;
+var
+  Entry: TJSONValue;
+  Line: TLine;
+  Card: TCard;
+  One: TJSONArray;
+begin
+  Result := False;
+  if not (Value is TJSONArray) then
+  begin
+    Error := Where + ': "content" must be a list';
+    Exit;
+  end;
+  for Entry in TJSONArray(Value) do
+  begin
+    if not (Entry is TJSONObject) then
+    begin
+      Error := Where + ': an entry of "content" must be an object';
+      Exit;
+    end;
+    if (TJSONObject(Entry).GetValue('divider') <> nil) or (TJSONObject(Entry).GetValue('search') <> nil) then
+    begin
+      // a divider or the search box: as format 1 reads them
+      One := TJSONArray.Create(TJSONValue(Entry.Clone));
+      try
+        if not ParseLines(One, Where, Parent, Lines, Error) then
+          Exit;
+      finally
+        One.Free;
+      end;
+      Continue;
+    end;
+    if not ParseCard(Entry, Where, Parent, Card, Error) then
+      Exit;
+    Line := TLine.Create;
+    Lines.Add(Line);
+    Line.Cards.Add(Card);
+  end;
+  Result := True;
+end;
+
 function CountRemaining(Lines: TLines): Integer;
 var
   Line: TLine;
@@ -591,22 +787,39 @@ begin
       Error := Format('%s: a newer form of layout (format %d; this Dexmenu knows %d)', [Source, Version, FormatVersion]);
       Exit;
     end;
-    if Version >= 1 then
-      Menu := TJSONObject(Root).GetValue('lines')
+    if Version >= 2 then
+    begin
+      // the menu one card holding the others (plan 11 3.1): its content are the menu's lines
+      Menu := TJSONObject(Root).GetValue('menu');
+      if not (Menu is TJSONObject) or (TJSONObject(Menu).GetValue('content') = nil) then
+      begin
+        Error := Source + ': "menu" with its "content" is missing';
+        Exit;
+      end;
+      Lines := TLines.Create;
+      Layout.FKinds.Add('default', Lines);
+      if not ParseContent(TJSONObject(Menu).GetValue('content'), Source, nil, Lines, Error) then
+        Exit;
+    end
     else
-      Menu := TJSONObject(Root).GetValue('default');   // the older form: its "default" section, the others ignored
-    if Menu = nil then
     begin
       if Version >= 1 then
-        Error := Source + ': "lines" is missing'
+        Menu := TJSONObject(Root).GetValue('lines')
       else
-        Error := Source + ': the kind "default" is missing';
-      Exit;
+        Menu := TJSONObject(Root).GetValue('default');   // the older form: its "default" section, the others ignored
+      if Menu = nil then
+      begin
+        if Version >= 1 then
+          Error := Source + ': "lines" is missing'
+        else
+          Error := Source + ': the kind "default" is missing';
+        Exit;
+      end;
+      Lines := TLines.Create;
+      Layout.FKinds.Add('default', Lines);
+      if not ParseLines(Menu, Source, nil, Lines, Error) then
+        Exit;
     end;
-    Lines := TLines.Create;
-    Layout.FKinds.Add('default', Lines);
-    if not ParseLines(Menu, Source, nil, Lines, Error) then
-      Exit;
     N := CountRemaining(Lines);
     if N <> 1 then
     begin
@@ -887,7 +1100,7 @@ begin
     Lines := TJSONArray.Create;
     Lines.AddElement(TJSONObject.Create(TJSONPair.Create('line', Line1)));
     Lines.AddElement(TJSONObject.Create(TJSONPair.Create('line', Line2)));
-    Root.AddPair('format', TJSONNumber.Create(FormatVersion));
+    Root.AddPair('format', TJSONNumber.Create(1));   // written in format 1's form (lines)
     Root.AddPair('lines', Lines);
     Result := ParseLayout(Root.ToJSON, Path + ' (needs updating)', Error);
   finally

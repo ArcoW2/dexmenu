@@ -1522,6 +1522,19 @@ end;
 
 // Items as buttons in a card (plan 02 3.3): a found submenu unfolded, its title the item's; found items without one
 // buttons themselves, the card's title; the buttons inside their card, side by side; hit tests reach the buttons only.
+// A card holding cards (plan 11): what shows inside it, line after line.
+function InnerOf(V: TViewCard): TArray<TViewCard>;
+var
+  L: TViewLine;
+  C: TViewCard;
+begin
+  Result := nil;
+  if V.Inner <> nil then
+    for L in V.Inner.Lines do
+      for C in L.Cards do
+        Result := Result + [C];
+end;
+
 // Dexmenu's own items found by rules (plan 12): tagged with what the DLL starts; a button in a card with buttons; an own
 // card of an earlier layout read as a card with an own rule.
 procedure TestOwnRules;
@@ -1551,9 +1564,9 @@ begin
       if (Level.Lines.Count < 2) or (Level.Lines[0].Cards[0].Kind <> vkGroup) then
         Exit;
       Titles := '';
-      for B in Level.Lines[0].Cards[0].Buttons do
+      for B in InnerOf(Level.Lines[0].Cards[0]) do
         Titles := Titles + B.Title + ';';
-      B := Level.Lines[0].Cards[0].Buttons[Level.Lines[0].Cards[0].Buttons.Count - 1];
+      B := InnerOf(Level.Lines[0].Cards[0])[High(InnerOf(Level.Lines[0].Cards[0]))];
       Check((Titles = 'Edit in LexPen;View in LexPen;Edit menu...;') and (B.Kind = vkCommand) and (B.Command = ccEditMenu) and B.Enabled,
         'an own rule in a card with buttons: Dexmenu''s item a button, tagged editMenu: ' + Titles);
       B := Level.Lines[1].Cards[0];
@@ -1610,18 +1623,18 @@ begin
       if (Zip = nil) or (Zip.Kind <> vkGroup) or (Lex.Kind <> vkGroup) then
         Exit;
       Titles := '';
-      for B in Zip.Buttons do
+      for B in InnerOf(Zip) do
         Titles := Titles + B.Title + ';';
       Check((Zip.Title = '7-Zip') and (Titles = 'Add to archive...;Extract here;CRC SHA;'),
         '7-Zip unfolded into its items, the card titled with it: ' + Zip.Title + ' ' + Titles);
-      Check((Zip.Buttons.Count = 3) and Zip.Buttons[2].HasSubmenu and not Zip.Buttons[0].HasSubmenu,
+      Check((Length(InnerOf(Zip)) = 3) and InnerOf(Zip)[2].HasSubmenu and not InnerOf(Zip)[0].HasSubmenu,
         'a button with a submenu of its own opens it');
       Titles := '';
-      for B in Lex.Buttons do
+      for B in InnerOf(Lex) do
         Titles := Titles + B.Title + ';';
       Check((Lex.Title = 'LexPen') and (Titles = 'Edit in LexPen;View in LexPen;'),
         'found items without a submenu: each a button, the card''s title: ' + Lex.Title + ' ' + Titles);
-      Check(not Zip.Enabled and (Zip.LookCard <> nil) and (Zip.Buttons[0].LookCard = nil),
+      Check(not Zip.Enabled and (Zip.LookCard <> nil) and (InnerOf(Zip)[0].LookCard = nil),
         'the card is no button; its buttons take the theme''s look, not the card''s');
       G := Measure(Level);
       ZipBox := -1;
@@ -1631,7 +1644,7 @@ begin
       Within := (ZipBox >= 0) and (ZipBox + 3 <= High(G.Boxes));
       if Within then
         for I := ZipBox + 1 to ZipBox + 3 do
-          Within := Within and (G.Boxes[I].Card = Zip.Buttons[I - ZipBox - 1]) and
+          Within := Within and (G.Boxes[I].Card = InnerOf(Zip)[I - ZipBox - 1]) and
             (G.Boxes[I].Rect.left >= G.Boxes[ZipBox].Rect.left) and (G.Boxes[I].Rect.right <= G.Boxes[ZipBox].Rect.right) and
             (G.Boxes[I].Rect.top > G.Boxes[ZipBox].Rect.top) and (G.Boxes[I].Rect.bottom <= G.Boxes[ZipBox].Rect.bottom);
       Check(Within, 'the buttons'' boxes follow their card''s, inside it');

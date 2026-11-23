@@ -238,7 +238,7 @@ begin
   L.Opener := V;
   L.Selected := -1;
   if V.Kind = vkMenu then
-    L.View := Placement.MenuLevel(V.Card)
+    L.View := Placement.LevelOf(V)
   else
   begin
     ReadChildren(V.Node);

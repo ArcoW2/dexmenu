@@ -29,7 +29,8 @@ type
   // vkNote: a note card (Card), no button; vkBack: "<<" at the top of a submenu that replaced its menu (plan 02 3.7)
   // vkCommand: Dexmenu's own item at the end of the menu ("Windows' menu", "Edit menu...", plan 02 3.6, 3.11)
   // vkSearch: the search's own line ("Search: ..."), a text, nothing to choose (plan 02 3.6)
-  // vkGroup: a card showing what it found as buttons inside it (Buttons; plan 02 3.3), itself no button
+  // vkGroup: a card showing cards inside it (Inner; docs/plans/11-PLAN-cards-hold-content.md): the cards it holds, or
+  // inner cards for what its rules found; itself no button
   TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand, vkSearch, vkGroup);
   TCommand = (ccNone, ccWindowsMenu, ccEditMenu);
 
@@ -38,6 +39,8 @@ type
     Rule: TRule;
     Own: TCommand;      // Dexmenu's own item an own rule found (plan 12), its tag; ccNone for Windows' items
   end;
+
+  TViewLevel = class;
 
   TViewCard = class
   public
@@ -49,8 +52,15 @@ type
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
     BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand, vkSearch, vkGroup: its text
-    Buttons: TObjectList<TViewCard>;   // vkGroup: its buttons, in their order (owned)
-    InGroup: Boolean;   // a button in a vkGroup card: the theme's look, not its card's
+    Inner: TViewLevel;  // vkGroup: what shows inside it, lines of cards measured as a level's (owned)
+    Framed: Boolean;    // vkGroup: its box and title drawn (a style or a title of its own, or found items inside it)
+    // an inner card made for an item its card (a vkGroup's, or a card showing them in a submenu) found: in the look
+    // of its template (Template; nil: the theme's card), not the card's own
+    InGroup: Boolean;
+    Template: TCard;    // an inner card: the card's template it follows (not owned), picked by its place or rule
+    // vkMenu "More": the rest of what a row or column could not hold, from MoreFrom on, as its submenu (plan 11 3.1)
+    IsMore: Boolean;
+    MoreFrom: Integer;
     ShownText: string;  // vkItem: a title in place of its own (a search hit: with its path); '' none
     Command: TCommand;  // vkCommand: which
     function Title: string;
@@ -74,6 +84,9 @@ type
     function Sometimes: Boolean;
     function CardId: string;
     function RuleIndex: Integer;   // -1: none
+    // The layout card whose size settings it has (weight, minWidth, height, wrap, cardFit, square): an inner card its
+    // card's template, else its layout card; nil for none.
+    function SizeCard: TCard;
     destructor Destroy; override;
   end;
 
@@ -81,6 +94,12 @@ type
   public
     Cards: TObjectList<TViewCard>;
     CardFit: TCardFit;   // the layout line's: how its lower cards fit it (plan 03 3.5)
+    // a line inside a card (plan 11 3.4): its cards wrap onto the next line where their content does not fit (a
+    // level's top lines wrap only at their minimum widths)
+    Inner: Boolean;
+    // a row without a set number per row: each card as wide as its content, from the left, wrapping where they do
+    // not fit (as format 1's buttons)
+    Flows: Boolean;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -123,6 +142,9 @@ type
     destructor Destroy; override;
     function TopLevel: TViewLevel;
     function MenuLevel(Card: TCard): TViewLevel;
+    // The level a card opens (plan 11): a card with a menu its menu; a card showing what it found in a submenu those
+    // items, each a line in its template's look; "More" the rest of its holder's row or column.
+    function LevelOf(V: TViewCard): TViewLevel;
     function SubmenuLevel(Node: TNode): TViewLevel;
     // The search (plan 02 3.6): a line with the text, then every item of Windows' menu at any depth whose name holds
     // the text (case ignored; a leading "/" makes the rest a regex), each on a line of its own, titled with its path;
@@ -243,28 +265,50 @@ end;
 
 destructor TViewCard.Destroy;
 begin
-  Buttons.Free;
+  Inner.Free;
   inherited;
 end;
 
 function TViewCard.LookCard: TCard;
 begin
   Result := nil;
-  if (Card <> nil) and not InGroup and ((Kind in [vkMenu, vkCommand, vkNote, vkGroup]) or
+  if (Card <> nil) and InGroup then
+    Exit(Template);   // an inner card: its template (nil: the theme's card)
+  if IsMore then
+    Exit;
+  if (Card <> nil) and ((Kind in [vkMenu, vkCommand, vkNote, vkGroup]) or
     ((Kind = vkItem) and not Card.IsRemaining)) then
     Result := Card;
+end;
+
+function TViewCard.SizeCard: TCard;
+begin
+  Result := nil;
+  if (Card = nil) or (Kind = vkSeparator) or IsMore then
+    Exit;
+  if InGroup then
+    Exit(Template);
+  Result := Card;
 end;
 
 function TViewCard.IconSpec: string;
 begin
   Result := '';
-  if (Card = nil) or InGroup then
+  if (Card <> nil) and InGroup then
+  begin
+    if Template <> nil then
+      Result := Template.Icon;
+    Exit;
+  end;
+  if (Card = nil) or IsMore then
     Exit;
   if (Kind in [vkMenu, vkCommand]) or ((Kind = vkItem) and not Card.IsRemaining) then
     Result := Card.Icon;
 end;
 
 function TViewCard.Title: string;
+var
+  Named: TCard;
 begin
   case Kind of
     vkItem:
@@ -274,9 +318,13 @@ begin
         if (Card <> nil) and (Card.ShownTitle <> '') and not Card.IsRemaining and not Several then
           Exit(Card.ShownTitle);
         Result := Node.Name;
-        if (Card <> nil) and (Card.RenameFrom <> '') then
+        // the card's rename on it; an inner card its card's template's
+        Named := Card;
+        if InGroup then
+          Named := Template;
+        if (Named <> nil) and (Named.RenameFrom <> '') then
           try
-            Result := TRegEx.Replace(Result, Card.RenameFrom, Card.RenameTo);
+            Result := TRegEx.Replace(Result, Named.RenameFrom, Named.RenameTo);
           except
             // a rename that does not compile: the item's own text
           end;
@@ -297,7 +345,9 @@ begin
       end;
     vkBack, vkSearch, vkGroup: Result := BackTitle;
     vkMenu:
-      if Card.ShownTitle <> '' then
+      if IsMore then
+        Result := BackTitle
+      else if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
       else
         Result := Card.Title;
@@ -333,7 +383,7 @@ end;
 
 function TViewCard.Sometimes: Boolean;
 begin
-  Result := ((Kind = vkItem) and Node.Sometimes) or ((Kind = vkMenu) and EmptyMenu);
+  Result := ((Kind = vkItem) and Node.Sometimes) or ((Kind in [vkMenu, vkGroup]) and EmptyMenu);
 end;
 
 function TViewCard.CardId: string;
@@ -533,7 +583,7 @@ var
     if Lines <> nil then
       for Line in Lines do
         for Card in Line.Cards do
-          if Card.Buttons or HasButtons(Card.Menu) then
+          if ((Card.Menu = nil) and (Card.Shows in [csRow, csColumn])) or HasButtons(Card.Menu) then
             Exit(True);
   end;
 
@@ -856,6 +906,273 @@ begin
   Result.Several := Several;
 end;
 
+function PlaceLines(P: TPlacement; Lines: TLines): TViewLevel; forward;
+
+// The inner cards for what a card's rules found (plan 11 3.1): each a card in the card's template's look, an own rule's
+// Dexmenu item too; a found item with a submenu unfolded into its items (as format 1's buttons did), separators
+// dropped. Unfolded: the item unfolded when it was the only one found, else nil. The caller owns the list and its cards.
+function FoundCards(P: TPlacement; Card: TCard; out Unfolded: TNode): TObjectList<TViewCard>;
+var
+  List: TList<TFound>;
+  F: TFound;
+  B: TViewCard;
+  Inner: TViewLevel;
+  SubLine: TViewLine;
+  Shown: Integer;
+begin
+  Result := TObjectList<TViewCard>.Create(False);
+  Unfolded := nil;
+  Shown := 0;
+  if not P.FFound.TryGetValue(Card, List) then
+    Exit;
+  for F in List do
+  begin
+    if F.Node = nil then
+    begin
+      Inc(Shown);
+      B := OwnView(F, Card, True);
+      B.InGroup := True;
+      Result.Add(B);
+      Continue;
+    end;
+    if P.Hides(F.Node) or F.Node.IsSeparator then
+      Continue;
+    Inc(Shown);
+    if F.Node.SubMenu <> 0 then
+    begin
+      Unfolded := F.Node;
+      if F.Node.Children = nil then
+        ReadChildren(F.Node);
+      Inner := P.SubmenuLevel(F.Node);
+      try
+        for SubLine in Inner.Lines do
+          while SubLine.Cards.Count > 0 do
+          begin
+            B := SubLine.Cards.Extract(SubLine.Cards[0]);
+            if B.Kind = vkSeparator then
+            begin
+              B.Free;
+              Continue;
+            end;
+            B.Card := Card;
+            B.Rule := F.Rule;
+            B.Several := True;
+            B.InGroup := True;
+            Result.Add(B);
+          end;
+      finally
+        Inner.Free;
+      end;
+    end
+    else if F.Node.Name <> '' then
+    begin
+      B := TViewCard.Create;
+      B.Kind := vkItem;
+      B.Node := F.Node;
+      B.Card := Card;
+      B.Rule := F.Rule;
+      B.Several := True;
+      B.InGroup := True;
+      Result.Add(B);
+    end;
+  end;
+  if Shown <> 1 then
+    Unfolded := nil;
+  // each its template: by its place, or by the rule that found it (plan 11 3.1)
+  for Shown := 0 to Result.Count - 1 do
+    Result[Shown].Template := Card.TemplateFor(Shown, Result[Shown].Rule);
+end;
+
+// The cards a card holds (its content, placed) as one list in their order, for a row or a column with limits:
+// dividers, the search box and the separators placing leaves dropped. The caller owns the list and its cards.
+function HeldCards(P: TPlacement; Card: TCard): TObjectList<TViewCard>;
+var
+  Level: TViewLevel;
+  Line: TViewLine;
+begin
+  Result := TObjectList<TViewCard>.Create(False);
+  Level := PlaceLines(P, Card.Menu);
+  try
+    for Line in Level.Lines do
+      while Line.Cards.Count > 0 do
+        if Line.Cards[0].Kind in [vkSeparator, vkSearch] then
+          Line.Cards.Delete(0)
+        else
+          Result.Add(Line.Cards.Extract(Line.Cards[0]));
+  finally
+    Level.Free;
+  end;
+end;
+
+// How many of a holder's cards show at most (plan 11 3.1): a row's perRow x rows, a column's perColumn x columns;
+// 0: all of them.
+function Capacity(Card: TCard): Integer;
+begin
+  Result := 0;
+  if (Card.Shows = csRow) and (Card.PerRow > 0) and (Card.Rows > 0) then
+    Result := Card.PerRow * Card.Rows
+  else if (Card.Shows = csColumn) and (Card.PerColumn > 0) and (Card.Columns > 0) then
+    Result := Card.PerColumn * Card.Columns;
+end;
+
+// Cards arranged as a card shows them (plan 11 3.1, 3.4), into lines measured as a level's: a row perRow to a line
+// (not set: one line, wrapping where they do not fit); a column one to a line, or with perColumn a grid filled column
+// by column (the columns sharing the width). Beyond the capacity: the last place a "More" card holding the rest as its
+// submenu, or (rest "none") the rest left out. Takes the cards over (the list is freed, its cards owned by the level).
+function Arrange(Card: TCard; Cards: TObjectList<TViewCard>): TViewLevel;
+var
+  Cap, I, Per, Lines, L: Integer;
+  More: TViewCard;
+  Line: TViewLine;
+begin
+  Result := TViewLevel.Create;
+  try
+    Cap := Capacity(Card);
+    More := nil;
+    if (Cap > 0) and (Cards.Count > Cap) then
+    begin
+      if Card.RestOf = roMenu then
+      begin
+        More := TViewCard.Create;   // the last place: "More", the rest as its submenu
+        More.Kind := vkMenu;
+        More.Card := Card;
+        More.IsMore := True;
+        More.MoreFrom := Cap - 1;
+        More.BackTitle := 'More';
+        Dec(Cap);
+      end;
+      for I := Cards.Count - 1 downto Cap do
+        Cards[I].Free;
+      Cards.Count := Cap;
+      if More <> nil then
+        Cards.Add(More);
+    end;
+    if Cards.Count = 0 then
+      Exit;
+    if Card.Shows = csRow then
+    begin
+      Per := Card.PerRow;
+      if Per <= 0 then
+        Per := Cards.Count;
+      for I := 0 to Cards.Count - 1 do
+      begin
+        if I mod Per = 0 then
+        begin
+          Line := TViewLine.Create;
+          Line.CardFit := Card.CardFit;
+          Line.Inner := True;
+          Line.Flows := Card.PerRow <= 0;
+          Result.Lines.Add(Line);
+        end;
+        Result.Lines.Last.Cards.Add(Cards[I]);
+      end;
+    end
+    else
+    begin
+      Per := Card.PerColumn;
+      if (Per <= 0) or (Per >= Cards.Count) then
+        Lines := Cards.Count
+      else
+        Lines := Per;
+      for L := 0 to Lines - 1 do
+      begin
+        Line := TViewLine.Create;
+        Line.CardFit := Card.CardFit;
+        Line.Inner := True;
+        Result.Lines.Add(Line);
+      end;
+      // column by column: line L holds the L-th card of each column
+      for I := 0 to Cards.Count - 1 do
+        Result.Lines[I mod Lines].Cards.Add(Cards[I]);
+    end;
+  finally
+    Cards.Free;
+  end;
+end;
+
+// Whether what shows inside a holder lets it show (plan 11 3.3, from plan 07): an action item (something that does
+// something when chosen), anything, or always. Dividers never count.
+function HolderShows(Card: TCard; Level: TViewLevel): Boolean;
+
+  function Counts(Level: TViewLevel; AnyItem: Boolean): Boolean;
+  var
+    Line: TViewLine;
+    V: TViewCard;
+  begin
+    Result := False;
+    for Line in Level.Lines do
+      for V in Line.Cards do
+        case V.Kind of
+          vkItem: if V.Enabled or AnyItem then Exit(True);
+          vkCommand: Exit(True);
+          vkMenu: if not V.EmptyMenu or AnyItem then Exit(True);
+          vkNote: if AnyItem then Exit(True);
+          vkGroup: if not V.EmptyMenu and (V.Inner <> nil) and Counts(V.Inner, AnyItem) then Exit(True);
+        end;
+  end;
+
+begin
+  case Card.ShownWhen of
+    swAlways: Result := True;
+    swAnyItem: Result := Counts(Level, True);
+  else
+    Result := Counts(Level, False);
+  end;
+end;
+
+// A card holding cards shown inside it (plan 11 3.1, 3.3): what it holds placed and arranged as it says; nil when it
+// is not shown (by shownWhen, at a right-click; the preview shows it striped).
+function HolderView(P: TPlacement; Card: TCard): TViewCard;
+var
+  Inner: TViewLevel;
+begin
+  Result := nil;
+  if (Card.Shows = csColumn) and (Card.PerColumn = 0) and (Capacity(Card) = 0) then
+    Inner := PlaceLines(P, Card.Menu)   // under each other as placed: its dividers kept
+  else
+    Inner := Arrange(Card, HeldCards(P, Card));
+  if not HolderShows(Card, Inner) and P.AtRightClick then
+  begin
+    Inner.Free;
+    Exit;
+  end;
+  Result := TViewCard.Create;
+  Result.Kind := vkGroup;
+  Result.Card := Card;
+  Result.Inner := Inner;
+  Result.EmptyMenu := not HolderShows(Card, Inner);
+  Result.Framed := (Card.Look <> nil) or (Card.ShownTitle <> '');
+  Result.BackTitle := Card.ShownTitle;
+end;
+
+// What a card's rules found shown inside it as inner cards (plan 11 3.1): nil when it found nothing. Framed, its title
+// above them: its own title, else the item it unfolded when that was all it found, else its name (as format 1's
+// buttons).
+function FoundView(P: TPlacement; Card: TCard): TViewCard;
+var
+  Cards: TObjectList<TViewCard>;
+  Unfolded: TNode;
+begin
+  Result := nil;
+  Cards := FoundCards(P, Card, Unfolded);
+  if Cards.Count = 0 then
+  begin
+    Cards.Free;
+    Exit;
+  end;
+  Result := TViewCard.Create;
+  Result.Kind := vkGroup;
+  Result.Card := Card;
+  Result.Inner := Arrange(Card, Cards);
+  Result.Framed := True;
+  if Card.ShownTitle <> '' then
+    Result.BackTitle := Card.ShownTitle
+  else if Unfolded <> nil then
+    Result.BackTitle := Unfolded.Name
+  else
+    Result.BackTitle := Card.Title;
+end;
+
 function PlaceLines(P: TPlacement; Lines: TLines): TViewLevel;
 var
   Line: TLine;
@@ -867,10 +1184,6 @@ var
   List: TList<TFound>;
   Inner: TViewLevel;
   Nothing: Boolean;
-  B: TViewCard;
-  SubLine: TViewLine;
-  Unfolded: TNode;
-  Shown: Integer;
 begin
   Result := TViewLevel.Create;
   for Line in Lines do
@@ -912,80 +1225,28 @@ begin
           V.Kind := vkNote;
           V.Card := Card;
         end
-        else if Card.Buttons then
+        else if (Card.Menu <> nil) and (Card.Shows in [csRow, csColumn]) then
         begin
-          // what it found as buttons inside it (plan 02 3.3): a found submenu unfolded into its items
-          if not P.FFound.TryGetValue(Card, List) then
+          // a card holding cards inside it (plan 11 3.1, 3.3): what a line or a group was, or a card of its own look
+          V := HolderView(P, Card);
+          if V = nil then
+            Continue;
+        end
+        else if (Card.Menu = nil) and (Card.Shows in [csRow, csColumn]) then
+        begin
+          // what its rules found as inner cards inside it (plan 11 3.1; format 1's buttons)
+          V := FoundView(P, Card);
+          if V = nil then
+            Continue;
+        end
+        else if (Card.Menu = nil) and (Card.Shows = csSubmenu) then
+        begin
+          // what its rules found as its submenu, in its template's look
+          if not P.FFound.TryGetValue(Card, List) or (List.Count = 0) then
             Continue;
           V := TViewCard.Create;
-          V.Kind := vkGroup;
+          V.Kind := vkMenu;
           V.Card := Card;
-          V.Buttons := TObjectList<TViewCard>.Create;
-          Unfolded := nil;
-          Shown := 0;
-          for F in List do
-          begin
-            if F.Node = nil then
-            begin
-              // Dexmenu's own item: a button of its own
-              Inc(Shown);
-              B := OwnView(F, Card, True);
-              B.InGroup := True;
-              V.Buttons.Add(B);
-              Continue;
-            end;
-            if P.Hides(F.Node) or F.Node.IsSeparator then
-              Continue;
-            Inc(Shown);
-            if F.Node.SubMenu <> 0 then
-            begin
-              Unfolded := F.Node;
-              if F.Node.Children = nil then
-                ReadChildren(F.Node);
-              Inner := P.SubmenuLevel(F.Node);
-              try
-                for SubLine in Inner.Lines do
-                  while SubLine.Cards.Count > 0 do
-                  begin
-                    B := SubLine.Cards.Extract(SubLine.Cards[0]);
-                    if B.Kind = vkSeparator then
-                    begin
-                      B.Free;
-                      Continue;
-                    end;
-                    B.Card := Card;
-                    B.Rule := F.Rule;
-                    B.Several := True;
-                    B.InGroup := True;
-                    V.Buttons.Add(B);
-                  end;
-              finally
-                Inner.Free;
-              end;
-            end
-            else if F.Node.Name <> '' then
-            begin
-              B := TViewCard.Create;
-              B.Kind := vkItem;
-              B.Node := F.Node;
-              B.Card := Card;
-              B.Rule := F.Rule;
-              B.Several := True;
-              B.InGroup := True;
-              V.Buttons.Add(B);
-            end;
-          end;
-          if V.Buttons.Count = 0 then
-          begin
-            V.Free;
-            Continue;
-          end;
-          if Card.ShownTitle <> '' then
-            V.BackTitle := Card.ShownTitle
-          else if (Shown = 1) and (Unfolded <> nil) then
-            V.BackTitle := Unfolded.Name
-          else
-            V.BackTitle := Card.Title;
         end
         else if Card.Menu <> nil then
         begin
@@ -1187,6 +1448,36 @@ end;
 function TPlacement.MenuLevel(Card: TCard): TViewLevel;
 begin
   Result := PlaceLines(Self, Card.Menu);
+end;
+
+function TPlacement.LevelOf(V: TViewCard): TViewLevel;
+var
+  Cards: TObjectList<TViewCard>;
+  Unfolded: TNode;
+  I: Integer;
+  Line: TViewLine;
+begin
+  if not V.IsMore and (V.Card.Menu <> nil) then
+    Exit(MenuLevel(V.Card));
+  // its found items (a card showing them in a submenu), or the rest of a holder's from MoreFrom on
+  if V.Card.Menu <> nil then
+    Cards := HeldCards(Self, V.Card)
+  else
+    Cards := FoundCards(Self, V.Card, Unfolded);
+  Result := TViewLevel.Create;
+  try
+    for I := 0 to Cards.Count - 1 do
+      if not V.IsMore or (I >= V.MoreFrom) then
+      begin
+        Line := TViewLine.Create;
+        Line.Cards.Add(Cards[I]);
+        Result.Lines.Add(Line);
+      end
+      else
+        Cards[I].Free;
+  finally
+    Cards.Free;
+  end;
 end;
 
 function TPlacement.SubmenuLevel(Node: TNode): TViewLevel;
