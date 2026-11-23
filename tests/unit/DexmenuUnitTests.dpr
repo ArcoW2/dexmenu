@@ -1866,7 +1866,90 @@ begin
   end;
 end;
 
+// DexmenuUnitTests --compare <old layout> <new layout> <kind>... (plan 11 3.7): the menu of a kind's seen items (the
+// preview's menu) placed and measured with both layouts, every box compared: kind, title, place and size. For the
+// conversion to format 2, which must show the same menu. Exit code: the number of kinds that differ.
+function CompareLayouts: Integer;
+var
+  OldText, NewText, Error, Kind, A, B: string;
+  OldLayout, NewLayout: ILayout;
+  K: Integer;
+
+  function Picture(Layout: ILayout; const Kind: string; AtRightClick: Boolean): string;
+  var
+    Menu: HMENU;
+    Top: TNodes;
+    P: TPlacement;
+    Level: TViewLevel;
+    G: TGeometry;
+    Box: TBox;
+    E: string;
+  begin
+    Result := '';
+    Menu := MenuFromSeen(ReadSeenText(Kind), E);
+    if Menu = 0 then
+      Exit('no seen items: ' + E);
+    Top := ReadLevel(Menu, '');
+    P := TPlacement.Create(Layout, 'default', Top);
+    P.AtRightClick := AtRightClick;
+    try
+      Level := P.TopLevel;
+      try
+        G := Measure(Level);
+        Result := Format('width %.1f height %.1f', [G.Width, G.Height]) + #13#10;
+        for Box in G.Boxes do
+          if (Box.Card.Kind <> vkGroup) or Box.Card.Framed then
+            Result := Result + Format('%d %s %.1f %.1f %.1f %.1f %s', [Ord(Box.Card.Kind), Box.Card.Title, Box.Rect.left,
+              Box.Rect.top, Box.Rect.right, Box.Rect.bottom, BoolToStr(Box.Alone, True)]) + #13#10;
+      finally
+        Level.Free;
+      end;
+    finally
+      P.Free;
+      Top.Free;
+      DestroyMenu(Menu);
+    end;
+  end;
+
 begin
+  Result := 0;
+  OldText := TFile.ReadAllText(ParamStr(2));
+  NewText := TFile.ReadAllText(ParamStr(3));
+  OldLayout := ParseLayout(OldText, ParamStr(2), Error);
+  if OldLayout = nil then
+  begin
+    Writeln('old layout not read: ', Error);
+    Exit(1);
+  end;
+  NewLayout := ParseLayout(NewText, ParamStr(3), Error);
+  if NewLayout = nil then
+  begin
+    Writeln('new layout not read: ', Error);
+    Exit(1);
+  end;
+  for K := 4 to ParamCount do
+  begin
+    Kind := ParamStr(K);
+    A := Picture(OldLayout, Kind, False) + Picture(OldLayout, Kind, True);
+    B := Picture(NewLayout, Kind, False) + Picture(NewLayout, Kind, True);
+    if A = B then
+      Writeln('SAME ', Kind, ': ', Length(A.Split([#13#10])) - 2, ' boxes')
+    else
+    begin
+      Inc(Result);
+      Writeln('DIFFERENT ', Kind);
+      TFile.WriteAllText(ChangeFileExt(ParamStr(3), '') + '.' + Kind + '.old.txt', A);
+      TFile.WriteAllText(ChangeFileExt(ParamStr(3), '') + '.' + Kind + '.new.txt', B);
+    end;
+  end;
+end;
+
+begin
+  if ParamStr(1) = '--compare' then
+  begin
+    ExitCode := CompareLayouts;
+    Exit;
+  end;
   TestComments;
   TestLayouts;
   TestCurrent;

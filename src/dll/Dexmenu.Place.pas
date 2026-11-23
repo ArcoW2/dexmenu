@@ -1121,6 +1121,19 @@ begin
   end;
 end;
 
+// Whether a level holds any card, a divider or the search box not counted.
+function HasCards(Level: TViewLevel): Boolean;
+var
+  L: TViewLine;
+  V: TViewCard;
+begin
+  Result := False;
+  for L in Level.Lines do
+    for V in L.Cards do
+      if not (V.Kind in [vkSeparator, vkSearch]) then
+        Exit(True);
+end;
+
 // A card holding cards shown inside it (plan 11 3.1, 3.3): what it holds placed and arranged as it says; nil when it
 // is not shown (by shownWhen, at a right-click; the preview shows it striped).
 function HolderView(P: TPlacement; Card: TCard): TViewCard;
@@ -1132,6 +1145,12 @@ begin
     Inner := PlaceLines(P, Card.Menu)   // under each other as placed: its dividers kept
   else
     Inner := Arrange(Card, HeldCards(P, Card), False);
+  // nothing in it but dividers (its cards found nothing): left out, also in the preview, as a line of such cards was
+  if not HasCards(Inner) then
+  begin
+    Inner.Free;
+    Exit;
+  end;
   if not HolderShows(Card, Inner) and P.AtRightClick then
   begin
     Inner.Free;
