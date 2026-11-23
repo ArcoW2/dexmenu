@@ -1,8 +1,9 @@
 # Plan 13: The card panel grouped: its fields by what they are about, in panels the user arranges
 
-Status: not started; see Status.
+Status: executed; see Status.
 
 - 2026-11-23: draft.
+- 2026-11-23: executed.
 
 Builds on plan 02 (`executed/02-PLAN-own-menu.md`: the editor's card panel, 3.5) and plan 03 (`03-PLAN-menu-look.md`:
 the size and look fields, 3.5, 3.6). Plans 10, 11 and 12 add fields to the same panel.
@@ -31,16 +32,16 @@ problem in red; the tab chosen in a panel stays when another card is selected.
 
 | Part | What | Reference |
 |---|---|---|
+| Groups | the card's name fixed at the top (Hidden as an eye at its right); the other fields in the groups Names, Rules, Inside, Layout, Style; per kind of card the groups that apply | 3.1; 3.2; 6.1 |
+| Panels arranged | each group a panel, dragged above or below another (under each other), onto another (both tabs), onto a tab (a new tab) or into a tab (under each other in it, the tab named for its panels); the arrangement remembered | 3.3; 6.1 |
+| Group marks | a dot by a group's name when something of its own is set; Rules with its count, red with an invalid rule | 3.4; 6.1 |
+| Tab kept | the first tab until another is chosen; the chosen tab kept across selections; the Rules tab chosen and the rule scrolled to when it is selected in the rules view or the preview | 3.4; 6.1 |
+| Tests | the editor's self-test (the arrangement); the panel rendered as first arranged and with a set of tabs | 3.5; 6.1 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Groups | the card's name fixed at the top; the other fields in the groups Names, Rules, Inside, Layout, Style; per kind of card the groups that apply | -- | 3.1; 3.2 |
-| Panels arranged | each group a panel, dragged above or below another (under each other), onto another (both tabs), onto a tab (a new tab) or into a tab (under each other in it, the tab named for its panels); the arrangement remembered | Groups | 3.3 |
-| Group marks | a group with anything set marked; the Rules group red with an invalid rule; its count of rules | Groups | 3.4 |
-| Tab kept | the chosen tab of each panel kept across selections; the Rules group shown when a rule is selected in the rules view or the preview | Panels arranged | 3.4 |
-| Tests | 3.5 | Groups | 3.5 |
 
 ## 3. Details
 
@@ -121,3 +122,24 @@ Submenus open sits in Inside: it is about what opens from the card.
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 The card panel's panels
+
+- The arrangement is `[ { panel: id } | { tabs: [ [ids], ... ] } ]` (layout model: `defaultArrangement`,
+  `normalArrangement`, `arrangePanel`, `tabName`, `panelSet`), kept in the editor's local storage
+  (`dexmenu.cardPanels`), so every editor window has it; read back whole (unknown and doubled panels dropped, a set
+  of one tab undone, a missing panel added).
+- Moving a panel takes it out first and keeps a set left with one tab until it is placed, so a panel dragged within
+  its own set lands where it was dropped; then a set of one tab becomes its panels on their own.
+- While dragging, the place shows: a line above or below a panel or a set (its top or bottom edge), an outline on a
+  panel (onto: tabs) or a tab (a new tab), a line above or below a panel inside a tab. Esc ends the drag, as any.
+- A tab of one panel shows that panel's fields directly, its name on the tab (the tab is its handle); a tab of more
+  shows each with its name on its border line. A dot marks a tab when any of its panels has something set.
+- The eye: Segoe Fluent Icons' View and Hide glyphs; not on Dexmenu's own card or the remaining card. Dexmenu's own
+  card has its Title in the fixed top and the Item choice in Names. A note keeps its single column.
+- Tested: the editor's self-test (the first arrangement; onto, onto a tab, into a tab above and below, above a set,
+  a set left with one tab, a tab's name with panels not shown, an arrangement read back, the marks); the panel
+  rendered in a browser as first arranged and with Rules | Inside | Layout/Style as tabs. Dragging tried by hand: not
+  yet.

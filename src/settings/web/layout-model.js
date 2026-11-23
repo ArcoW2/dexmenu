@@ -508,6 +508,89 @@ const LayoutModel = (() => {
 
   // ---- copied between layouts (plan 05 3.6: Ctrl+C / Ctrl+V between editor windows) ---------------------------------
 
+  // ---- the card panel's panels (plan 13): the groups of a card's fields, arranged by the user ---------------------
+
+  const panelIds = ["names", "rules", "inside", "layout", "style"];
+  const panelNames = { names: "Names", rules: "Rules", inside: "Inside", layout: "Layout", style: "Style" };
+
+  // An arrangement: what stands under each other below the card's name, each { panel: id } on its own or
+  // { tabs: [ [ids], [ids], ... ] }, a set of tabs, each tab its panels under each other. The first: every panel on its
+  // own, in the order of panelIds.
+  function defaultArrangement() { return panelIds.map(id => ({ panel: id })); }
+
+  // An arrangement made whole (also one read back from storage, which may be anything): every panel once, unknown ones
+  // and empty tabs dropped, a set of tabs left with one tab its panels on their own, a missing panel added at the end.
+  function normalArrangement(arrangement) {
+    const seen = new Set(), out = [];
+    const take = id => typeof id === "string" && panelIds.includes(id) && !seen.has(id) && seen.add(id);
+    for (const item of Array.isArray(arrangement) ? arrangement : []) {
+      if (!item || typeof item !== "object") continue;
+      if (typeof item.panel === "string") { if (take(item.panel)) out.push({ panel: item.panel }); continue; }
+      if (!Array.isArray(item.tabs)) continue;
+      const tabs = item.tabs.filter(Array.isArray).map(t => t.filter(take)).filter(t => t.length);
+      if (tabs.length === 1) for (const id of tabs[0]) out.push({ panel: id });
+      else if (tabs.length > 1) out.push({ tabs });
+    }
+    for (const id of panelIds) if (!seen.has(id)) out.push({ panel: id });
+    return out;
+  }
+
+  // Where a panel is in an arrangement: { item, tab (-1 on its own), at (its place in the tab) }, or null.
+  function locatePanel(arrangement, id) {
+    for (let i = 0; i < arrangement.length; i++) {
+      const item = arrangement[i];
+      if (item.panel === id) return { item: i, tab: -1, at: 0 };
+      if (item.tabs) for (let t = 0; t < item.tabs.length; t++) {
+        const at = item.tabs[t].indexOf(id);
+        if (at >= 0) return { item: i, tab: t, at };
+      }
+    }
+    return null;
+  }
+
+  // The panel id moved (a new arrangement): target { kind, of, side } by the panel it is dropped on (of):
+  //   "above" / "below": on its own above or below what of stands in (a panel on its own, or its set of tabs);
+  //   "onto": of on its own and the panel become a set of tabs, a tab each (of in a set of tabs: as "tab");
+  //   "tab": a new tab after the tab holding of (of on its own: as "onto");
+  //   "inTab": into the tab holding of, before (side "above") or after it (of on its own: as "above" / "below").
+  function arrangePanel(arrangement, id, target) {
+    const arr = normalArrangement(JSON.parse(JSON.stringify(arrangement)));
+    if (!target || target.of === id || !panelIds.includes(id)) return arr;
+    // taken out first; a set left with one tab stays a set until the end, so the target's place holds
+    const from = locatePanel(arr, id);
+    if (from.tab < 0) arr.splice(from.item, 1);
+    else {
+      const tabs = arr[from.item].tabs;
+      tabs[from.tab].splice(from.at, 1);
+      if (!tabs[from.tab].length) tabs.splice(from.tab, 1);
+    }
+    const to = locatePanel(arr, target.of);
+    if (!to) return normalArrangement(arr);
+    let kind = target.kind;
+    if (to.tab < 0 && kind === "tab") kind = "onto";
+    if (to.tab >= 0 && kind === "onto") kind = "tab";
+    if (to.tab < 0 && kind === "inTab") kind = target.side === "below" ? "below" : "above";
+    if (kind === "above") arr.splice(to.item, 0, { panel: id });
+    else if (kind === "below") arr.splice(to.item + 1, 0, { panel: id });
+    else if (kind === "onto") arr[to.item] = { tabs: [[target.of], [id]] };
+    else if (kind === "tab") arr[to.item].tabs.splice(to.tab + 1, 0, [id]);
+    else if (kind === "inTab") arr[to.item].tabs[to.tab].splice(to.at + (target.side === "below" ? 1 : 0), 0, id);
+    return normalArrangement(arr);
+  }
+
+  // A tab's name: its panels' names joined ("Layout/Style"), only those shown.
+  function tabName(tab, shown) { return tab.filter(id => !shown || shown.includes(id)).map(id => panelNames[id]).join("/"); }
+
+  // Whether a card has anything of its own set in a panel's fields (its mark). The Rules panel shows its count instead.
+  const panelKeys = {
+    names: ["title", "rename", "extra", "extraAt", "icon", "hint", "comment"],
+    rules: ["skipDuplicates"],
+    inside: ["buttons", "submenus"],
+    layout: ["weight", "minWidth", "height", "wrap", "cardFit"],
+    style: ["background", "foreground", "border", "borderWidth", "radius", "hover", "pressed"],
+  };
+  function panelSet(card, id) { return (panelKeys[id] || []).some(k => card[k] !== undefined); }
+
   // A card's style, what "Copy style" takes and "Paste style" puts on another card: its look (background, text
   // colour, border, radius, the hover and pressed look) and how it sits and opens (height, wrap, fit in line, extra
   // text at, submenus open). Not its name, texts, icon, rules or menu.
@@ -646,7 +729,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

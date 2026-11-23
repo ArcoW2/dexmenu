@@ -304,6 +304,32 @@
     check(moveLine(id => M.moveCardNext(L5.lines, id, idOf("Rest"), "above")) && names() === "X / A|B / Rest", "as a line of its own again: " + names());
   }
 
+  // the card panel's panels arranged (plan 13 3.3)
+  {
+    const show = a => a.map(i => i.panel || "[" + i.tabs.map(t => t.join("+")).join(" | ") + "]").join(" / ");
+    let a = M.defaultArrangement();
+    check(show(a) === "names / rules / inside / layout / style", "the first arrangement: each on its own, in order");
+    a = M.arrangePanel(a, "style", { kind: "onto", of: "layout" });
+    check(show(a) === "names / rules / inside / [layout | style]", "onto another: a set of tabs, a tab each: " + show(a));
+    a = M.arrangePanel(a, "inside", { kind: "tab", of: "layout" });
+    check(show(a) === "names / rules / [layout | inside | style]", "onto a tab: a new tab after it: " + show(a));
+    a = M.arrangePanel(a, "names", { kind: "inTab", of: "style", side: "above" });
+    check(show(a) === "rules / [layout | inside | names+style]", "into a tab, above a panel: " + show(a));
+    a = M.arrangePanel(a, "rules", { kind: "inTab", of: "style", side: "below" });
+    check(show(a) === "[layout | inside | names+style+rules]" && M.tabName(["names", "style", "rules"]) === "Names/Style/Rules",
+      "into a tab, below a panel; the tab named for its panels: " + show(a));
+    a = M.arrangePanel(a, "names", { kind: "above", of: "layout" });
+    check(show(a) === "names / [layout | inside | style+rules]", "above a set of tabs: on its own: " + show(a));
+    a = M.arrangePanel(a, "inside", { kind: "below", of: "names" });
+    a = M.arrangePanel(a, "layout", { kind: "below", of: "inside" });
+    check(show(a) === "names / inside / layout / style / rules", "a set left with one tab: its panels on their own: " + show(a));
+    check(M.tabName(["layout", "style"], ["style"]) === "Style", "a tab's name: only the panels shown");
+    check(show(M.normalArrangement([{ panel: "rules" }, { tabs: [["x"], ["style", "rules"]] }, 5])) === "rules / style / names / inside / layout",
+      "an arrangement read back: unknown and twice dropped, a set of one tab undone, the missing added");
+    check(M.panelSet({ wrap: true }, "layout") && !M.panelSet({ wrap: true }, "style") && M.panelSet({ hover: {} }, "style"),
+      "a panel marked when something of its own is set");
+  }
+
   // a rule's states: its own, else what General sets
   check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
     M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",

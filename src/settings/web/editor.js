@@ -356,6 +356,7 @@ const zoneClass = zone => zone === "onto" ? "over" : "over-" + zone;
 
 function select(id, ruleIndex) {
   selectedLine = null;
+  if (ruleIndex >= 0) revealRule = true;
   selectedId = id;
   selectedRule = ruleIndex;
   post({ type: "mark", cardId: id || "" });
@@ -592,18 +593,7 @@ function lookFields(card) {
       else card.hover = Object.assign(card.hover || {}, { background: v });
     }
   };
-  const extraAt = el("select");
-  for (const [v, label] of [["", "below the title"], ["above", "above the title"]]) {
-    const o = el("option", "", label);
-    o.value = v;
-    extraAt.append(o);
-  }
-  extraAt.value = card.extraAt || "";
-  extraAt.addEventListener("change", () => { if (extraAt.value) card.extraAt = extraAt.value; else delete card.extraAt; changed(); });
-  const extraRow = el("label", "field");
-  extraRow.append(el("span", "", "Extra text at"), extraAt);
-  return [extraRow,
-    colorField("Background", own("background").get, own("background").set, true),
+  return [colorField("Background", own("background").get, own("background").set, true),
     colorField("Text colour", own("foreground").get, own("foreground").set),
     colorField("Border", own("border").get, own("border").set),
     textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
@@ -851,9 +841,59 @@ function renderCardPane() {
       el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
     return;
   }
-  if (M.isOwn(card)) {
-    // Dexmenu's own item: which one, its title and icon; no rules
-    $("cardHeading").textContent = "Dexmenu's own item";
+  $("cardHeading").textContent = M.isOwn(card) ? "Dexmenu's own item" : M.isRemaining(card) ? "The remaining card"
+    : card.menu ? "A card with a menu" : "A card with rules";
+  const groups = cardGroups(card);
+  $("card").replaceChildren(cardTop(card), renderPanels(card, groups));
+  if (revealRule) {
+    revealRule = false;
+    requestAnimationFrame(() => { const r = $("card").querySelector(".rule.selected"); if (r) r.scrollIntoView({ block: "nearest" }); });
+  }
+}
+
+// ---- the card panel's parts (plan 13): the name fixed at the top, the other fields in panels the user arranges -----
+
+let revealRule = false;   // a rule selected elsewhere (the rules view, the preview): shown once the panel is drawn
+const chosenTabs = new Map();   // a set of tabs (by its panels) -> the tab chosen in it (by that tab's panels), this session
+const panelsKey = "dexmenu.cardPanels";
+let arrangement = (() => {
+  try { return M.normalArrangement(JSON.parse(localStorage.getItem(panelsKey) || "null")); }
+  catch (e) { return M.defaultArrangement(); }
+})();
+function keepArrangement() {
+  try { localStorage.setItem(panelsKey, JSON.stringify(arrangement)); } catch (e) { /* not kept: this session only */ }
+}
+
+// Segoe Fluent Icons (Segoe MDL2 Assets on Windows 10): an open eye, and one struck through
+const eyeShown = String.fromCharCode(0xE890), eyeHidden = String.fromCharCode(0xED1A);
+
+// The fixed top: the card's name (Dexmenu's own item: its title) and, at its right, Hidden as an eye.
+function cardTop(card) {
+  const top = el("div", "card-top");
+  const own = M.isOwn(card);
+  const name = textField(own ? "Title" : "Name", card.card, v => {
+    card.card = v || (own ? (card.own === "windowsMenu" ? "Windows' menu" : "Edit menu...") : "Card");
+    changed();
+  });
+  top.append(name);
+  if (!M.isRemaining(card) && !own) {
+    const eye = el("button", "eye" + (card.hidden ? " hidden" : ""), card.hidden ? eyeHidden : eyeShown);
+    eye.title = card.hidden ? "Hidden: not shown; its rules still take their items, so they show nowhere (click to show it)"
+      : "Shown (click to hide it: its rules still take their items, so they show nowhere, not in the remaining card either)";
+    eye.addEventListener("click", () => { if (card.hidden) delete card.hidden; else card.hidden = true; changed(); });
+    top.append(eye);
+  }
+  return top;
+}
+
+// A card's fields by panel (plan 13 3.1, 3.2): { names, rules, inside, layout, style }, each a list of elements; a
+// panel the card's kind does not have is left out.
+function cardGroups(card) {
+  const own = M.isOwn(card), rest = M.isRemaining(card), withRules = !card.menu && !rest && !own;
+  const g = {};
+  // Names: what it and its items show as text, the icon, the hint, the comment
+  const names = [];
+  if (own) {
     const which = el("select");
     for (const [v, label] of [["editMenu", "Edit menu...: this editor on the layout in use"], ["windowsMenu", "Windows' menu: shows Windows' own menu"]]) {
       const o = el("option", "", label);
@@ -864,39 +904,34 @@ function renderCardPane() {
     which.addEventListener("change", () => { card.own = which.value; changed(); });
     const row = el("label", "field");
     row.append(el("span", "", "Item"), which);
-    $("card").replaceChildren(row,
-      textField("Title", card.card, v => { card.card = v || (card.own === "windowsMenu" ? "Windows' menu" : "Edit menu..."); changed(); }),
-      textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); }, "(none) e.g. E70F"),
-      textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
-        "(none) a smaller text with the title"),
-      ...sizeFields(card), ...lookFields(card),
-      el("div", "hint", "Shown where it stands in the layout; a layout without it does not show it."));
-    return;
-  }
-  $("cardHeading").textContent = M.isRemaining(card) ? "The remaining card" : card.menu ? "A card with a menu" : "A card with rules";
-  const box = $("card");
-  box.replaceChildren();
-  box.append(textField("Name", card.card, v => { card.card = v || "Card"; changed(); }));
-  box.append(textField("Title", card.title, v => { if (v) card.title = v; else delete card.title; changed(); },
+    names.push(row);
+  } else names.push(textField("Title", card.title, v => { if (v) card.title = v; else delete card.title; changed(); },
     card.menu ? "(its name)" : "(the item's own text for one item)"));
+  if (withRules) names.push(textField("Rename (regex)", card.rename && card.rename.regex, v => {
+    if (v) card.rename = { regex: v, replace: (card.rename && card.rename.replace) || "" }; else delete card.rename;
+    changed();
+  }), textField("... replace with", card.rename && card.rename.replace, v => {
+    if (card.rename) { card.rename.replace = v; changed(); }
+  }));
+  names.push(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
+    "(none) a smaller text with the title"), extraAtField(card));
   // its icon (plan 02 3.8): a glyph of Segoe Fluent Icons by its code point, or an icon in a file; else the item's own
-  if (!M.isRemaining(card)) box.append(textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); },
-    "(the item's own) e.g. E8C8, or shell32.dll,4"));
-  box.append(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
-    "(none) a smaller text with the title"));
-  // the hint on hover: a text in place of the item's own hint, or a regex on it (so it can be added to)
-  const hint = card.hint;
-  box.append(textField("Hint", typeof hint === "string" ? hint : "", v => {
-    if (v) card.hint = v; else if (typeof card.hint === "string") delete card.hint;
-    changed();
-  }, "(the item's own hint)"));
-  box.append(textField("Hint regex", hint && typeof hint === "object" ? hint.regex : "", v => {
-    if (v) card.hint = { regex: v, replace: (card.hint && typeof card.hint === "object" && card.hint.replace) || "" };
-    else if (card.hint && typeof card.hint === "object") delete card.hint;
-    changed();
-  }, "e.g. ^(.*)$ to add to it"), textField("... replace with", hint && typeof hint === "object" ? hint.replace : "", v => {
-    if (card.hint && typeof card.hint === "object") { card.hint.replace = v; changed(); }
-  }, "e.g. $1 (via LexPen)"));
+  if (!rest) names.push(textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); },
+    own ? "(none) e.g. E70F" : "(the item's own) e.g. E8C8, or shell32.dll,4"));
+  if (!own) {
+    // the hint on hover: a text in place of the item's own hint, or a regex on it (so it can be added to)
+    const hint = card.hint;
+    names.push(textField("Hint", typeof hint === "string" ? hint : "", v => {
+      if (v) card.hint = v; else if (typeof card.hint === "string") delete card.hint;
+      changed();
+    }, "(the item's own hint)"), textField("Hint regex", hint && typeof hint === "object" ? hint.regex : "", v => {
+      if (v) card.hint = { regex: v, replace: (card.hint && typeof card.hint === "object" && card.hint.replace) || "" };
+      else if (card.hint && typeof card.hint === "object") delete card.hint;
+      changed();
+    }, "e.g. ^(.*)$ to add to it"), textField("... replace with", hint && typeof hint === "object" ? hint.replace : "", v => {
+      if (card.hint && typeof card.hint === "object") { card.hint.replace = v; changed(); }
+    }, "e.g. $1 (via LexPen)"));
+  }
   // the comment: for the editor only, never in the menu
   const comment = el("label", "field");
   const area = el("textarea");
@@ -905,20 +940,44 @@ function renderCardPane() {
   area.placeholder = "(only here, never in the menu)";
   area.addEventListener("change", () => { if (area.value) card.comment = area.value; else delete card.comment; changed(); });
   comment.append(el("span", "", "Comment"), area);
-  box.append(comment);
-  if (!M.isRemaining(card)) {
+  names.push(comment);
+  g.names = names;
+  // Rules: what it finds
+  if (withRules) {
+    const rules = [];
+    const actions = el("div", "actions");
+    const add = el("button", "", "+ Rule");
+    add.addEventListener("click", () => { M.addRule(linesOf(), card); selectedRule = card.rules.length - 1; changed(); });
+    actions.append(add);
+    rules.push(actions, ...(card.rules || []).map((r, i) => ruleEditor(card, r, i)));
+    // one item per name over all its rules (Windows 11 shows some items twice: a newer and an older copy)
     const cb = el("input");
     cb.type = "checkbox";
-    cb.checked = !!card.hidden;
-    cb.addEventListener("change", () => { if (cb.checked) card.hidden = true; else delete card.hidden; changed(); });
+    cb.checked = !!card.skipDuplicates;
+    cb.addEventListener("change", () => { if (cb.checked) card.skipDuplicates = true; else delete card.skipDuplicates; changed(); });
     const l = el("label", "field");
-    l.title = "Its rules still take their items, so they show nowhere, not in the remaining card either";
-    l.append(el("span", "", "Hidden"), el("span"));
-    l.lastChild.append(cb, " not shown: what it finds is left out of the menu");
-    box.append(l);
-  }
-  // how what opens from this card opens: as set for every menu (main window), or its own way
-  {
+    l.title = "Of the items its rules find with the same name, only the first shows; the others show nowhere";
+    l.append(el("span", "", "Duplicates"), el("span"));
+    l.lastChild.append(cb, " skip: one item per name");
+    rules.push(l);
+    g.rules = rules;
+  } else if (rest) g.rules = [el("div", "what", "Every item of Windows' menu that no rule took is placed here, each a card of its own, with its submenu. It can be moved, also into a card with a menu, but not deleted.")];
+  // Inside: how what it found shows and opens
+  if (!own) {
+    const inside = [];
+    if (withRules) {
+      // what it finds as buttons inside it, a found submenu unfolded (plan 02 3.3)
+      const bt = el("input");
+      bt.type = "checkbox";
+      bt.checked = !!card.buttons;
+      bt.addEventListener("change", () => { if (bt.checked) card.buttons = true; else delete card.buttons; changed(); });
+      const lb = el("label", "field");
+      lb.title = "What it finds shows as buttons inside it, side by side; an item with a submenu shows the items of that submenu";
+      lb.append(el("span", "", "Items as buttons"), el("span"));
+      lb.lastChild.append(bt, " inside the card");
+      inside.push(lb);
+    }
+    // how what opens from this card opens: as set for every menu (main window), or its own way
     const way = el("select");
     for (const [v, label] of [["", "as set for every menu"], ["next", "next to the card"], ["under", "under the card"],
       ["replace", "in place of the menu (<< back)"]]) {
@@ -931,47 +990,148 @@ function renderCardPane() {
     const row = el("label", "field");
     row.title = card.menu ? "How this card's menu opens" : "How the submenus of the items this card shows open";
     row.append(el("span", "", "Submenus open"), way);
-    box.append(row);
+    inside.push(row);
+    g.inside = inside;
   }
-  // its size on its line and its own look; the remaining card's items each take a line of their own, in their own look
-  if (!M.isRemaining(card)) box.append(...sizeFields(card), ...lookFields(card));
-  if (!card.menu && !M.isRemaining(card)) {
-    // one item per name over all its rules (Windows 11 shows some items twice: a newer and an older copy)
-    const cb = el("input");
-    cb.type = "checkbox";
-    cb.checked = !!card.skipDuplicates;
-    cb.addEventListener("change", () => { if (cb.checked) card.skipDuplicates = true; else delete card.skipDuplicates; changed(); });
-    const l = el("label", "field");
-    l.title = "Of the items its rules find with the same name, only the first shows; the others show nowhere";
-    l.append(el("span", "", "Duplicates"), el("span"));
-    l.lastChild.append(cb, " skip: one item per name");
-    box.append(l);
-    // what it finds as buttons inside it, a found submenu unfolded (plan 02 3.3)
-    const bt = el("input");
-    bt.type = "checkbox";
-    bt.checked = !!card.buttons;
-    bt.addEventListener("change", () => { if (bt.checked) card.buttons = true; else delete card.buttons; changed(); });
-    const lb = el("label", "field");
-    lb.title = "What it finds shows as buttons inside it, side by side; an item with a submenu shows the items of that submenu";
-    lb.append(el("span", "", "Items as buttons"), el("span"));
-    lb.lastChild.append(bt, " inside the card");
-    box.append(lb);
+  // Layout and Style: not the remaining card's (its items each take a line of their own, in their own look)
+  if (!rest) {
+    g.layout = sizeFields(card);
+    g.style = lookFields(card);
   }
-  if (!card.menu)
-    box.append(textField("Rename (regex)", card.rename && card.rename.regex, v => {
-      if (v) card.rename = { regex: v, replace: (card.rename && card.rename.replace) || "" }; else delete card.rename;
-      changed();
-    }), textField("... replace with", card.rename && card.rename.replace, v => {
-      if (card.rename) { card.rename.replace = v; changed(); }
-    }));
+  return g;
+}
 
-  const actions = el("div", "actions");
-  const button = (label, fn) => { const b = el("button", "", label); b.addEventListener("click", fn); actions.append(b); };
-  if (!card.menu && !M.isRemaining(card))
-    button("+ Rule", () => { M.addRule(linesOf(), card); selectedRule = card.rules.length - 1; changed(); });
-  box.append(actions);
-  if (!card.menu && !M.isRemaining(card)) (card.rules || []).forEach((r, i) => box.append(ruleEditor(card, r, i)));
-  if (M.isRemaining(card)) box.append(el("div", "what", "Every item of Windows' menu that no rule took is placed here, each a card of its own, with its submenu. It can be moved, also into a card with a menu, but not deleted."));
+// The panels as arranged (plan 13 3.3): on their own or in sets of tabs, only those the card has; each panel's name
+// on its border line (or its tab) is the handle to drag it by.
+function renderPanels(card, groups) {
+  const shown = Object.keys(groups);
+  const box = el("div", "panels");
+  const ruleCount = (card.rules || []).filter(r => r !== "remaining").length;
+  const invalid = (card.rules || []).some(r => r !== "remaining" && M.ruleProblem(r));
+  // a panel's name as shown: a dot when something of its own is set; Rules its count, red when a rule is invalid
+  const label = id => {
+    const span = el("span", "panel-name" + (id === "rules" && invalid ? " bad" : ""), M.panelNames[id]);
+    if (id === "rules" && groups.rules && !M.isRemaining(card)) span.append(el("span", "panel-count", " " + ruleCount));
+    if (M.panelSet(card, id)) span.append(el("span", "panel-dot", ""));
+    return span;
+  };
+  const handle = (elem, id) => {
+    elem.draggable = true;
+    elem.title = "Drag to move this panel: onto another (tabs), onto a tab (a new tab), into a tab, or above or below another";
+    elem.addEventListener("dragstart", e => {
+      e.stopPropagation();
+      e.dataTransfer.setData("text/panel", id);
+      e.dataTransfer.effectAllowed = "move";
+    });
+  };
+  const panelBox = (id, where) => {
+    const p = el("div", "cpanel");
+    p.dataset.panel = id;
+    p.dataset.where = where;   // "own": on its own; "tab": one of several in a tab
+    const head = el("div", "cpanel-head");
+    head.append(label(id));
+    handle(head, id);
+    const body = el("div", "cpanel-body");
+    body.append(...groups[id]);
+    p.append(head, body);
+    return p;
+  };
+  for (const item of arrangement) {
+    if (item.panel) { if (shown.includes(item.panel)) box.append(panelBox(item.panel, "own")); continue; }
+    const tabs = item.tabs.map(t => t.filter(id => shown.includes(id))).filter(t => t.length);
+    if (!tabs.length) continue;
+    const setKey = item.tabs.flat().join(","), tabKey = t => t.join(",");
+    // the first tab until the user chooses another; a rule selected elsewhere: the tab with Rules
+    let chosen = tabs.find(t => tabKey(t) === chosenTabs.get(setKey)) || tabs[0];
+    if (revealRule && tabs.some(t => t.includes("rules"))) chosen = tabs.find(t => t.includes("rules"));
+    const set = el("div", "ctabs");
+    set.dataset.set = setKey;
+    const line = el("div", "ctab-line");
+    for (const t of tabs) {
+      const b = el("button", "ctab" + (t === chosen ? " on" : ""));
+      b.dataset.tab = t[0];
+      if (t.length === 1) { b.append(label(t[0])); handle(b, t[0]); }
+      else {
+        b.append(el("span", "panel-name", M.tabName(t, shown)));
+        if (t.some(id => M.panelSet(card, id))) b.append(el("span", "panel-dot", ""));
+      }
+      b.addEventListener("click", () => { chosenTabs.set(setKey, tabKey(t)); renderCardPane(); });
+      line.append(b);
+    }
+    const content = el("div", "ctab-content");
+    for (const id of chosen) {
+      if (chosen.length === 1) {
+        // one panel in the tab: its fields; its name is on the tab
+        const p = el("div", "cpanel-body");
+        p.dataset.panel = id;
+        p.dataset.where = "tab";
+        p.append(...groups[id]);
+        content.append(p);
+      } else content.append(panelBox(id, "tab"));
+    }
+    set.append(line, content);
+    box.append(set);
+  }
+  // a dragged panel dropped: where it would go shown while dragging; Esc cancels (the drag's own)
+  const clear = () => { for (const x of box.querySelectorAll(".drop-above, .drop-below, .drop-onto")) x.classList.remove("drop-above", "drop-below", "drop-onto"); };
+  const targetOf = e => {
+    const set = e.target.closest(".ctabs"), y = e.clientY;
+    if (set) {
+      const r = set.getBoundingClientRect();
+      if (y - r.top < 8) return { elem: set, cls: "drop-above", t: { kind: "above", of: set.dataset.set.split(",")[0] } };
+      if (r.bottom - y < 8) return { elem: set, cls: "drop-below", t: { kind: "below", of: set.dataset.set.split(",")[0] } };
+      const tab = e.target.closest(".ctab");
+      if (tab) return { elem: tab, cls: "drop-onto", t: { kind: "tab", of: tab.dataset.tab } };
+      const inner = e.target.closest("[data-where='tab']");
+      if (inner) {
+        const ir = inner.getBoundingClientRect(), below = y > ir.top + ir.height / 2;
+        return { elem: inner, cls: below ? "drop-below" : "drop-above", t: { kind: "inTab", of: inner.dataset.panel, side: below ? "below" : "above" } };
+      }
+      const last = [...set.querySelectorAll("[data-where='tab']")].pop();
+      return last ? { elem: last, cls: "drop-below", t: { kind: "inTab", of: last.dataset.panel, side: "below" } } : null;
+    }
+    const p = e.target.closest(".cpanel[data-where='own']");
+    if (!p) return null;
+    const r = p.getBoundingClientRect(), edge = Math.min(14, r.height / 4);
+    if (y - r.top < edge) return { elem: p, cls: "drop-above", t: { kind: "above", of: p.dataset.panel } };
+    if (r.bottom - y < edge) return { elem: p, cls: "drop-below", t: { kind: "below", of: p.dataset.panel } };
+    return { elem: p, cls: "drop-onto", t: { kind: "onto", of: p.dataset.panel } };
+  };
+  box.addEventListener("dragover", e => {
+    if (!e.dataTransfer.types.includes("text/panel")) return;
+    e.preventDefault();
+    clear();
+    const t = targetOf(e);
+    if (t) t.elem.classList.add(t.cls);
+  });
+  box.addEventListener("dragleave", e => { if (!box.contains(e.relatedTarget)) clear(); });
+  box.addEventListener("drop", e => {
+    if (!e.dataTransfer.types.includes("text/panel")) return;
+    e.preventDefault();
+    clear();
+    const id = e.dataTransfer.getData("text/panel"), t = targetOf(e);
+    if (!t) return;
+    arrangement = M.arrangePanel(arrangement, id, t.t);
+    keepArrangement();
+    renderCardPane();
+  });
+  box.addEventListener("dragend", clear);
+  return box;
+}
+
+// Extra text at: above or below the title (a Names field)
+function extraAtField(card) {
+  const extraAt = el("select");
+  for (const [v, label] of [["", "below the title"], ["above", "above the title"]]) {
+    const o = el("option", "", label);
+    o.value = v;
+    extraAt.append(o);
+  }
+  extraAt.value = card.extraAt || "";
+  extraAt.addEventListener("change", () => { if (extraAt.value) card.extraAt = extraAt.value; else delete card.extraAt; changed(); });
+  const extraRow = el("label", "field");
+  extraRow.append(el("span", "", "Extra text at"), extraAt);
+  return extraRow;
 }
 
 // ---- a card's style (its look, how it sits and opens), copied and pasted onto other cards, also in another layout's

@@ -140,9 +140,9 @@ h2 button { white-space: nowrap; }
   background: linear-gradient(var(--swatch), var(--swatch)), repeating-conic-gradient(#999 0 25%, #fff 0 50%) 0 0 / 10px 10px; }
 .slider { display: flex; flex: 1 1 100%; align-items: center; gap: 6px; font-size: 12px; min-width: 0; }
 .slider.angle { flex: 0 1 auto; }
-.slider-name { flex: 0 0 72px; white-space: nowrap; }
+.slider-name { flex: 0 0 64px; white-space: nowrap; }
 .slider input[type=range] { flex: 1 1 60px; min-width: 40px; width: auto; }
-.slider input.slider-value { width: 4.2em; text-align: right; font: inherit; color: inherit; background: var(--card);
+.slider input.slider-value { width: 44px; flex: none; box-sizing: border-box; text-align: right; font: inherit; color: inherit; background: var(--card);
   border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
 .slider input.slider-value:disabled { color: var(--dim); text-decoration: line-through; }
 [hidden] { display: none !important; }
@@ -187,3 +187,34 @@ textarea { font: inherit; color: inherit; background: var(--card); border: 1px s
 #rules .problem { margin-left: 6px; }
 dialog { background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; }
 dialog menu { display: flex; justify-content: flex-end; gap: 6px; padding: 0; margin: 10px 0 0; }
+
+/* the card panel (plan 13): the name fixed at the top, Hidden as an eye at its right */
+.card-top { position: sticky; top: -6px; z-index: 3; background: var(--bg); display: flex; gap: 8px; align-items: center;
+  padding: 6px 0 4px; margin-top: -6px; border-bottom: 1px solid var(--line); }
+.card-top > .field { flex: 1; margin: 0; }
+.card-top .eye { font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets"; font-size: 16px; line-height: 1; padding: 3px 7px; }
+.card-top .eye.hidden { color: var(--bad); border-color: var(--bad); }
+/* its panels: a box each, its name on the border line (the handle to drag it by) */
+.panels { display: flex; flex-direction: column; }
+.cpanel { position: relative; border: 1px solid var(--line); border-radius: 6px; padding: 14px 8px 8px; margin: 14px 0 0; min-width: 0; }
+.cpanel-head { position: absolute; top: -10px; left: 10px; padding: 0 4px; background: var(--bg); cursor: grab; }
+.panel-name { font-weight: 600; }
+.panel-name.bad { color: var(--bad); }
+.panel-count { font-weight: normal; color: var(--dim); }
+.panel-dot { display: inline-block; width: 6px; height: 6px; border-radius: 3px; background: var(--accent); margin-left: 5px; vertical-align: middle; }
+/* a set of tabs: its tab line, then the chosen tab's panels */
+.ctabs { border: 1px solid var(--line); border-radius: 6px; margin: 14px 0 0; min-width: 0; }
+.ctab-line { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 6px 0; border-bottom: 1px solid var(--line); }
+.ctab { border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0; background: none; padding: 3px 10px; cursor: pointer; }
+.ctab.on { background: var(--card); border-color: var(--line); }
+.ctab-content { padding: 4px 8px 8px; min-width: 0; }
+.ctab-content > .cpanel:first-child { margin-top: 12px; }
+/* where a dragged panel would go */
+.drop-above { box-shadow: 0 -3px 0 var(--accent); }
+.drop-below { box-shadow: 0 3px 0 var(--accent); }
+.drop-onto { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* a panel's fields never wider than the panel: its selects and fields shrink with it */
+.cpanel-body { min-width: 0; }
+.cpanel-body select { max-width: 100%; min-width: 0; }
+/* the typed values beside the sliders: no spin buttons, the digits have the room */
+.slider input.slider-value::-webkit-inner-spin-button, .slider input.slider-value::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
