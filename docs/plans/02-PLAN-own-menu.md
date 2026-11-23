@@ -37,7 +37,8 @@ take Windows' items by their text and where they sit, and is an action when it f
 when it finds more. Global settings decide how submenus open, the menu's width per level and the marks for actions
 and submenus; a card can overrule them. A card with a menu has no rules; the cards in its submenu do. Every layout has
 one remaining card that takes every item no rule took; the user puts it where the rest should go, at the root or in a
-submenu. A row of the most used items comes from counting every choice. The
+submenu. A row of the most used items comes from counting every choice; a rule can also find the most used or most
+recently used items by their rank, so any card can show them. The
 window follows the program's changes while it is open and returns the chosen item's id
 exactly as Windows' menu would, so every item still does what it does now. On any error Windows' own menu is shown.
 Layouts are saved under a name; the settings app shows the menu while a layout is edited, drawn by the same code, so
@@ -75,6 +76,7 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Explorer's own icons | Explorer's owner-drawn items' icons read at a right-click and used in the menu and the preview | the probe's result | 3.8 |
+| Used rules | a rule that finds the most used or the most recently used items by rank (all, one, a range) instead of by name; the last use kept per item; the rule panel and the rules view | -- | 3.3; 3.9; 3.12 |
 | Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | Items as buttons in a card | 3.10 |
 | Items as buttons in a card | a card showing its items as buttons inside it (Default B's cards per program) | plan 03 Card | 3.3; 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
@@ -119,6 +121,16 @@ in the layout is where its items show.
   - `path`: (part of) the submenu path the item sits in, matched as the name is (`7-Zip`, or `startsWith: "Tortoise"`).
   - Neither: `top`.
   - `verb` instead of `name`, if 3.2 allows it.
+  - `used` instead of `name`: `"most"` (the most used items) or `"recent"` (the most recently used), with a `rank`:
+    none (all of them, in order), one number (`3`: the third) or a range (`"1-3"`). The ranks are counted over the
+    items of this kind of right-click with a use (3.9) that are in this menu and in the rule's states, so a rank does
+    not shift when another rule took an item: two cards side by side with `"1-3"` and `"4-6"` show the six most
+    recent in two columns of three. Everything else works as for a name: the states, `consume`, `also`, the card's
+    `skipDuplicates`, the priority list, a found item taking its subitems, titles. Without a function here, and left
+    out of the rule panel for it: the match kind, `caseSensitive`, `scope` and `path` (a used item is found at any
+    depth). Most used: by count, a tie by the most recent; most recent: by the last use. In the editor the rule panel
+    starts with what the rule finds (by name, most used, most recently used) and, for the last two, a Rank field; the
+    rules view shows such a rule as "most used 1-3".
 - **Match kinds:** `equals`, `contains`, `startsWith`, `endsWith`, `wildcard` (`*`, `?`), `regex`. Case insensitive by
   default; `caseSensitive: true` per rule. `any` takes a list of patterns (one of them).
 - **States:** a set, `["enabled"]`, `["disabled"]` or both; an item whose state is in the set is taken. The default
@@ -366,6 +378,8 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
 
 - Every choice counted per item (its path and the kind of right-click), in `%APPDATA%\Dexmenu\usage.json`, written by
   the DLL after the menu has closed, so the choice is not slowed.
+- With the count, the time of the item's last use (`usage.json` per kind: `last`, by the same key), for the rules on
+  the most recently used (3.3); an item counted before this has no time and ranks after those that have one.
 - `mostUsed` in a layout: a row of the items chosen most, for this kind of right-click, as many as the global setting
   says; only items present in this menu.
 - An item may show both in the most used row and at its own place: the row is a shortcut.
@@ -455,6 +469,9 @@ Windows' texts, so they fit an English Windows until a rule on the verb is possi
   (the removed card gone, its line closed up), the right id handed back after.
 - Edit menu...: the settings app started with this menu's items and kind of right-click.
 - Use counts: a choice counted once, the most used row in order of counts.
+- Used rules: `most` and `recent` with no rank, one rank and a range; a rank past the items there finds nothing;
+  ranks fixed when an earlier rule took an item; with `also`, `consume: false`, the states and `skipDuplicates`; the
+  last use written with each choice; an older `usage.json` without times read.
 - The preview: the same tree and layout drawn in the test host's menu window and in the preview window give the same
   picture (both captured and compared); a layout edit redraws the preview; striped items; a choice in the preview
   runs nothing.
