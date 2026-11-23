@@ -44,7 +44,8 @@ and the icon theme in use draws it. The owner-draw probe in the DLL is removed.
 | Probing menus | the settings app asks Windows for the real menus of a set of right-clicks and keeps every bitmap | -- | 3.2 |
 | Probing registrations | items still without an icon: the `Icon` of their verb's registration, a packaged extension's icon | Probing menus | 3.3 |
 | Icon themes | shipped icons for Windows' own items and common tasks, by name, in several icon themes; the icon theme chosen per light and dark | -- | 3.6 |
-| Icon picker | in the card panel: choose an icon theme's icon, a glyph, a kept icon or an icon in a file | Icon themes | 3.4 |
+| Icon from a file | in the card panel: "..." beside Icon, a file chosen (exe, dll, ico), its icons shown, one picked as `path,index` | -- | 3.4 |
+| Icon picker | the picker's other tabs: an icon theme's icon, a glyph, a kept icon | Icon themes | 3.4 |
 | Owner-draw probe removed | the DLL's opt-in probe (ProbeIcons) and its code taken out | -- | 3.5 |
 | Tests | 3.7 | -- | 3.7 |
 
@@ -83,6 +84,9 @@ and the icon theme in use draws it. The owner-draw probe in the DLL is removed.
 - In the editor's card panel, beside the Icon field: "Select an icon...", and where a card shows no icon in the
   preview the same choice on the card. A dialog with four tabs: the icon themes' icons by name (3.6), the glyphs of Segoe Fluent Icons (searchable by
   name), the kept icons (by the items' names), and an icon in a file (`path,index`, the file's icons shown).
+- The icon in a file comes first, on its own: "..." beside the Icon field opens Windows' file dialog (programs,
+  libraries, icon files); the settings app reads the file's icons and shows them in a grid; the one clicked is
+  written as `path,index`. The other tabs join it once the icon themes are there.
 - A kept icon chosen is written as the card's `icon` by its file, so it stays when the item's own icon changes (where
   that file lives: Open question 2).
 

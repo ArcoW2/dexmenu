@@ -56,6 +56,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Submenu panels | next, under, replace: where they appear and how they look | -- | 3.9 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
 | Preview marks | striped unavailable items, new | -- | 3.10 |
+| Colour fields | the card panel's colours each a picker: a colour or a palette colour, an intensity and an opacity | -- | 3.6 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -217,6 +218,11 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   gradient, image; `none` or alpha only on a menu with a background, 3.4), `foreground`, `border`, `radius`,
   `height`, `minWidth`, `weight`, `cardFit` (3.5). Per state where wanted
   (`hover` of its own).
+- **Its colours in the editor:** each colour field of the card panel (Background, Text colour, Border, Hover
+  background) is a colour picker with what a theme's colour has (3.2): a colour picked, or a colour of the theme's
+  palette chosen by name; an intensity (0 - 200, 100 the colour itself) and an opacity (0 - 100). What is chosen is
+  written in its shortest form: `#rrggbb` or the palette name alone at intensity and opacity 100, else
+  `{ "color", "intensity", "opacity" }`. A gradient (or `none`) stays a text field beside it, as JSON.
 - **Template cards:** items Dexmenu places in a submenu itself are drawn with a template card's look (plan 02 3.3):
   the layout's, or a card's own submenu template. A template has the same look settings as a card, no rules.
 - **An action or a submenu:** the same card; the mark and the click differ (an item, or a card with a menu or an
