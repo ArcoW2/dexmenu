@@ -1029,13 +1029,17 @@ begin
         GroupState := 'hover';
         FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True);
       end;
-      BorderColor := Theme.Color(Element, GroupState, 'border', RGBA(0, 0, 0, 0), Own);
+      // its border; none set: the dividers' colour (so the frame shows); "none": no frame line
+      BorderColor := Theme.Color(Element, GroupState, 'border', RGBA(0, 0, 0, -1), Own);
       if BorderColor.A > 0 then
         T.CreateSolidColorBrush(ToD2D(BorderColor), nil, CardBorder)
+      else if BorderColor.A < 0 then
+        CardBorder := Sep
       else
-        CardBorder := Sep;
-      T.DrawRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), CardBorder,
-        Theme.Number(Element, 'normal', 'borderWidth', 1, Own));
+        CardBorder := nil;
+      if CardBorder <> nil then
+        T.DrawRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), CardBorder,
+          Theme.Number(Element, 'normal', 'borderWidth', 1, Own));
       if (Marked <> '') and (V.CardId = Marked) then
         T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
           CardRadius, CardRadius), Accent, 1.5);

@@ -162,6 +162,7 @@ const LayoutModel = (() => {
   // and opacity, start and end, and its angle, 90 when not given) or "json" (anything else, as text: a gradient of
   // more colours, "none").
   function fillState(value, gradients) {
+    if (value === "none") return { kind: "none" };   // nothing drawn: no background, no border line
     if (gradients && value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.gradient) &&
       value.gradient.length === 2 && Object.keys(value).every(k => k === "gradient" || k === "angle") &&
       (value.angle === undefined || typeof value.angle === "number")) {
@@ -177,6 +178,7 @@ const LayoutModel = (() => {
   // The value written for a colour field's state; ok false when JSON text does not parse (left as it was). A
   // gradient: { "gradient": [ start, end ], "angle" } with each colour in its shortest form, the angle only when not 90.
   function fillValue(state) {
+    if (state.kind === "none") return { ok: true, value: "none" };
     if (state.kind === "json") return colorValue({ mode: "json", text: state.text });
     if (state.kind === "colour") return colorValue(state.colour);
     const v = { gradient: [colorValue(state.start).value, colorValue(state.end).value] };

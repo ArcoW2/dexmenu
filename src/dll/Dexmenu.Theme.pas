@@ -300,6 +300,12 @@ begin
   begin
     if ParseColor(V.Value, Color) then
       Exit(True);
+    // "none": no colour at all (a border or background not drawn), not an unknown name
+    if V.Value = 'none' then
+    begin
+      Color := RGBA(0, 0, 0, 0);
+      Exit(True);
+    end;
     // a palette name
     Named := nil;
     if FPalette <> nil then

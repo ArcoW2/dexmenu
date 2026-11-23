@@ -958,7 +958,7 @@ var
   Lookup: TFunc<string, string>;
   Stops: TArray<TRGBA>;
   Angle: Single;
-  Own, None: TJSONObject;
+  Own, None, NoBorder: TJSONObject;
 
   function Near(const A: TRGBA; R, G, B: Integer; Alpha: Single = 1): Boolean;
   begin
@@ -1025,6 +1025,7 @@ begin
     '"card": { "normal": { "background": "#111111" } } }', Lookup, Error);
   Own := TJSONObject.ParseJSONValue('{ "background": "#ff0000", "hover": { "foreground": "#0000ff" } }') as TJSONObject;
   None := TJSONObject.ParseJSONValue('{ "background": "none" }') as TJSONObject;
+  NoBorder := TJSONObject.ParseJSONValue('{ "border": "none" }') as TJSONObject;
   try
     Check(Near(T.Color('item', 'normal', 'foreground', RGBA(0, 0, 0)), 0, 255, 0) and
       Near(T.Color('item', 'hover', 'background', RGBA(0, 0, 0)), 0, 0, 255) and (T.Number('item', 'normal', 'radius', 0) = 4),
@@ -1037,7 +1038,12 @@ begin
     Check(T.Background('card', 'hover', Stops, Angle, nil, True) and not T.Background('card', 'pressed', Stops, Angle, nil, True),
       'a state''s own background only: hover given, pressed not');
     Check(not T.Background('card', 'normal', Stops, Angle, None), 'a card''s background "none": none drawn');
+    Check((T.Color('card', 'normal', 'border', RGBA(0, 0, 0, -1), None).A < 0) and
+      (T.Color('card', 'normal', 'border', RGBA(0, 0, 0, -1), TJSONObject(None)).A < 0),
+      'a border not set: the default (told apart from none)');
+    Check(T.Color('card', 'normal', 'border', RGBA(0, 0, 0, -1), NoBorder).A = 0, 'a border "none": no colour (no line drawn)');
   finally
+    NoBorder.Free;
     None.Free;
     Own.Free;
     T.Free;

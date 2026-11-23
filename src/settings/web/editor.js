@@ -633,7 +633,7 @@ function colorControls(cs, withTheme, commit) {
 // gradient of two colours (From and To on rows of their own, each a colour or a palette colour with its intensity and
 // opacity, and its angle), or anything else as JSON (a gradient of more colours, "none"). Written in its shortest form
 // (LayoutModel.fillValue).
-function colorField(label, get, set, gradients = false) {
+function colorField(label, get, set, gradients = false, withNone = false) {
   let state = M.fillState(get(), gradients);
   const row = el("div", "field color-field");
   const body = el("div", "color-body");
@@ -649,7 +649,8 @@ function colorField(label, get, set, gradients = false) {
     : { mode: "pick", base: Object.keys(palette).find(n => n !== "basecolor") || "#808080", intensity: 100, opacity: 100, overrule: false };
   const build = () => {
     const kind = el("select");
-    for (const [v, text] of [["colour", "a colour"], ...(gradients ? [["gradient", "a gradient"]] : []), ["json", "other (JSON)"]]) {
+    for (const [v, text] of [["colour", "a colour"], ...(gradients ? [["gradient", "a gradient"]] : []),
+      ...(withNone ? [["none", "none (not drawn)"]] : []), ["json", "other (JSON)"]]) {
       const o = el("option", "", text);
       o.value = v;
       kind.append(o);
@@ -662,6 +663,7 @@ function colorField(label, get, set, gradients = false) {
       if (kind.value === "colour")
         state = { kind: "colour", colour: state.kind === "gradient" ? { ...state.start } : { mode: "theme", intensity: 100, opacity: 100, overrule: false } };
       else if (kind.value === "gradient") { const s = stop(); state = { kind: "gradient", start: s, end: { ...s }, angle: 90 }; }
+      else if (kind.value === "none") state = { kind: "none" };
       else state = { kind: "json", text: current.ok && current.value !== undefined ? JSON.stringify(current.value) : "" };
       if (state.kind === "json" && !state.text) body.replaceChildren(...build());   // nothing to write yet
       else commit();
@@ -672,6 +674,7 @@ function colorField(label, get, set, gradients = false) {
       first.append(colorControls(state.colour, true, commit));
       return [first];
     }
+    if (state.kind === "none") return [first];
     if (state.kind === "json") {
       const json = el("input");
       json.type = "text";
@@ -718,15 +721,15 @@ function lookFields(card) {
       else card.hover = Object.assign(card.hover || {}, { background: v });
     }
   };
-  return [colorField("Background", own("background").get, own("background").set, true),
+  return [colorField("Background", own("background").get, own("background").set, true, true),
     colorField("Text colour", own("foreground").get, own("foreground").set),
-    colorField("Border", own("border").get, own("border").set),
+    colorField("Border", own("border").get, own("border").set, false, true),
     textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
       const n = Number(v.trim());
       if (v.trim() && n >= 0) card.radius = n; else delete card.radius;
       changed();
     }, "(the theme's) corners, in DIP"),
-    colorField("Hover background", hover.get, hover.set, true)];
+    colorField("Hover background", hover.get, hover.set, true, true)];
 }
 
 function matchEditor(match, onChange) {

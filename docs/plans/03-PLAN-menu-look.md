@@ -43,6 +43,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
+| None | "none" for Background, Hover background and Border: nothing drawn (a framed card's border "none": no frame line, where not set gives the dividers' colour) | 3.6; 6.9 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
@@ -60,6 +61,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
 | Preview marks | striped unavailable items, new | -- | 3.10 |
 | Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient | Menu window | 3.6 |
+| 3D border | a card's border raised (outset) or sunk (inset), lit from an angle, and a shadow at a distance in a colour; in the card panel's Style | -- | 3.6 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -242,6 +244,15 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - **An action or a submenu:** the same card; the mark and the click differ (an item, or a card with a menu or an
   item with a Windows submenu).
 
+- **A 3D border:** besides a flat border, a card's border can look raised (`outset`) or sunk (`inset`): its edges
+  on the light side drawn in a light colour, those on the other side in a shadow colour, the light coming from an
+  angle (degrees, 135 when not given: from the top left). And a shadow: the card's shape in a colour, at a distance
+  from it in the direction away from the light, drawn under the card. In the layout:
+  `"border3d": { "style": "outset" | "inset" | "flat", "angle": 135, "width": 2, "light": <colour>, "shadow": <colour> }`
+  and `"shadow": { "color": <colour>, "distance": 3, "angle": 135, "blur": 0 }`, each colour as any colour field
+  (3.2). In the card panel's Style: a "3D border" part (style, angle, width, light and shadow colours) and a
+  "Shadow" part (colour, distance, angle, blur); copied with the style.
+
 ### 3.7 States
 
 - `hover` (the mouse over it), `pressed` (the button down), `focused` (the keyboard's: a ring, as Windows' focus
@@ -317,7 +328,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 ## 4. Open questions
 
-None.
+1. The 3D border: are inset and outset meant as a bevel on the border (its edges in a light and a shadow colour, as
+   Windows' classic buttons), with the shadow apart (the card's shape under it at a distance), as planned; or as
+   shadows (an outer shadow for outset, an inner one for inset, as CSS box-shadow)?
+2. The shadow's blur (soft edges): wanted, or a sharp shadow only?
 
 ## 6. As built
 
@@ -455,3 +469,10 @@ None.
   top, in the gutter or between lines at that place, below the last line at the bottom. A duplicate gets new ids and
   its rules go to the end of the priority list. Tested in the editor's self-test (at the top, at a place, inside a
   card with a menu, not inside a note or the remaining card, every id once, the priorities 1..n).
+
+### 6.9 None
+
+- "none (not drawn)" is a kind of the Background, Hover background and Border fields, written `"none"`. The theme
+  reads `"none"` as no colour (before: an unknown palette name); a framed card (plan 11) with border `"none"` draws no
+  frame line, where a border not set still draws one in the dividers' colour. Tested: unit tests (a border not set
+  told apart from none; none no colour) and the editor's self-test.

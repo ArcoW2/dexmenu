@@ -414,6 +414,7 @@
     check(M.fillState(two, false).kind === "json", "where no gradient is drawn (text colour, border): a gradient as JSON");
     check(M.fillState({ gradient: ["a", "b", "c"] }, true).kind === "json" && M.fillState({ gradient: ["a", { intensity: 5 }] }, true).kind === "json",
       "a gradient of more colours, or with the theme's colour in it: as JSON");
+    check(M.fillState("none", false).kind === "none" && fill("none") === '"none"', "none: its own kind, written as none");
     check(M.fillState("accent", true).kind === "colour" && fill("accent") === '"accent"' && fill(undefined) === undefined,
       "a colour field holding a colour, or nothing");
     const pal = { basecolor: "#000000ff", accent: "#ff0000ff", glass: "#ffffff80" };
