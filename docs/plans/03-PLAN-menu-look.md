@@ -7,6 +7,7 @@ Status: partly executed; see Status.
 - 2026-11-23: partly executed: lines and cards; the card.
 - 2026-11-23: partly executed: the colour fields.
 - 2026-11-23: partly executed: a title that wraps.
+- 2026-11-23: partly executed: none; a note's style and font; the 3D border; the shadow.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -44,6 +45,9 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
 | None | "none" for Background, Hover background and Border: nothing drawn (a framed card's border "none": no frame line, where not set gives the dividers' colour) | 3.6; 6.9 |
+| Note style | a note's own style (background, text colour, border, radius, 3D border, shadow) and its font: the items' text, the smaller extra text, or its own (family, size, bold, italic) | 3.6; 6.10 |
+| 3D border | a card's border raised (outset) or sunk (inset) as Windows' classic buttons, lit from an angle, its width and light and dark edge colours; in the card panel's Style | 3.6; 6.10 |
+| Shadow | a card's shadow in a colour at a distance away from the light, its edge blurred, under the card and inside the menu only; in the card panel's Style | 3.6; 6.10 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
@@ -61,11 +65,9 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
 | Preview marks | striped unavailable items, new | -- | 3.10 |
 | Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient | Menu window | 3.6 |
-| Note style | a note's own style (background, text colour, border, radius, as a card's) and its font: the items' text, the smaller extra text, or a font of its own (family, size, bold, italic) | -- | 3.6 |
-| 3D border | a card's border raised (outset) or sunk (inset) as Windows' classic buttons, lit from an angle; in the card panel's Style | -- | 3.6 |
-| Shadow | a card's shadow in a colour at a distance away from the light, its edge blurred by an intensity, only on the menu's background; in the card panel's Style | -- | 3.6 |
-| Note from a file | later: a note showing what a file holds (a timer, a reminder), read when the menu opens; kept plain text so the menu stays fast | Note style | 3.6 |
 | Tests | 3.11 | -- | 3.11 |
+
+Moved out: a note showing what a file holds, to plan 14.
 
 ## 3. Details
 
@@ -254,8 +256,7 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   what is not given). Plain text only: no markdown, so a note stays as fast and crisp as the rest of the menu. In the
   card panel a note gets the Style panel and a Font field beside its text; its style is copied and pasted as a
   card's.
-- **Later, a note from a file:** a note showing what a file holds (a timer, a reminder), read when the menu opens,
-  plain text as any note.
+- A note showing what a file holds, or the time and date, is plan 14.
 - **A 3D border:** besides a flat border, a card's border can look raised (`outset`) or sunk (`inset`), as
   Windows' classic buttons: a bevel of a width, its edges on the light side drawn in a light colour, those on the
   other side in a shadow colour, the light coming from an angle (degrees, 135 when not given: from the top left).
@@ -487,3 +488,22 @@ None.
   reads `"none"` as no colour (before: an unknown palette name); a framed card (plan 11) with border `"none"` draws no
   frame line, where a border not set still draws one in the dividers' colour. Tested: unit tests (a border not set
   told apart from none; none no colour) and the editor's self-test.
+
+### 6.10 A note's style, the 3D border, the shadow
+
+- A note reads its style as a card does (`ParseCardLook`) and its `font`; its text format is made once per font and
+  kept (`NoteFormatOf`); a family that is not there falls back to the items' font. A note with a text colour of its
+  own uses it, else the dim colour as before. In the editor a note's fields are Text, Text placed, Font (with family,
+  size, bold, italic for its own), its size fields and the Style fields without the hover background.
+- `DrawBorder` draws every card's and framed holder's border: the bevel when `border3d` says outset or inset (the
+  box less the box inside it by the width, cut into four edges with 45 degree corners, each edge light, dark, or
+  between the two when the light runs along it), else the flat border as before. Defaults: width 2, light from 135,
+  light edges white at 90%, dark edges black at 35%.
+- `DrawShadow` draws under a card, a framed holder and a styled note: the shape moved the distance away from the
+  light, a blur as rings from blur/2 outside to blur/2 inside the shape (at most 16), each adding what is still
+  missing so the colour ramps evenly to its own alpha. Cards are drawn inside the menu's clip, so a shadow never
+  leaves the menu. Cards sit close together by default; a shadow needs a gap (a divider, a row's gap) to show.
+- `border3d`, `shadow` and `font` are part of a card's style (Copy style / Paste style).
+- Tested: unit tests (a note's font read; the 3D border and shadow kept in a card's look), the editor's self-test
+  (the style takes them), the preview captured as a picture (outset, inset, rounded outset lit from above, sharp and
+  blurred shadows, a note in its own font and colours), and the editor's fields in the headless harness.

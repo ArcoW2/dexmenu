@@ -284,6 +284,56 @@ begin
     Result := NotePad;
 end;
 
+var
+  NoteFormats: TDictionary<string, IDWriteTextFormat>;   // a note's own font's format, by its font (made once)
+
+// A note's text format (plan 03 3.6): the items' font, a card's smaller extra text, or its own (family, size, bold,
+// italic; the items' for what it does not give); wrapping, from the top.
+function NoteFormatOf(V: TViewCard): IDWriteTextFormat;
+var
+  Family, Key: string;
+  Size: Single;
+  Weight: DWRITE_FONT_WEIGHT;
+  Style: DWRITE_FONT_STYLE;
+begin
+  Result := NoteFormat;
+  if (V.Card = nil) or not (V.Card.FontExtra or V.Card.FontOwn) then
+    Exit;
+  Family := TextFont;
+  Size := FontSize;
+  Weight := DWRITE_FONT_WEIGHT_NORMAL;
+  Style := DWRITE_FONT_STYLE_NORMAL;
+  if V.Card.FontExtra then
+    Size := ExtraSize
+  else
+  begin
+    if V.Card.FontFamily <> '' then
+      Family := V.Card.FontFamily;
+    if V.Card.FontSize > 0 then
+      Size := V.Card.FontSize;
+    if V.Card.FontBold then
+      Weight := DWRITE_FONT_WEIGHT_SEMI_BOLD;
+    if V.Card.FontItalic then
+      Style := DWRITE_FONT_STYLE_ITALIC;
+  end;
+  Key := Format('%s|%g|%d|%d', [Family, Size, Ord(Weight), Ord(Style)]);
+  FactoryLock.Enter;
+  try
+    if NoteFormats = nil then
+      NoteFormats := TDictionary<string, IDWriteTextFormat>.Create;
+    if NoteFormats.TryGetValue(Key, Result) then
+      Exit;
+    if Failed(DWrite.CreateTextFormat(PWideChar(Family), nil, Weight, Style, DWRITE_FONT_STRETCH_NORMAL, Size, 'en-us',
+      Result)) then
+      Exit(NoteFormat);   // a font that is not there: the items' font
+    Result.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+    Result.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    NoteFormats.Add(Key, Result);
+  finally
+    FactoryLock.Leave;
+  end;
+end;
+
 // A note's text laid out in its box (width), aligned as the layout says; nil when it has no text.
 function NoteLayout(V: TViewCard; Width: Single): IDWriteTextLayout;
 const
@@ -294,7 +344,7 @@ var
 begin
   Result := nil;
   Text := V.Title;
-  if (Text = '') or Failed(DWrite.CreateTextLayout(PWideChar(Text), Length(Text), NoteFormat,
+  if (Text = '') or Failed(DWrite.CreateTextLayout(PWideChar(Text), Length(Text), NoteFormatOf(V),
     Max(1, Width - NoteLeft(V) - NotePad), 10000, Result)) then
     Exit(nil);
   Result.SetTextAlignment(Align[V.Card.NoteAlign]);
@@ -312,14 +362,14 @@ begin
     Result := Max(ItemHeight, M.height + 2 * NotePad);
 end;
 
-// A note's widest line, for the menu's width (the menu still stops at its maximum; the note then wraps).
-function NoteWidth(const Text: string): Single;
+// A note's widest line in its font, for the menu's width (the menu still stops at its maximum; the note then wraps).
+function NoteWidth(V: TViewCard): Single;
 var
   Line: string;
 begin
   Result := 0;
-  for Line in Text.Split([#10]) do
-    Result := Max(Result, TextWidth(Line.TrimRight([#13]), NormalFormat));
+  for Line in V.Title.Split([#10]) do
+    Result := Max(Result, TextWidth(Line.TrimRight([#13]), NoteFormatOf(V)));
   Result := Result + 2 * NotePad;
 end;
 
@@ -406,7 +456,7 @@ begin
   else if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
     Result := TextWidth(V.Divider.DividerText, NormalFormat) + 48
   else if V.Kind = vkNote then
-    Result := NoteWidth(V.Title) + NoteLeft(V) - NotePad
+    Result := NoteWidth(V) + NoteLeft(V) - NotePad
   else if V.Kind <> vkSeparator then
   begin
     if V.IsDefault then
@@ -830,6 +880,176 @@ begin
   Result := D2D1ColorF(C.R, C.G, C.B, C.A);
 end;
 
+// The direction the light comes from (plan 03 3.6), as a vector on screen (y down): angle in degrees, 0 from the
+// right, 90 from the top, 135 from the top left (the default), 180 from the left.
+procedure LightFrom(Angle: Single; out LX, LY: Single);
+begin
+  LX := Cos(DegToRad(Angle));
+  LY := -Sin(DegToRad(Angle));
+end;
+
+// A card's shadow (plan 03 3.6; "shadow": { color, distance, angle, blur }): its shape in the colour, moved the distance
+// away from the light, under the card; a blur softens its edge over that many DIP (rings of growing size, each adding
+// a little of the colour). Drawn inside the menu's clip only: never outside the menu window's background.
+procedure DrawShadow(T: ID2D1RenderTarget; Theme: TTheme; Own: TJSONObject; const R: TD2D1RectF; Radius: Single);
+const
+  MaxRings = 16;
+var
+  S: TJSONObject;
+  C: TRGBA;
+  Distance, Blur, LX, LY, DX, DY, E, Alpha: Single;
+  Rings, K: Integer;
+  Brush: ID2D1SolidColorBrush;
+  Box: TD2D1RectF;
+begin
+  if (Own = nil) or not (Own.GetValue('shadow') is TJSONObject) then
+    Exit;
+  S := TJSONObject(Own.GetValue('shadow'));
+  C := Theme.Color('card', 'normal', 'color', RGBA(0, 0, 0, 0.25), S);
+  if C.A <= 0 then
+    Exit;
+  Distance := Max(0, Theme.Number('card', 'normal', 'distance', 3, S));
+  Blur := Max(0, Theme.Number('card', 'normal', 'blur', 0, S));
+  LightFrom(Theme.Number('card', 'normal', 'angle', 135, S), LX, LY);
+  DX := -LX * Distance;
+  DY := -LY * Distance;
+  Rings := Max(1, Min(MaxRings, Ceil(Blur)));
+  Alpha := C.A;
+  C.A := 1;
+  T.CreateSolidColorBrush(ToD2D(C), nil, Brush);
+  for K := 0 to Rings - 1 do
+  begin
+    // the rings drawn from the largest in: after K + 1 of them the colour is (K + 1) / Rings of its own alpha, an
+    // even ramp from the outer edge to the shape (each ring the part still missing)
+    Brush.SetOpacity(1 - (1 - Alpha * (K + 1) / Rings) / (1 - Alpha * K / Rings));
+    // from Blur/2 outside the shape to Blur/2 inside it
+    if Rings = 1 then
+      E := 0
+    else
+      E := Blur / 2 - Blur * K / (Rings - 1);
+    Box := D2D1RectF(R.left + DX - E, R.top + DY - E, R.right + DX + E, R.bottom + DY + E);
+    if (Box.right > Box.left) and (Box.bottom > Box.top) then
+      T.FillRoundedRectangle(D2D1RoundedRect(Box, Max(0, Radius + E), Max(0, Radius + E)), Brush);
+  end;
+end;
+
+// A card's border (plan 03 3.6): a 3D border ("border3d": { style "outset" | "inset", angle, width, light, shadow }) as
+// Windows' classic buttons, a bevel whose edges facing the light are drawn in the light colour and the others in the
+// shadow colour (inset the other way round), an edge across the light half of each; else a flat border in its colour
+// ("border"); not set: Fallback (nil: none); "none": none.
+procedure DrawBorder(T: ID2D1RenderTarget; Theme: TTheme; const Element, State: string; Own: TJSONObject;
+  const R: TD2D1RectF; Radius: Single; Fallback: ID2D1Brush);
+var
+  B: TJSONObject;
+  Style: string;
+  W, LX, LY, D, Facing: Single;
+  Light, Shade, C: TRGBA;
+  Outer, Inside: ID2D1RoundedRectangleGeometry;
+  Ring, Side, Part: ID2D1PathGeometry;
+  Sink: ID2D1GeometrySink;
+  Brush: ID2D1SolidColorBrush;
+  Edge: Integer;
+  P: array[0..3] of TD2D1Point2F;
+  Identity: TD2DMatrix3x2F;
+
+  function Path(out G: ID2D1PathGeometry; out S: ID2D1GeometrySink): Boolean;
+  begin
+    Result := Succeeded(D2D.CreatePathGeometry(G)) and Succeeded(G.Open(S));
+  end;
+
+begin
+  B := nil;
+  if (Own <> nil) and (Own.GetValue('border3d') is TJSONObject) then
+    B := TJSONObject(Own.GetValue('border3d'));
+  Style := '';
+  if (B <> nil) and (B.GetValue('style') is TJSONString) then
+    Style := B.GetValue('style').Value;
+  if (Style = 'outset') or (Style = 'inset') then
+  begin
+    FillChar(Identity, SizeOf(Identity), 0);
+    Identity._11 := 1;
+    Identity._22 := 1;
+    W := Max(0.5, Min(Theme.Number('card', 'normal', 'width', 2, B), Min(R.right - R.left, R.bottom - R.top) / 2));
+    LightFrom(Theme.Number('card', 'normal', 'angle', 135, B), LX, LY);
+    Light := Theme.Color('card', 'normal', 'light', RGBA(255, 255, 255, 0.9), B);
+    Shade := Theme.Color('card', 'normal', 'shadow', RGBA(0, 0, 0, 0.35), B);
+    if Style = 'inset' then
+    begin
+      C := Light;
+      Light := Shade;
+      Shade := C;
+    end;
+    // the bevel: the box less the box inside it by its width
+    if Failed(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(R, Radius, Radius), Outer)) or
+      Failed(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(D2D1RectF(R.left + W, R.top + W, R.right - W,
+        R.bottom - W), Max(0, Radius - W), Max(0, Radius - W)), Inside)) or not Path(Ring, Sink) then
+      Exit;
+    Outer.CombineWithGeometry(Inside, D2D1_COMBINE_MODE_EXCLUDE, Identity, 0.25, Sink);
+    Sink.Close;
+    // each edge: a trapezoid with 45 degree corners, deep enough for a rounded corner, cut out of the bevel
+    D := Min(Max(W, Radius) + 1, Min(R.right - R.left, R.bottom - R.top) / 2);
+    for Edge := 0 to 3 do
+    begin
+      case Edge of
+        0: begin   // top
+             P[0] := D2D1PointF(R.left, R.top); P[1] := D2D1PointF(R.right, R.top);
+             P[2] := D2D1PointF(R.right - D, R.top + D); P[3] := D2D1PointF(R.left + D, R.top + D);
+             Facing := -LY;
+           end;
+        1: begin   // right
+             P[0] := D2D1PointF(R.right, R.top); P[1] := D2D1PointF(R.right, R.bottom);
+             P[2] := D2D1PointF(R.right - D, R.bottom - D); P[3] := D2D1PointF(R.right - D, R.top + D);
+             Facing := LX;
+           end;
+        2: begin   // bottom
+             P[0] := D2D1PointF(R.right, R.bottom); P[1] := D2D1PointF(R.left, R.bottom);
+             P[2] := D2D1PointF(R.left + D, R.bottom - D); P[3] := D2D1PointF(R.right - D, R.bottom - D);
+             Facing := LY;
+           end;
+      else         // left
+             P[0] := D2D1PointF(R.left, R.bottom); P[1] := D2D1PointF(R.left, R.top);
+             P[2] := D2D1PointF(R.left + D, R.top + D); P[3] := D2D1PointF(R.left + D, R.bottom - D);
+             Facing := -LX;
+      end;
+      // facing the light: light; away: shadow; across it (light from straight above, for a side): between the two
+      if Facing > 0.01 then
+        C := Light
+      else if Facing < -0.01 then
+        C := Shade
+      else
+      begin
+        C.R := (Light.R + Shade.R) / 2;
+        C.G := (Light.G + Shade.G) / 2;
+        C.B := (Light.B + Shade.B) / 2;
+        C.A := (Light.A + Shade.A) / 2;
+      end;
+      if not Path(Side, Sink) then
+        Exit;
+      Sink.BeginFigure(P[0], D2D1_FIGURE_BEGIN_FILLED);
+      Sink.AddLine(P[1]);
+      Sink.AddLine(P[2]);
+      Sink.AddLine(P[3]);
+      Sink.EndFigure(D2D1_FIGURE_END_CLOSED);
+      Sink.Close;
+      if not Path(Part, Sink) then
+        Exit;
+      Ring.CombineWithGeometry(Side, D2D1_COMBINE_MODE_INTERSECT, Identity, 0.25, Sink);
+      Sink.Close;
+      T.CreateSolidColorBrush(ToD2D(C), nil, Brush);
+      T.FillGeometry(Part, Brush, nil);
+    end;
+    Exit;
+  end;
+  C := Theme.Color(Element, State, 'border', RGBA(0, 0, 0, -1), Own);
+  if C.A > 0 then
+  begin
+    T.CreateSolidColorBrush(ToD2D(C), nil, Brush);
+    T.DrawRoundedRectangle(D2D1RoundedRect(R, Radius, Radius), Brush, Theme.Number(Element, State, 'borderWidth', 1, Own));
+  end
+  else if (C.A < 0) and (Fallback <> nil) then
+    T.DrawRoundedRectangle(D2D1RoundedRect(R, Radius, Radius), Fallback, Theme.Number(Element, State, 'borderWidth', 1, Own));
+end;
+
 // A theme's background for an element and state over a rounded box (plan 03 3.4): a colour, or a linear gradient at
 // its angle across the box; False (nothing drawn) when the theme gives none.
 function FillBackground(T: ID2D1RenderTarget; Theme: TTheme; const Element, State: string; const R: TD2D1RectF;
@@ -977,10 +1197,29 @@ begin
       Continue;
     if V.Kind = vkNote then
     begin
-      // a note: its text in the dim colour, aligned as the layout says; no button (no hover, no mark)
+      // a note: no button (no hover, no mark); its own style (plan 03 3.6): its background, border, shadow and 3D
+      // border where it has them; its text in its own colour, else the dim colour, aligned as the layout says
+      Own := nil;
+      if V.Card <> nil then
+        Own := V.Card.Look;
+      if Own <> nil then
+      begin
+        CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius, Own);
+        Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
+        DrawShadow(T, Theme, Own, Inner, CardRadius);
+        if Own.GetValue('background') <> nil then
+          FillBackground(T, Theme, 'card', 'normal', Inner, CardRadius, Own, True);
+        DrawBorder(T, Theme, 'card', 'normal', Own, Inner, CardRadius, nil);
+      end;
       NoteText := NoteLayout(V, R.right - R.left);
       if NoteText <> nil then
-        T.DrawTextLayout(D2D1PointF(R.left + NoteLeft(V), R.top + NotePad), NoteText, Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      begin
+        if (Own <> nil) and (Own.GetValue('foreground') <> nil) then
+          T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'foreground', RGBA($A0, $A0, $A0), Own)), nil, Brush)
+        else
+          Brush := Extra;
+        T.DrawTextLayout(D2D1PointF(R.left + NoteLeft(V), R.top + NotePad), NoteText, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      end;
       Continue;
     end;
     if V.Kind = vkSeparator then
@@ -1019,6 +1258,7 @@ begin
         DrawStripes(T, Inner, Stripe);   // not shown at a right-click (shownWhen)
       if not V.Framed then
         Continue;
+      DrawShadow(T, Theme, Own, Inner, CardRadius);
       FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
       GroupState := 'normal';
       if (Own <> nil) and (Own.GetValue('hover') <> nil) and (Selected >= 0) and (Selected <= High(G.Boxes)) and
@@ -1029,17 +1269,8 @@ begin
         GroupState := 'hover';
         FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True);
       end;
-      // its border; none set: the dividers' colour (so the frame shows); "none": no frame line
-      BorderColor := Theme.Color(Element, GroupState, 'border', RGBA(0, 0, 0, -1), Own);
-      if BorderColor.A > 0 then
-        T.CreateSolidColorBrush(ToD2D(BorderColor), nil, CardBorder)
-      else if BorderColor.A < 0 then
-        CardBorder := Sep
-      else
-        CardBorder := nil;
-      if CardBorder <> nil then
-        T.DrawRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), CardBorder,
-          Theme.Number(Element, 'normal', 'borderWidth', 1, Own));
+      // its border (or 3D border); none set: the dividers' colour (so the frame shows); "none": no frame line
+      DrawBorder(T, Theme, Element, GroupState, Own, Inner, CardRadius, Sep);
       if (Marked <> '') and (V.CardId = Marked) then
         T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
           CardRadius, CardRadius), Accent, 1.5);
@@ -1074,7 +1305,10 @@ begin
     CardRadius := Theme.Number(Element, 'normal', 'radius', ItemRadius, Own);
     Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
     if V.Kind in [vkItem, vkMenu, vkCommand] then
+    begin
+      DrawShadow(T, Theme, Own, Inner, CardRadius);
       FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
+    end;
     if Editing and V.Sometimes then
       DrawStripes(T, Inner, Stripe);
     // hover and pressed over the normal background: the state's own, a pressed card without one as hovered
@@ -1082,13 +1316,7 @@ begin
       State := 'hover';
     if (State = 'hover') and not FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True) then
       T.FillRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), Hover);
-    BorderColor := Theme.Color(Element, State, 'border', RGBA(0, 0, 0, 0), Own);
-    if BorderColor.A > 0 then
-    begin
-      T.CreateSolidColorBrush(ToD2D(BorderColor), nil, CardBorder);
-      T.DrawRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), CardBorder,
-        Theme.Number(Element, State, 'borderWidth', 1, Own));
-    end;
+    DrawBorder(T, Theme, Element, State, Own, Inner, CardRadius, nil);
     // the items of the card selected in the settings app's editor (the preview only)
     if (Marked <> '') and (V.CardId = Marked) then
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),

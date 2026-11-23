@@ -648,10 +648,10 @@ const LayoutModel = (() => {
   function panelSet(card, id) { return (panelKeys[id] || []).some(k => card[k] !== undefined); }
 
   // A card's style, what "Copy style" takes and "Paste style" puts on another card: its look (background, text
-  // colour, border, radius, the hover and pressed look) and how it sits and opens (height, square, wrap, fit in line,
-  // extra text at, submenus open). Not its name, texts, icon, rules or what it holds.
-  const styleKeys = ["background", "foreground", "border", "borderWidth", "radius", "hover", "pressed", "disabled",
-    "height", "square", "wrap", "cardFit", "extraAt", "submenus"];
+  // colour, border, radius, 3D border, shadow, the hover and pressed look, a note's font) and how it sits and opens
+  // (height, square, wrap, fit in line, extra text at, submenus open). Not its name, texts, icon, rules or what it holds.
+  const styleKeys = ["background", "foreground", "border", "borderWidth", "radius", "border3d", "shadow", "font", "hover",
+    "pressed", "disabled", "height", "square", "wrap", "cardFit", "extraAt", "submenus"];
   function styleOf(card) {
     const style = {};
     for (const k of styleKeys) if (card[k] !== undefined) style[k] = JSON.parse(JSON.stringify(card[k]));

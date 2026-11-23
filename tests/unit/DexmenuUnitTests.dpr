@@ -92,6 +92,20 @@ begin
   Check((NoteLayout <> nil) and (NoteLayout.Lines('')[0].Cards[0].NoteAlign = naText) and
     (NoteLayout.Lines('')[0].Cards[1].NoteAlign = naRight) and (NoteLayout.Lines('')[0].Cards[2].NoteAlign = naLeft),
     'a note''s alignment read: text, right; left when not given');
+  // a note's font and style; a card's 3D border and shadow kept in its look (plan 03 3.6)
+  NoteLayout := ParseLayout('{ "format": 1, "lines": [ { "line": [ { "note": "a", "font": "extra" }, ' +
+    '{ "note": "b", "font": { "family": "Georgia", "size": 13, "italic": true }, "background": "#ffeecc" }, { "note": "c" }, ' +
+    '{ "card": "D", "rules": [ { "name": { "equals": "x" } } ], "border3d": { "style": "inset" }, "shadow": { "blur": 4 } } ] }, ' +
+    '{ "line": [ ' + Remaining + ' ] } ] }', 'test', NoteError);
+  Check((NoteLayout <> nil) and NoteLayout.Lines('')[0].Cards[0].FontExtra and not NoteLayout.Lines('')[0].Cards[0].FontOwn and
+    NoteLayout.Lines('')[0].Cards[1].FontOwn and (NoteLayout.Lines('')[0].Cards[1].FontFamily = 'Georgia') and
+    (NoteLayout.Lines('')[0].Cards[1].FontSize = 13) and NoteLayout.Lines('')[0].Cards[1].FontItalic and
+    not NoteLayout.Lines('')[0].Cards[1].FontBold and (NoteLayout.Lines('')[0].Cards[1].Look <> nil) and
+    not NoteLayout.Lines('')[0].Cards[2].FontExtra and not NoteLayout.Lines('')[0].Cards[2].FontOwn,
+    'a note''s font read: the extra text, its own (family, size, italic), the items'' when not given; its style kept');
+  Check((NoteLayout <> nil) and (NoteLayout.Lines('')[0].Cards[3].Look <> nil) and
+    (NoteLayout.Lines('')[0].Cards[3].Look.GetValue('border3d') <> nil) and (NoteLayout.Lines('')[0].Cards[3].Look.GetValue('shadow') <> nil),
+    'a card''s 3D border and shadow kept in its look');
 end;
 
 procedure TestCurrent;

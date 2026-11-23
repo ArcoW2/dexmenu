@@ -291,6 +291,8 @@
       to.icon === "E700" && to.card === "B" && to.rules[0].name.equals === "b" && to.background !== from.background,
       "the style pasted: the card's look replaced (what the style does not set gone), its name, icon and rules kept, a copy");
     check(M.paste(L3, L3.lines, M.clip("style", style), null, at(L3.lines, 1, 0)) === null, "no style onto the remaining card");
+    check(Object.keys(M.styleOf({ note: "n", font: { size: 12 }, border3d: { style: "outset" }, shadow: { blur: 3 } })).sort().join() ===
+      "border3d,font,shadow", "a style takes the 3D border, the shadow and a note's font");
   }
 
   // a template copied onto another card: a copy added to its templates; not onto a card holding cards

@@ -710,9 +710,104 @@ function colorField(label, get, set, gradients = false, withNone = false) {
   return row;
 }
 
+// A select as a field row: options [value, text]; onChange(value).
+function selectRow(label, options, value, onChange, title = "") {
+  const sel = el("select");
+  for (const [v, text] of options) { const o = el("option", "", text); o.value = v; sel.append(o); }
+  sel.value = value;
+  if (title) sel.title = title;
+  sel.addEventListener("change", () => onChange(sel.value));
+  const row = el("label", "field");
+  row.append(el("span", "", label), sel);
+  return row;
+}
+
+// A checkbox as a field row.
+function checkRow(label, checked, onChange) {
+  const box = el("input");
+  box.type = "checkbox";
+  box.checked = !!checked;
+  box.addEventListener("change", () => onChange(box.checked));
+  const row = el("label", "field");
+  const span = el("span");
+  row.append(el("span", "", label), span);
+  span.append(box);
+  return row;
+}
+
+// A property of an object in the card (card[key], made when set, gone when empty), as get/set for a field.
+function partOf(card, key, name) {
+  return {
+    get: () => card[key] && card[key][name],
+    set: v => {
+      if (v === undefined) { if (card[key]) { delete card[key][name]; if (!Object.keys(card[key]).length) delete card[key]; } }
+      else card[key] = Object.assign(card[key] || {}, { [name]: v });
+    }
+  };
+}
+
+// A number in such an object: empty the default.
+function partNumber(card, key, name, label, placeholder, min = 0) {
+  const p = partOf(card, key, name);
+  return textField(label, p.get() === undefined ? "" : String(p.get()), v => {
+    const n = Number(v.trim());
+    p.set(v.trim() && Number.isFinite(n) && n >= min ? n : undefined);
+    changed();
+  }, placeholder);
+}
+
+// A card's 3D border (plan 03 3.6): flat (its border), or raised or sunk as Windows' classic buttons, lit from an
+// angle, its width and its light and shadow colours.
+function bevelFields(card) {
+  const style = (card.border3d && card.border3d.style) || "flat";
+  const rows = [selectRow("3D border", [["flat", "flat (the border above)"], ["outset", "raised (outset)"], ["inset", "sunk (inset)"]], style, v => {
+    if (v === "flat") delete card.border3d; else card.border3d = Object.assign(card.border3d || {}, { style: v });
+    changed();
+  }, "Raised or sunk as Windows' classic buttons: the edges facing the light light, the others dark")];
+  if (style === "flat") return rows;
+  rows.push(partNumber(card, "border3d", "width", "Bevel width", "2 (DIP)", 0.5),
+    partNumber(card, "border3d", "angle", "Light from", "135 (degrees: 90 the top, 135 top left, 180 the left)", -360),
+    colorField("Light edges", partOf(card, "border3d", "light").get, partOf(card, "border3d", "light").set),
+    colorField("Dark edges", partOf(card, "border3d", "shadow").get, partOf(card, "border3d", "shadow").set));
+  return rows;
+}
+
+// A card's shadow (plan 03 3.6): its shape at a distance away from the light, under the card, its edge blurred; only
+// on the menu's own background.
+function shadowFields(card) {
+  const rows = [checkRow("Shadow", !!card.shadow, on => { if (on) card.shadow = { distance: 3 }; else delete card.shadow; changed(); })];
+  if (!card.shadow) return rows;
+  rows.push(colorField("Shadow colour", partOf(card, "shadow", "color").get, partOf(card, "shadow", "color").set),
+    partNumber(card, "shadow", "distance", "Shadow distance", "3 (DIP)"),
+    partNumber(card, "shadow", "angle", "Light from", "135 (degrees; the shadow falls away from it)", -360),
+    partNumber(card, "shadow", "blur", "Shadow blur", "0 (a sharp edge; higher: softer and wider)"));
+  return rows;
+}
+
+// A note's font (plan 03 3.6): the items' text, the smaller extra text, or its own (family, size, bold, italic; empty:
+// the items'). Plain text only.
+function fontFields(card) {
+  const kind = card.font === "extra" ? "extra" : card.font && typeof card.font === "object" ? "own" : "text";
+  const rows = [selectRow("Font", [["text", "as the items' text"], ["extra", "as the extra text (smaller)"], ["own", "its own"]], kind, v => {
+    if (v === "text") delete card.font; else if (v === "extra") card.font = "extra"; else card.font = {};
+    changed();
+  })];
+  if (kind !== "own") return rows;
+  const f = card.font;
+  rows.push(textField("Font family", f.family || "", v => { if (v.trim()) f.family = v.trim(); else delete f.family; changed(); }, "(the items' font)"),
+    textField("Font size", f.size === undefined ? "" : String(f.size), v => {
+      const n = Number(v.trim());
+      if (v.trim() && n >= 4) f.size = Math.min(72, n); else delete f.size;
+      changed();
+    }, "(the items' size, in DIP)"),
+    checkRow("Bold", f.bold, on => { if (on) f.bold = true; else delete f.bold; changed(); }),
+    checkRow("Italic", f.italic, on => { if (on) f.italic = true; else delete f.italic; changed(); }));
+  return rows;
+}
+
 // A card's own look over the theme's (plan 03 3.6): its colours as pickers (colorField), the hover background the
-// same; the radius a number.
-function lookFields(card) {
+// same; the radius a number; its 3D border and shadow. A note: no hover.
+function lookFields(card, note = false) {
   const own = name => ({ get: () => card[name], set: v => { if (v === undefined) delete card[name]; else card[name] = v; } });
   const hover = {
     get: () => card.hover && card.hover.background,
@@ -729,7 +824,9 @@ function lookFields(card) {
       if (v.trim() && n >= 0) card.radius = n; else delete card.radius;
       changed();
     }, "(the theme's) corners, in DIP"),
-    colorField("Hover background", hover.get, hover.set, true, true)];
+    ...bevelFields(card),
+    ...shadowFields(card),
+    ...(note ? [] : [colorField("Hover background", hover.get, hover.set, true, true)])];
 }
 
 function matchEditor(match, onChange) {
@@ -1015,7 +1112,7 @@ function renderCardPane() {
     place.addEventListener("change", () => { if (place.value === "left") delete card.align; else card.align = place.value; changed(); });
     const placeRow = el("label", "field");
     placeRow.append(el("span", "", "Text placed"), place);
-    $("card").replaceChildren(row, placeRow, ...sizeFields(card),
+    $("card").replaceChildren(row, placeRow, ...fontFields(card), ...sizeFields(card), ...lookFields(card, true),
       el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
     return;
   }

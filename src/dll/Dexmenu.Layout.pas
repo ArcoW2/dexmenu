@@ -100,6 +100,12 @@ type
     IsNote: Boolean;
     NoteText: string;
     NoteAlign: TNoteAlign;   // "align": left (default), text (with the items' text), center, right
+    // A note's "font" (plan 03 3.6): "text" (the items' text, the default), "extra" (a card's smaller extra text), or
+    // its own { "family", "size", "bold", "italic" } (FontOwn; what is not given the items'); plain text only
+    FontExtra, FontOwn: Boolean;
+    FontFamily: string;
+    FontSize: Single;
+    FontBold, FontItalic: Boolean;
     SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
     // Its size on a line (plan 03 3.5): "weight", its share of the line's width (1 when not set); "minWidth" (DIP; 0
     // none); "height", in lines of text (0: auto, from its content); "cardFit", how it fits a taller line.
@@ -414,8 +420,8 @@ end;
 // A card's extra text and its own look (plan 03 3.6).
 procedure ParseCardLook(Obj: TJSONObject; Card: TCard);
 const
-  Props: array[0..7] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed',
-    'disabled');
+  Props: array[0..9] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed',
+    'disabled', 'border3d', 'shadow');
 var
   P: string;
 begin
@@ -484,6 +490,25 @@ begin
         Card.NoteAlign := naRight;
     Card.Parent := Parent;
     ParseCardSize(Obj, Card);
+    // its style as a card's, and its font (plan 03 3.6)
+    ParseCardLook(Obj, Card);
+    if Obj.GetValue('font') is TJSONString then
+      Card.FontExtra := Obj.GetValue('font').Value = 'extra'
+    else if Obj.GetValue('font') is TJSONObject then
+    begin
+      Card.FontOwn := True;
+      with TJSONObject(Obj.GetValue('font')) do
+      begin
+        if GetValue('family') is TJSONString then
+          Card.FontFamily := Trim(GetValue('family').Value);
+        if (GetValue('size') is TJSONNumber) and (TJSONNumber(GetValue('size')).AsDouble >= 4) then
+          Card.FontSize := Min(72, TJSONNumber(GetValue('size')).AsDouble);
+        if GetValue('bold') is TJSONBool then
+          Card.FontBold := TJSONBool(GetValue('bold')).AsBoolean;
+        if GetValue('italic') is TJSONBool then
+          Card.FontItalic := TJSONBool(GetValue('italic')).AsBoolean;
+      end;
+    end;
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then
       Card.Id := Obj.GetValue('id').Value
