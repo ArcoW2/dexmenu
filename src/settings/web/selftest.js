@@ -267,9 +267,9 @@
     check(M.ruleType(r) === "name" && r.used === undefined && r.rank === undefined && r.name.contains === "" && r.also,
       "back to Name: used and rank taken out, an empty contains");
     const used = rank => M.ruleProblem({ used: "recent", rank });
-    check([undefined, 1, 3, "2", "1-3", "3-1", " 2 - 5 "].every(k => used(k) === ""),
+    check([undefined, 1, 3, "2", "1-3", "3-1", " 2 - 5 ", "1,3,5", "1-2, 5-6, 8-10"].every(k => used(k) === ""),
       "a rank: none, a number, a text with one, a range, a range from high to low");
-    check([0, -1, 1.5, "0", "0-3", "3-0", "x", "", "1-"].every(k => used(k) !== ""),
+    check([0, -1, 1.5, "0", "0-3", "3-0", "x", "", "1-", "1,x", "0,1", "1,,2"].every(k => used(k) !== ""),
       "a wrong rank outlined red: 0 or lower, a fraction, text, half a range");
     check(M.ruleProblem({ used: "often" }) !== "" && M.ruleProblem({ used: "most", name: { equals: "a" } }) !== "",
       "an unknown use, or both a name and a use: outlined red");

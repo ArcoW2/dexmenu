@@ -806,7 +806,7 @@ function ruleEditor(card, rule, index) {
     rank.type = "text";
     rank.className = "rank";
     rank.placeholder = "all";
-    rank.title = "Empty: all of them, in order; a number from 1 (3: the third); a range (1-3), or from high to low (3-1: the same in reverse)";
+    rank.title = "Empty: all of them, in order; a number from 1 (3: the third); a range (1-3, or 3-1: the same in reverse); several, as pages to print (1,3,5 or 1-2,5-6,8-10)";
     rank.value = rule.rank === undefined ? "" : String(rule.rank);
     rank.addEventListener("change", () => {
       const v = rank.value.trim();

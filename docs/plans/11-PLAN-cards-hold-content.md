@@ -290,3 +290,6 @@ None.
   shared by their weights (before, they stood at their content's width from the left). In the card panel "Fit in
   line" is "Height in row" (it is the card's height in a taller row, not its width); Height is greyed out with
   Square (the width sets the height). Tested: a unit test (the flowing row filled to its card's width).
+- A row of found items without `perRow` is a grid: as many per row as its widest card lets fit, every row the same
+  number in equal columns over the card's width (before: each card at its text's width, so six could wrap 3, 2, 1).
+  Tested: a unit test (six found: rows of the same number).

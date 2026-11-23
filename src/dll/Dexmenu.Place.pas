@@ -752,6 +752,7 @@ var
     Used: TList<TUsedItem>;
     Keys: TDictionary<string, Boolean>;
     I, First, Last: Integer;
+    Part: TRankRange;
     Recent: Boolean;
 
     procedure Walk(Nodes: TNodes);
@@ -813,21 +814,24 @@ var
           if Result = 0 then
             Result := CompareText(UsageKey(A.Node), UsageKey(B.Node));
         end));
-      First := R.Spec.RankFrom;
-      Last := R.Spec.RankTo;
-      if First = 0 then
-      begin
-        First := 1;
-        Last := Used.Count;
-      end;
-      if First <= Last then
-      begin
-        for I := First to Min(Last, Used.Count) do
-          TakeRank(I);
-      end
+      // the ranks asked for, in the order written: each range in its direction; none: all of them
+      if Length(R.Spec.Ranks) = 0 then
+        for I := 1 to Used.Count do
+          TakeRank(I)
       else
-        for I := Min(First, Used.Count) downto Last do
-          TakeRank(I);
+        for Part in R.Spec.Ranks do
+        begin
+          First := Part.From;
+          Last := Part.To_;
+          if First <= Last then
+          begin
+            for I := First to Min(Last, Used.Count) do
+              TakeRank(I);
+          end
+          else
+            for I := Min(First, Used.Count) downto Last do
+              TakeRank(I);
+        end;
     finally
       Keys.Free;
       Used.Free;

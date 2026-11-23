@@ -635,6 +635,8 @@ begin
   Check(not RuleValid('{ "used": "most", "rank": 0 }') and not RuleValid('{ "used": "most", "rank": -1 }') and
     not RuleValid('{ "used": "most", "rank": "0-3" }') and not RuleValid('{ "used": "most", "rank": "3-0" }') and
     not RuleValid('{ "used": "most", "rank": "x" }') and not RuleValid('{ "used": "most", "rank": 1.5 }') and
+    not RuleValid('{ "used": "most", "rank": "1,x" }') and not RuleValid('{ "used": "most", "rank": "0,1" }') and
+    not RuleValid('{ "used": "most", "rank": "1,,2" }') and RuleValid('{ "used": "most", "rank": "1-2, 5-6, 8" }') and
     not RuleValid('{ "used": "often" }') and not RuleValid('{ "used": "most", "name": { "equals": "Cut" } }'),
     'a wrong used rule: a rank of 0 or lower, text, a fraction; an unknown kind; both name and used');
   Check(RuleValid('{ "used": "most", "scope": "anywhere", "path": { "contains": "x" }, "caseSensitive": true }'),
@@ -673,6 +675,15 @@ begin
     Check(Placed(Line(Card('A', '{ "used": "most", "rank": 3, ' + Enabled + ' }'))) = 'I:Delete', 'most used 3: the third');
     Check(Placed(Line(Card('A', '{ "used": "most", "rank": "2-1", ' + Enabled + ' }'))) = 'I:Cut / I:Copy',
       'a range from high to low: the same items in reverse order');
+    // ranks as a set, as pages to print
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "1,3,5", ' + Enabled + ' }'))) = 'I:Copy / I:Delete / I:Properties',
+      'a set of ranks: 1,3,5');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "2,4", ' + Enabled + ' }'))) = 'I:Cut / I:Add to archive...',
+      '... 2,4');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "1-2,5-6", ' + Enabled + ' }'))) = 'I:Copy / I:Cut / I:Properties',
+      'ranges in a set: 1-2,5-6 (6 past the items)');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "3-1,5", ' + Enabled + ' }'))) = 'I:Delete / I:Cut / I:Copy / I:Properties',
+      'a reversed range in a set, in the order written');
     Check(Placed(Line(Card('A', '{ "used": "most", "rank": "7-2", ' + Enabled + ' }'))) =
       'I:Properties / I:Add to archive... / I:Delete / I:Cut', 'a reversed range partly past the items');
     Check(Placed(Line(Card('A', '{ "used": "most", "rank": "4-9", ' + Enabled + ' }'))) =
@@ -1546,6 +1557,8 @@ var
   Top: TNodes;
   Error: string;
   Layout: ILayout;
+  Tops: TDictionary<Integer, Integer>;
+  Titles_: string;
 
   // the top level of a format 2 layout with this content (and the remaining card), at a right-click or in the preview
   function Level(const Content: string; out P: TPlacement; AtRightClick: Boolean = True): TViewLevel;
@@ -1758,6 +1771,31 @@ begin
           Box := I;
       Check((Box >= 0) and (Abs(G.Boxes[Box + 4].Rect.right - (G.Boxes[Box].Rect.right - 6)) < 1),
         'the flowing row filled to its card''s width (less its padding)');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // six found items flowing: a grid, the same number on every row (not 3, 2, 1 by their text)
+    L := Level(Card('Six', '{ "name": { "any": [ "Cut", "Copy", "Delete", "Properties", "Edit in LexPen", "View in LexPen" ] } }',
+      ', "show": "row"'), P);
+    try
+      G := Measure(L);
+      Titles_ := '';
+      Tops := TDictionary<Integer, Integer>.Create;
+      try
+        for I := 0 to High(G.Boxes) do
+          if G.Boxes[I].Card.InGroup then
+          begin
+            Box := Round(G.Boxes[I].Rect.top);
+            if Tops.ContainsKey(Box) then Tops[Box] := Tops[Box] + 1 else Tops.Add(Box, 1);
+          end;
+        Inside := True;
+        for Box in Tops.Values do
+          Inside := Inside and (6 mod Box = 0) and (Box = 6 div Tops.Count);
+        Check(Inside and (Tops.Count >= 1), Format('six flowing: %d rows of the same number', [Tops.Count]));
+      finally
+        Tops.Free;
+      end;
     finally
       L.Free;
       P.Free;

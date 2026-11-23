@@ -43,6 +43,10 @@ type
   TScope = (scTop, scAnywhere, scPath);
   TStates = set of (stEnabled, stDisabled);
   TUsedKind = (ukNone, ukMost, ukRecent);   // a rule by name; by the most used; by the most recently used
+  // one part of a used rule's ranks: a rank (From = To) or a range, From > To in reverse
+  TRankRange = record
+    From, To_: Integer;
+  end;
 
   TRuleSpec = record
     Valid: Boolean;
@@ -56,7 +60,9 @@ type
     SkipDuplicates: Boolean;
     Priority: Integer;   // -1: none given
     Used: TUsedKind;     // ukNone: a rule by name
-    RankFrom, RankTo: Integer;   // the ranks a used rule finds, from 1; RankFrom > RankTo: in reverse; 0: all
+    // the ranks a used rule finds, from 1, in the order written ("1,3,5", "1-2,5-6,8-10"; a range from high to low in
+    // reverse); none: all of them
+    Ranks: TArray<TRankRange>;
     Own: string;         // a rule finding Dexmenu's own item: its tag, "editMenu" or "windowsMenu"; '' none
   end;
 
@@ -164,40 +170,53 @@ begin
   end;
 end;
 
-// "rank": a number from 1, or a text with one ("3") or a range ("1-3", "3-1").
-function ParseRank(V: TJSONValue; out RankFrom, RankTo: Integer; var Problem: string): Boolean;
+// "rank": a number from 1, or a text of ranks and ranges separated by commas, as pages to print: "3", "1-3", "3-1",
+// "1,3,5", "1-2,5-6,8-10". Every rank from 1.
+function ParseRank(V: TJSONValue; out Ranks: TArray<TRankRange>; var Problem: string): Boolean;
 var
   M: System.RegularExpressions.TMatch;
   D: Double;
+  Part: string;
+  R: TRankRange;
 begin
   Result := False;
-  RankFrom := 0;
-  RankTo := 0;
+  Ranks := nil;
   if V is TJSONNumber then
   begin
     D := TJSONNumber(V).AsDouble;
     if (Frac(D) = 0) and (D >= 1) and (D <= MaxInt) then
     begin
-      RankFrom := Trunc(D);
-      RankTo := RankFrom;
+      R.From := Trunc(D);
+      R.To_ := R.From;
+      Ranks := [R];
+      Exit(True);
     end;
   end
-  else if V is TJSONString then
+  else if (V is TJSONString) and (Trim(V.Value) <> '') then
   begin
-    M := TRegEx.Match(V.Value, '^\s*(\d{1,9})\s*(?:-\s*(\d{1,9})\s*)?$');
-    if M.Success then
+    for Part in V.Value.Split([',']) do
     begin
-      RankFrom := StrToInt(M.Groups[1].Value);
-      RankTo := RankFrom;
+      M := TRegEx.Match(Part, '^\s*(\d{1,9})\s*(?:-\s*(\d{1,9})\s*)?$');
+      if not M.Success then
+      begin
+        Ranks := nil;
+        Break;
+      end;
+      R.From := StrToInt(M.Groups[1].Value);
+      R.To_ := R.From;
       if (M.Groups.Count > 2) and (M.Groups[2].Value <> '') then
-        RankTo := StrToInt(M.Groups[2].Value);
+        R.To_ := StrToInt(M.Groups[2].Value);
+      if (R.From < 1) or (R.To_ < 1) then
+      begin
+        Ranks := nil;
+        Break;
+      end;
+      Ranks := Ranks + [R];
     end;
+    if Ranks <> nil then
+      Exit(True);
   end;
-  if (RankFrom >= 1) and (RankTo >= 1) then
-    Exit(True);
-  RankFrom := 0;
-  RankTo := 0;
-  Problem := 'rank: a number from 1, or a range as "1-3"';
+  Problem := 'rank: numbers from 1 and ranges, as "1-3" or "1,3,5" or "1-2,5-6"';
 end;
 
 function ParseRule(Obj: TJSONObject): TRuleSpec;
@@ -250,8 +269,7 @@ begin
       Result.Problem := '"used" is "most" or "recent"';
       Exit;
     end;
-    if (Obj.GetValue('rank') <> nil) and not ParseRank(Obj.GetValue('rank'), Result.RankFrom, Result.RankTo,
-      Result.Problem) then
+    if (Obj.GetValue('rank') <> nil) and not ParseRank(Obj.GetValue('rank'), Result.Ranks, Result.Problem) then
       Exit;
   end
   else

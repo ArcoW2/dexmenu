@@ -567,6 +567,19 @@ end;
 // A level's lines split into rows: a line whose cards do not fit side by side within WrapWidth wraps its last cards
 // onto a row of their own below it, in their order. At the menu's top a card counts its minimum width; inside a card
 // (an inner line) its content.
+// A row that flows (found items without a set number per row, plan 11 3.4): as many per row as its widest card lets
+// fit, so its rows are a grid of equal columns.
+function FlowPer(Line: TViewLine; Width, CardGap: Single): Integer;
+var
+  V: TViewCard;
+  Widest: Single;
+begin
+  Widest := 1;
+  for V in Line.Cards do
+    Widest := Max(Widest, Max(CardNeed(V), CardMin(V)));
+  Result := Max(1, Min(Line.Cards.Count, Trunc((Width + CardGap) / (Widest + CardGap))));
+end;
+
 procedure SplitRows(Level: TViewLevel; WrapWidth, CardGap: Single; Rows: TList<TArray<TViewCard>>;
   RowLines: TList<TViewLine>);
 var
@@ -574,11 +587,33 @@ var
   Row: TArray<TViewCard>;
   V: TViewCard;
   SumMin, Size: Single;
+  Per: Integer;
 begin
   for Line in Level.Lines do
   begin
     Row := nil;
     SumMin := 0;
+    if Line.Flows then
+    begin
+      // a grid: the same number on every row
+      Per := FlowPer(Line, WrapWidth, CardGap);
+      for V in Line.Cards do
+      begin
+        Row := Row + [V];
+        if Length(Row) = Per then
+        begin
+          Rows.Add(Row);
+          RowLines.Add(Line);
+          Row := nil;
+        end;
+      end;
+      if Length(Row) > 0 then
+      begin
+        Rows.Add(Row);
+        RowLines.Add(Line);
+      end;
+      Continue;
+    end;
     for V in Line.Cards do
     begin
       if Line.Inner then
@@ -606,8 +641,8 @@ begin
 end;
 
 // A level's lines laid out from Left, Top at a width (DIP): each row's cards side by side sharing the width by their
-// weights (a card below its minimum gets it); a row that flows (a row without a set number per row) each card its
-// content's width and the room left shared by their weights, so the row fills the width. Collect: the boxes appended to Boxes, a card holding cards its own box then the
+// weights (a card below its minimum gets it); a row that flows (a row without a set number per row) a grid of equal
+// columns over the whole width, as many as its widest card lets fit. Collect: the boxes appended to Boxes, a card holding cards its own box then the
 // boxes inside it, recursively. The height used. WrapWidth: where a line wraps (-1: Width).
 function LayLines(Level: TViewLevel; Left, Top, Width: Single; Collect: Boolean; var Boxes: TArray<TBox>;
   WrapWidth: Single; Framed: Boolean): Single;
@@ -620,7 +655,7 @@ var
   Fixed: TArray<Boolean>;
   V: TViewCard;
   Y, H, X, Avail, FreeWeight, OwnH, CardTop: Single;
-  N, I, J: Integer;
+  N, I, J, Per: Integer;
   Changed, First: Boolean;
   Box: TBox;
   Fit: TCardFit;
@@ -647,19 +682,11 @@ begin
       SetLength(Fixed, N);
       if Line.Flows then
       begin
-        // a row that flows: each card its content's width, the row then filled to its width (the room left shared by
-        // the cards' weights), so the cards stand over the whole width
-        Avail := Width - CardGap * (N - 1);
-        FreeWeight := 0;
+        // a row that flows: a grid of equal columns over the whole width, as many as its widest card lets fit; a
+        // last row with fewer cards keeps the columns
+        Per := FlowPer(Line, WrapWidth, CardGap);
         for J := 0 to N - 1 do
-        begin
-          Widths[J] := Min(Width, Max(CardNeed(Row[J]), CardMin(Row[J])));
-          Avail := Avail - Widths[J];
-          FreeWeight := FreeWeight + CardWeight(Row[J]);
-        end;
-        if Avail > 0 then
-          for J := 0 to N - 1 do
-            Widths[J] := Widths[J] + Avail * CardWeight(Row[J]) / Max(FreeWeight, 0.0001);
+          Widths[J] := Max(0, (Width - CardGap * (Per - 1)) / Per);
       end
       else
       begin

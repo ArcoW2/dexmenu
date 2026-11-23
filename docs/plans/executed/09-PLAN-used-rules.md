@@ -150,3 +150,10 @@ None.
 - Tested: unit tests (an earlier layout's row read as three cards, ranked; no counts, nothing); the editor's
   self-test (the row converted, also in a card's menu; a rule's states as General sets unless its own); the layout
   files' self-test.
+
+### 6.6 Ranks as a set
+
+- A rank may be a set, as pages to print: numbers and ranges separated by commas (`"1,3,5"`, `"2,4,6"`,
+  `"1-2,5-6,8-10"`), taken in the order written, a range from high to low in reverse; ranks past the used items find
+  nothing. Every rank from 1; anything else makes the rule invalid (outlined red in the editor). Tested: unit tests
+  (1,3,5; 2,4; 1-2,5-6 past the items; 3-1,5; wrong sets) and the editor's self-test.

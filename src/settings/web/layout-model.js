@@ -203,12 +203,18 @@ const LayoutModel = (() => {
     return "rgba(" + mixed.join(", ") + ", " + alpha + ")";
   }
 
-  // A used rule's rank (plan 09 3.1): none, a number from 1, or a text with one ("3") or a range ("1-3", "3-1").
+  // A used rule's rank (plan 09 3.1): none, a number from 1, or a text of ranks and ranges separated by commas, as
+  // pages to print ("3", "1-3", "3-1", "1,3,5", "1-2,5-6,8-10").
   function rankProblem(rank) {
+    const problem = "rank: numbers from 1 and ranges, as 1-3 or 1,3,5 or 1-2,5-6";
     if (rank === undefined) return "";
-    if (typeof rank === "number") return Number.isInteger(rank) && rank >= 1 ? "" : "rank: a number from 1, or a range as 1-3";
-    const m = typeof rank === "string" ? /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(rank) : null;
-    return m && +m[1] >= 1 && (m[2] === undefined || +m[2] >= 1) ? "" : "rank: a number from 1, or a range as 1-3";
+    if (typeof rank === "number") return Number.isInteger(rank) && rank >= 1 ? "" : problem;
+    if (typeof rank !== "string" || !rank.trim()) return problem;
+    for (const part of rank.split(",")) {
+      const m = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(part);
+      if (!m || +m[1] < 1 || (m[2] !== undefined && +m[2] < 1)) return problem;
+    }
+    return "";
   }
 
   // The states a rule takes: its own ("states"), else what General sets for every rule ("both", "enabled",
