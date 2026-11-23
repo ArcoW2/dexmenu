@@ -141,9 +141,12 @@ None.
   main window's "The most used row shows ... items", are gone. A layout that still has the row reads it as three cards
   side by side, each with a used rule (`most`, rank 1, 2, 3, enabled items, `also`, not consuming): the DLL when it
   reads the layout, the editor when it opens it (written so on the next save). Default D has those three cards.
-- A rule's states in the rule panel: a group with "Own states" in its border. Not ticked: the rule takes what the
+- A rule's states in the rule panel: a group with "Overrule general setting: States" in its border. Not ticked: the rule takes what the
   main window's General sets ("Rules take, unless a rule sets its own"), shown greyed; ticked: its own enabled and
   disabled, written also when both (General may say enabled only). At least one stays ticked.
+- The rule panel is a group box: its number, its place in the priority list and its type on the border line at the
+  left, "x" (delete) on it at the right (shown on hover or when selected); its whole left edge the handle to drag it
+  by; its settings in two columns, the fields in line with the card's fields above.
 - Tested: unit tests (an earlier layout's row read as three cards, ranked; no counts, nothing); the editor's
   self-test (the row converted, also in a card's menu; a rule's states as General sets unless its own); the layout
   files' self-test.

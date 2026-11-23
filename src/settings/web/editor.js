@@ -423,8 +423,10 @@ function colorControls(cs, withTheme, commit) {
   overrule.type = "checkbox";
   overrule.checked = !!cs.overrule;
   overrule.title = "Ticked: this opacity overrules the colour's own; not ticked: as the theme has it";
-  intensityBox.prepend("Intensity ");
-  opacityBox.prepend(overrule, " Opacity ");
+  intensityBox.prepend(el("span", "slider-name", "Intensity"));
+  const opacityName = el("span", "slider-name");
+  opacityName.append(overrule, " Opacity");
+  opacityBox.prepend(opacityName);
   const show = () => {
     picker.hidden = source.value !== "pick";
     opacity.disabled = opacityShown.disabled = !cs.overrule;
@@ -529,8 +531,8 @@ function colorField(label, get, set, gradients = false) {
       state.angle = n;
       commit();
     });
-    const angleBox = el("label", "slider");
-    angleBox.append("Angle ", angle);
+    const angleBox = el("label", "slider angle");
+    angleBox.append(el("span", "slider-name", "Angle"), angle);
     first.append(angleBox);
     const stopRow = (name, cs) => {
       const r = el("div", "color-row");
@@ -595,11 +597,14 @@ function matchEditor(match, onChange) {
   return [kindSel, input];
 }
 
+// A rule's panel: a group box with its number, its place in the priority list and its type in the border line, "x"
+// (delete) at the top right of that line, its whole left edge the handle to drag it by; inside, its settings in two
+// columns, a label and its fields.
 function ruleEditor(card, rule, index) {
   const box = el("div", "rule" + (index === selectedRule ? " selected" : ""));
   // Reordered by dragging its handle (the card's rules keep their places in the priority list, swapped among
   // themselves); numbered within the card, with its number in the priority list beside it.
-  const handle = el("span", "handle", "::");
+  const handle = el("div", "rule-handle");
   handle.draggable = true;
   handle.title = "Drag to change the order of this card's rules, or onto another card: move (Shift: copy)";
   handle.addEventListener("dragstart", e => {
@@ -616,7 +621,7 @@ function ruleEditor(card, rule, index) {
     e.preventDefault();
     if (M.moveCardRule(linesOf(), card, +from, index)) { selectedRule = index; changed(); }
   });
-  const head = el("div", "row");
+  const head = el("div", "rule-head");
   const number = el("span", "number", (index + 1) + ".");
   const priority = el("span", "badge", "#" + rule.priority);
   priority.title = "Its place in the priority list";
@@ -626,10 +631,16 @@ function ruleEditor(card, rule, index) {
   typeSel.value = M.ruleType(rule);
   typeSel.title = "What the rule finds items by: their name, or their use (the most used or most recently used)";
   typeSel.addEventListener("change", () => { M.setRuleType(rule, typeSel.value); changed(); });
-  head.append(handle, number, priority, typeSel);
-  const group = el("div", "rulegroup");
+  head.append(number, priority, typeSel);
+  // a setting's row: its label in the first column, its fields in the second
+  const body = el("div", "rule-body");
+  const row = (label, ...fields) => {
+    const f = el("div", "rule-fields");
+    f.append(...fields);
+    body.append(el("span", "rule-label", label), f);
+    return f;
+  };
   if (M.ruleType(rule) === "usage") {
-    const row = el("div", "row");
     const usedSel = el("select");
     for (const [u, label] of [["most", "most used"], ["recent", "most recently used"]]) { const o = el("option", "", label); o.value = u; usedSel.append(o); }
     usedSel.value = rule.used === "recent" ? "recent" : "most";
@@ -646,21 +657,17 @@ function ruleEditor(card, rule, index) {
       else rule.rank = /^\d+$/.test(v) ? +v : v;
       changed();
     });
-    row.append(el("span", "", "Finds the"), usedSel, el("span", "", "Rank"), rank);
-    group.append(row);
+    row("Finds the", usedSel);
+    row("Rank", rank);
   } else {
-    const nameRow = el("div", "row");
-    nameRow.append(...matchEditor(rule.name, m => { rule.name = m; changed(); }));
     const cs = el("input");
     cs.type = "checkbox";
     cs.checked = !!rule.caseSensitive;
     cs.addEventListener("change", () => { if (cs.checked) rule.caseSensitive = true; else delete rule.caseSensitive; changed(); });
     const csl = el("label");
     csl.append(cs, " case sensitive");
-    nameRow.append(csl);
-    group.append(nameRow);
+    row("Name", ...matchEditor(rule.name, m => { rule.name = m; changed(); }), csl);
   }
-  const where = el("div", "row");
   const placeSel = el("select");
   for (const p of ["top", "anywhere", "path"]) { const o = el("option", "", placeNames[p]); o.value = p; placeSel.append(o); }
   placeSel.value = rule.path ? "path" : rule.scope === "anywhere" ? "anywhere" : "top";
@@ -671,10 +678,9 @@ function ruleEditor(card, rule, index) {
     if (placeSel.value === "path") rule.path = { contains: "" };
     changed();
   });
-  where.append(el("span", "", "Where"), placeSel);
-  if (rule.path) where.append(...matchEditor(rule.path, m => { rule.path = m; changed(); }));
-  if (M.ruleType(rule) === "name") group.append(where);
-  // the states it takes: a group whose border holds "Own states"; not ticked, the rule takes what General sets (shown,
+  if (M.ruleType(rule) === "name")
+    row("Where", placeSel, ...(rule.path ? matchEditor(rule.path, m => { rule.path = m; changed(); }) : []));
+  // the states it takes: a group whose border holds "Overrule general setting: States"; not ticked, the rule takes what General sets (shown,
   // greyed); ticked, its own, written even when both (General may say otherwise)
   const statesBox = el("fieldset", "states");
   const legend = el("legend");
@@ -687,7 +693,7 @@ function ruleEditor(card, rule, index) {
   });
   const ownLabel = el("label");
   ownLabel.title = "Not ticked: as General sets for every rule (the main window); ticked: this rule's own";
-  ownLabel.append(own, " Own states");
+  ownLabel.append(own, " Overrule general setting: States");
   legend.append(ownLabel);
   statesBox.append(legend);
   const states = M.statesOf(rule, generalStates);
@@ -707,8 +713,8 @@ function ruleEditor(card, rule, index) {
     l.append(cb, " " + s);
     statesBox.append(l);
   }
-  if (!own.checked) statesBox.append(el("span", "hint", "(as General sets)"));
-  const opts = el("div", "row");
+  body.append(el("span", "rule-label"), statesBox);
+  const opts = row("Options");
   for (const [flag, label] of [["also", "also when taken"],
     ["skipDuplicates", "skip duplicates (one per name)"]]) {
     const cb = el("input");
@@ -729,10 +735,12 @@ function ruleEditor(card, rule, index) {
     l.append(cb, " consumes the item");
     opts.append(l);
   }
-  const del = el("button", "", "Delete rule");
-  del.addEventListener("click", () => { M.deleteRule(linesOf(), card, index); selectedRule = -1; changed(); });
-  opts.append(del);
-  box.append(head, group, statesBox, opts);
+  const actions = el("div", "rule-actions");
+  const del = el("button", "", "x");
+  del.title = "Delete this rule";
+  del.addEventListener("click", e => { e.stopPropagation(); M.deleteRule(linesOf(), card, index); selectedRule = -1; changed(); });
+  actions.append(del);
+  box.append(head, actions, handle, body);
   const problem = M.ruleProblem(rule);
   if (problem) box.append(el("div", "problem", problem));
   // selecting the rule only moves the highlights: a full render here would replace the checkbox or field this same

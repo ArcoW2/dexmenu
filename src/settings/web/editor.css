@@ -116,10 +116,11 @@ h2 button { white-space: nowrap; }
 .card .lines { margin-top: 5px; }
 
 /* the selected card */
-.field { display: grid; grid-template-columns: 110px 1fr; gap: 4px 8px; align-items: center; margin: 3px 0; }
+.field { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; margin: 3px 0; }
 .field input[type=text], .field textarea { width: 100%; box-sizing: border-box; }
 /* a colour picker (plan 03 3.6): the swatch over a checkerboard, so an opacity shows */
-.color-controls { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
+/* a colour's controls flow in their row: the swatch, where it comes from, the picker; then the sliders a row each */
+.color-controls { display: contents; }
 .color-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .color-row { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
 .color-row > input[type=text] { flex: 1 1 160px; width: auto; }
@@ -128,29 +129,42 @@ h2 button { white-space: nowrap; }
 .color-controls input[type=color] { width: 32px; height: 22px; padding: 0; border: 1px solid var(--line); background: none; }
 .swatch { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 4px; flex: none;
   background: linear-gradient(var(--swatch), var(--swatch)), repeating-conic-gradient(#999 0 25%, #fff 0 50%) 0 0 / 10px 10px; }
-.slider { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
-.slider input[type=range] { width: 90px; }
+.slider { display: flex; flex: 1 1 100%; align-items: center; gap: 6px; font-size: 12px; min-width: 0; }
+.slider.angle { flex: 0 1 auto; }
+.slider-name { flex: 0 0 72px; white-space: nowrap; }
+.slider input[type=range] { flex: 1 1 60px; min-width: 40px; width: auto; }
 .slider input.slider-value { width: 4.2em; text-align: right; font: inherit; color: inherit; background: var(--card);
   border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
 .slider input.slider-value:disabled { color: var(--dim); text-decoration: line-through; }
 [hidden] { display: none !important; }
 textarea { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; resize: vertical; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-.rule { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+.rule { position: relative; border: 1px solid var(--line); border-radius: 6px; padding: 18px 8px 6px 24px; margin: 16px 0 6px;
+  min-width: 0; }
+/* on the border line: its number, its place in the priority list, its type at the left; "x" at the right */
+.rule-head { position: absolute; top: -12px; left: 20px; display: flex; gap: 6px; align-items: center; padding: 0 4px;
+  background: var(--bg); }
+.rule-actions { position: absolute; top: -10px; right: 8px; display: none; background: var(--bg); padding: 0 2px; }
+.rule-actions button { padding: 0 5px; font-size: 11px; }
+.rule:hover > .rule-actions, .rule.selected > .rule-actions { display: block; }
+/* its whole left edge the handle */
+.rule-handle { position: absolute; left: 0; top: 0; bottom: 0; width: 16px; cursor: grab; border-radius: 5px 0 0 5px;
+  background: radial-gradient(var(--dim) 1px, transparent 1.5px) 0 0 / 6px 6px; opacity: .5; }
+.rule-handle:hover { opacity: 1; background-color: var(--hover); }
+/* its settings in two columns, a label and its fields, the fields in line with the card's fields above (the card's
+   label column, 110px, less the rule's handle and padding) */
+.rule-body { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; }
+.rule-fields { display: flex; gap: 4px 10px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.rule-fields input[type=text] { flex: 1 1 70px; min-width: 0; }
+.rule-fields input.rank { flex: 0 0 70px; }
 .rule.selected { border-color: var(--accent); }
 .rule.over { box-shadow: 0 -2px 0 var(--accent); }
-.rule .handle { cursor: grab; color: var(--dim); font-weight: 700; letter-spacing: -1px; padding: 0 2px; }
 .rule .number { font-weight: 600; min-width: 1.6em; }
-.rule .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 3px 0; }
-.rule .row input[type=text] { flex: 1; min-width: 120px; }
-/* a rule's states: "Own states" in the group's border (not ticked: as General sets, greyed) */
-.rule fieldset.states { border: 1px solid var(--line); border-radius: 4px; margin: 4px 0; padding: 2px 8px 4px;
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* a rule's states: "Overrule general setting: States" in the group's border (not ticked: as General sets, greyed) */
+.rule fieldset.states { border: 1px solid var(--line); border-radius: 4px; margin: 2px 0; padding: 2px 8px 4px;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .rule fieldset.states legend { padding: 0 4px; font-size: 12px; }
 .rule fieldset.states .hint { color: var(--dim); font-size: 12px; }
-/* the rule's type's own fields (Name or Usage, plan 09 3.3) */
-.rulegroup { border-left: 2px solid var(--line); padding-left: 8px; margin: 4px 0; }
-.rule .row input.rank { flex: 0 0 70px; min-width: 0; }
 .problem { color: var(--bad); font-size: 12px; }
 
 /* the rules view */
