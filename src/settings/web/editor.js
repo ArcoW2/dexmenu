@@ -678,6 +678,16 @@ function renderCardPane() {
     l.append(el("span", "", "Duplicates"), el("span"));
     l.lastChild.append(cb, " skip: one item per name");
     box.append(l);
+    // what it finds as buttons inside it, a found submenu unfolded (plan 02 3.3)
+    const bt = el("input");
+    bt.type = "checkbox";
+    bt.checked = !!card.buttons;
+    bt.addEventListener("change", () => { if (bt.checked) card.buttons = true; else delete card.buttons; changed(); });
+    const lb = el("label", "field");
+    lb.title = "What it finds shows as buttons inside it, side by side; an item with a submenu shows the items of that submenu";
+    lb.append(el("span", "", "Items as buttons"), el("span"));
+    lb.lastChild.append(bt, " inside the card");
+    box.append(lb);
   }
   if (!card.menu)
     box.append(textField("Rename (regex)", card.rename && card.rename.regex, v => {

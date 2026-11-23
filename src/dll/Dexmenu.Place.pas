@@ -29,7 +29,8 @@ type
   // vkNote: a note card (Card), no button; vkBack: "<<" at the top of a submenu that replaced its menu (plan 02 3.7)
   // vkCommand: Dexmenu's own item at the end of the menu ("Windows' menu", "Edit menu...", plan 02 3.6, 3.11)
   // vkSearch: the search's own line ("Search: ..."), a text, nothing to choose (plan 02 3.6)
-  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand, vkSearch);
+  // vkGroup: a card showing what it found as buttons inside it (Buttons; plan 02 3.3), itself no button
+  TViewKind = (vkItem, vkMenu, vkSeparator, vkNote, vkBack, vkCommand, vkSearch, vkGroup);
   TCommand = (ccNone, ccWindowsMenu, ccEditMenu);
 
   TFound = record
@@ -46,7 +47,9 @@ type
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
-    BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand, vkSearch: its text
+    BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand, vkSearch, vkGroup: its text
+    Buttons: TObjectList<TViewCard>;   // vkGroup: its buttons, in their order (owned)
+    InGroup: Boolean;   // a button in a vkGroup card: the theme's look, not its card's
     ShownText: string;  // vkItem: a title in place of its own (a search hit: with its path); '' none
     Command: TCommand;  // vkCommand: which
     function Title: string;
@@ -70,6 +73,7 @@ type
     function Sometimes: Boolean;
     function CardId: string;
     function RuleIndex: Integer;   // -1: none
+    destructor Destroy; override;
   end;
 
   TViewLine = class
@@ -231,17 +235,24 @@ begin
     Result := Trim(Copy(Node.Item.Text, P + 1, MaxInt));
 end;
 
+destructor TViewCard.Destroy;
+begin
+  Buttons.Free;
+  inherited;
+end;
+
 function TViewCard.LookCard: TCard;
 begin
   Result := nil;
-  if (Card <> nil) and ((Kind in [vkMenu, vkCommand, vkNote]) or ((Kind = vkItem) and not Card.IsRemaining)) then
+  if (Card <> nil) and not InGroup and ((Kind in [vkMenu, vkCommand, vkNote, vkGroup]) or
+    ((Kind = vkItem) and not Card.IsRemaining)) then
     Result := Card;
 end;
 
 function TViewCard.IconSpec: string;
 begin
   Result := '';
-  if Card = nil then
+  if (Card = nil) or InGroup then
     Exit;
   if (Kind in [vkMenu, vkCommand]) or ((Kind = vkItem) and not Card.IsRemaining) then
     Result := Card.Icon;
@@ -265,7 +276,7 @@ begin
           end;
       end;
     vkNote: Result := Card.NoteText;
-    vkBack, vkCommand, vkSearch: Result := BackTitle;
+    vkBack, vkCommand, vkSearch, vkGroup: Result := BackTitle;
     vkMenu:
       if Card.ShownTitle <> '' then
         Result := Card.ShownTitle
@@ -485,8 +496,25 @@ function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
 var
   Rules: TList<TRule>;
   R: TRule;
+
+  // a card showing its items as buttons unfolds the submenus it finds (plan 02 3.3)
+  function HasButtons(Lines: TLines): Boolean;
+  var
+    Line: TLine;
+    Card: TCard;
+  begin
+    Result := False;
+    if Lines <> nil then
+      for Line in Lines do
+        for Card in Line.Cards do
+          if Card.Buttons or HasButtons(Card.Menu) then
+            Exit(True);
+  end;
+
 begin
-  Result := False;
+  Result := HasButtons(Layout.Lines(Kind));
+  if Result then
+    Exit;
   Rules := TList<TRule>.Create;
   try
     CollectRules(Layout.Lines(Kind), Rules);
@@ -672,6 +700,10 @@ var
   List: TList<TFound>;
   Inner: TViewLevel;
   Nothing: Boolean;
+  B: TViewCard;
+  SubLine: TViewLine;
+  Unfolded: TNode;
+  Shown: Integer;
 begin
   Result := TViewLevel.Create;
   for Line in Lines do
@@ -725,6 +757,72 @@ begin
           V.Command := CommandOf(Card.Own);
           V.BackTitle := Card.Title;
           V.Card := Card;
+        end
+        else if Card.Buttons then
+        begin
+          // what it found as buttons inside it (plan 02 3.3): a found submenu unfolded into its items
+          if not P.FFound.TryGetValue(Card, List) then
+            Continue;
+          V := TViewCard.Create;
+          V.Kind := vkGroup;
+          V.Card := Card;
+          V.Buttons := TObjectList<TViewCard>.Create;
+          Unfolded := nil;
+          Shown := 0;
+          for F in List do
+          begin
+            if P.Hides(F.Node) or F.Node.IsSeparator then
+              Continue;
+            Inc(Shown);
+            if F.Node.SubMenu <> 0 then
+            begin
+              Unfolded := F.Node;
+              if F.Node.Children = nil then
+                ReadChildren(F.Node);
+              Inner := P.SubmenuLevel(F.Node);
+              try
+                for SubLine in Inner.Lines do
+                  while SubLine.Cards.Count > 0 do
+                  begin
+                    B := SubLine.Cards.Extract(SubLine.Cards[0]);
+                    if B.Kind = vkSeparator then
+                    begin
+                      B.Free;
+                      Continue;
+                    end;
+                    B.Card := Card;
+                    B.Rule := F.Rule;
+                    B.Several := True;
+                    B.InGroup := True;
+                    V.Buttons.Add(B);
+                  end;
+              finally
+                Inner.Free;
+              end;
+            end
+            else if F.Node.Name <> '' then
+            begin
+              B := TViewCard.Create;
+              B.Kind := vkItem;
+              B.Node := F.Node;
+              B.Card := Card;
+              B.Rule := F.Rule;
+              B.Several := True;
+              B.InGroup := True;
+              V.Buttons.Add(B);
+            end;
+          end;
+          if V.Buttons.Count = 0 then
+          begin
+            V.Free;
+            Continue;
+          end;
+          if Card.ShownTitle <> '' then
+            V.BackTitle := Card.ShownTitle
+          else if (Shown = 1) and (Unfolded <> nil) then
+            V.BackTitle := Unfolded.Name
+          else
+            V.BackTitle := Card.Title;
         end
         else if Card.Menu <> nil then
         begin

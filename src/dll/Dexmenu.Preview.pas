@@ -392,6 +392,7 @@ begin
           vkNote: Kind := 'note';
           vkBack: Kind := 'back';
           vkCommand: Kind := 'command';
+          vkGroup: Kind := 'group';
         else
           Kind := 'separator';
         end;

@@ -16,6 +16,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: Dexmenu's own items as cards; the shipped layouts Default A, C and D.
 - 2026-11-22: partly executed: the items' icons in the preview.
 - 2026-11-22: partly executed: access keys and shortcuts; the search.
+- 2026-11-23: partly executed: items as buttons in a card.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -69,13 +70,13 @@ the preview is the result.
 | Search box | `{ "search": true }` in a layout: a "Search..." line where it stands ("+ Search" in the editor, moved and deleted as a divider); Default D has one at the top | 3.6; 3.10 |
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
+| Items as buttons in a card | `"buttons": true`: a card showing what it found as buttons inside it, a found submenu unfolded (Default B's cards per program); "Items as buttons" in the editor | 3.3; 6.1 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | Items as buttons in a card | 3.10 |
-| Items as buttons in a card | a card showing its items as buttons inside it (Default B's cards per program) | -- | 3.3; 3.10 |
+| Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 Moved out: Explorer's own icons (and an icon picker for cards) to plan 10.
@@ -154,6 +155,17 @@ in the layout is where its items show.
   (plan 03); until then the dim text colour. In the editor: "+ Note" beside "+ Card" and "+ Divider", dragged or
   clicked, its text edited in the panel as a text box. Used for the warning of a layout the DLL cannot use (plan 05
   3.1.1).
+- **Items as buttons in a card:** a card with rules and `"buttons": true` shows what it found as buttons inside
+  it, not each on a line of its own: its title at the top, the buttons under it side by side, each as wide as its
+  text, wrapping onto the next row when the card is full. A found item with a submenu is unfolded: the items of its
+  submenu are the buttons (those another rule took left out, as in any submenu), and the card takes its title when
+  it found only that item and the layout gives no `title`. A found item without a submenu is a button itself. A
+  button with a submenu of its own opens it as any card does. The card itself is no button (as a note: hover, clicks
+  and the keys go to its buttons); it stands on its line as any card (weight, minimum width, beside other cards), its
+  height following its rows of buttons. Found nothing (or only empty submenus): not shown. Its look is its card's
+  (the theme's, its own from the layout); the buttons take the theme's `card` look. Because it unfolds submenus, a
+  layout with such a card opens the submenus an extension fills only when opened before the rules run, as a rule
+  that looks inside submenus does. In the editor: "Items as buttons" in the card panel.
 - **Hidden:** a card with `hidden: true` shows nothing, while its rules (and those of the cards in its menu) still
   take their items: a way to leave items out of the menu, the remaining card included. The editor draws a hidden
   card with diagonal stripes. The remaining card cannot be hidden.
@@ -464,3 +476,22 @@ Windows' texts, so they fit an English Windows until a rule on the verb is possi
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 Items as buttons in a card
+
+- A card with `"buttons": true` is placed as one view card of its own kind (a group) that holds its buttons; the
+  measure gives it its share of the line like any card and lays its buttons out inside it, each as wide as its
+  content (the icon slot, the title, the mark), wrapping when the next does not fit. Its buttons' boxes follow its
+  own in the level, so the keys, the hover, a click and a submenu opening from a button work as for any card; a hit
+  test passes the group itself by.
+- A found item with a submenu: its submenu is read when it was not yet (a test menu, or a submenu read lazily) and
+  placed as a submenu is (items another rule took directly left out, separators dropped).
+- The group is drawn with its element's (`item` alone on its line, else `card`) background and its own look from the
+  layout; its frame is its border, else the dividers' colour, so it shows in themes without a card background. Its
+  title is bold at the top. The buttons take the theme's `card` look (not the card's own, nor its icon or extra
+  text).
+- Tested: unit tests (TestButtons: unfolding, titles, a button's submenu, the look, the boxes inside the card, the hit
+  tests, a buttons card opening lazily filled submenus); the editor's self-test; in the preview, LexPen's and 7-Zip's
+  cards side by side, 7-Zip unfolded and with its own border. Not tried at a real right-click.

@@ -100,6 +100,8 @@ type
     // Its own look over the theme's (plan 03 3.6): "background", "foreground", "border", "borderWidth", "radius", and
     // the same per state in "hover" / "pressed"; nil when it has none. Owned.
     Look: TJSONObject;
+    // "buttons": what its rules found shown as buttons inside it, a found submenu unfolded (plan 02 3.3)
+    Buttons: Boolean;
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -376,6 +378,8 @@ begin
       Card.SubmenuMode := ParseSubmenuMode(Obj.GetValue('submenus').Value);
     if Obj.GetValue('skipDuplicates') is TJSONBool then
       Card.SkipDuplicates := TJSONBool(Obj.GetValue('skipDuplicates')).AsBoolean;
+    if Obj.GetValue('buttons') is TJSONBool then
+      Card.Buttons := TJSONBool(Obj.GetValue('buttons')).AsBoolean;
     if Obj.GetValue('hidden') is TJSONBool then
       Card.Hidden := TJSONBool(Obj.GetValue('hidden')).AsBoolean;   // not for the remaining card (Dexmenu.Place)
     if (Obj.GetValue('rename') is TJSONObject) and (TJSONObject(Obj.GetValue('rename')).GetValue('regex') <> nil) then

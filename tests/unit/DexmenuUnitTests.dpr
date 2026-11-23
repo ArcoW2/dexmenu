@@ -1292,6 +1292,90 @@ begin
     'a card with an extra text: its line one extra line higher');
 end;
 
+// Items as buttons in a card (plan 02 3.3): a found submenu unfolded, its title the item's; found items without one
+// buttons themselves, the card's title; the buttons inside their card, side by side; hit tests reach the buttons only.
+procedure TestButtons;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error, Titles: string;
+  P: TPlacement;
+  Level: TViewLevel;
+  G: TGeometry;
+  Zip, Lex: TViewCard;
+  I, ZipBox, Inside: Integer;
+  B: TViewCard;
+  Within: Boolean;
+begin
+  Layout := ParseLayout('{ "format": 1, "lines": [ { "line": [ ' +
+    '{ "card": "Archive", "buttons": true, "rules": [ { "name": { "equals": "7-Zip" } } ] }, ' +
+    '{ "card": "LexPen", "buttons": true, "rules": [ { "name": { "endsWith": "in LexPen" } } ] } ] }, ' +
+    '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  Check(Layout <> nil, 'a layout with buttons cards read: ' + Error);
+  if Layout = nil then
+    Exit;
+  Check(RulesLookDeeper(Layout, 'default'), 'a layout with a buttons card opens the submenus filled when opened');
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      Zip := nil;
+      Lex := nil;
+      if (Level.Lines.Count > 0) and (Level.Lines[0].Cards.Count = 2) then
+      begin
+        Zip := Level.Lines[0].Cards[0];
+        Lex := Level.Lines[0].Cards[1];
+      end;
+      Check((Zip <> nil) and (Zip.Kind = vkGroup) and (Lex.Kind = vkGroup), 'the two buttons cards side by side: ' +
+        Describe(Level));
+      if (Zip = nil) or (Zip.Kind <> vkGroup) or (Lex.Kind <> vkGroup) then
+        Exit;
+      Titles := '';
+      for B in Zip.Buttons do
+        Titles := Titles + B.Title + ';';
+      Check((Zip.Title = '7-Zip') and (Titles = 'Add to archive...;Extract here;CRC SHA;'),
+        '7-Zip unfolded into its items, the card titled with it: ' + Zip.Title + ' ' + Titles);
+      Check((Zip.Buttons.Count = 3) and Zip.Buttons[2].HasSubmenu and not Zip.Buttons[0].HasSubmenu,
+        'a button with a submenu of its own opens it');
+      Titles := '';
+      for B in Lex.Buttons do
+        Titles := Titles + B.Title + ';';
+      Check((Lex.Title = 'LexPen') and (Titles = 'Edit in LexPen;View in LexPen;'),
+        'found items without a submenu: each a button, the card''s title: ' + Lex.Title + ' ' + Titles);
+      Check(not Zip.Enabled and (Zip.LookCard <> nil) and (Zip.Buttons[0].LookCard = nil),
+        'the card is no button; its buttons take the theme''s look, not the card''s');
+      G := Measure(Level);
+      ZipBox := -1;
+      for I := 0 to High(G.Boxes) do
+        if G.Boxes[I].Card = Zip then
+          ZipBox := I;
+      Within := (ZipBox >= 0) and (ZipBox + 3 <= High(G.Boxes));
+      if Within then
+        for I := ZipBox + 1 to ZipBox + 3 do
+          Within := Within and (G.Boxes[I].Card = Zip.Buttons[I - ZipBox - 1]) and
+            (G.Boxes[I].Rect.left >= G.Boxes[ZipBox].Rect.left) and (G.Boxes[I].Rect.right <= G.Boxes[ZipBox].Rect.right) and
+            (G.Boxes[I].Rect.top > G.Boxes[ZipBox].Rect.top) and (G.Boxes[I].Rect.bottom <= G.Boxes[ZipBox].Rect.bottom);
+      Check(Within, 'the buttons'' boxes follow their card''s, inside it');
+      if not Within then
+        Exit;
+      Inside := BoxAt(G, (G.Boxes[ZipBox + 1].Rect.left + G.Boxes[ZipBox + 1].Rect.right) / 2,
+        (G.Boxes[ZipBox + 1].Rect.top + G.Boxes[ZipBox + 1].Rect.bottom) / 2, 0);
+      Check(Inside = ZipBox + 1, 'a point on a button hits the button');
+      Check(BoxAt(G, G.Boxes[ZipBox].Rect.left + 8, G.Boxes[ZipBox].Rect.top + 8, 0) = -1,
+        'a point on the card''s title hits nothing');
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
 begin
   TestComments;
   TestLayouts;
@@ -1311,6 +1395,7 @@ begin
   TestSubmenuModes;
   TestSeen;
   TestLinesAndCards;
+  TestButtons;
   if Failures = 0 then
     Writeln('OK')
   else

@@ -314,13 +314,18 @@ begin
   LevelWidths := Settings.Widths;
 end;
 
-// What a card's content needs across (DIP): the icon slot, its title, a shortcut, the mark; a divider's label; a note.
+function GroupNeed(V: TViewCard): Single; forward;
+
+// What a card's content needs across (DIP): the icon slot, its title, a shortcut, the mark; a divider's label; a note;
+// a card with buttons its widest button.
 function CardNeed(V: TViewCard): Single;
 var
   Fmt: IDWriteTextFormat;
 begin
   Result := 0;
-  if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
+  if V.Kind = vkGroup then
+    Result := GroupNeed(V)
+  else if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
     Result := TextWidth(V.Divider.DividerText, NormalFormat) + 48
   else if V.Kind = vkNote then
     Result := NoteWidth(V.Title) + NoteLeft(V) - NotePad
@@ -339,6 +344,45 @@ begin
   end;
 end;
 
+const
+  GroupPad = 6;    // a card with buttons (plan 02 3.3): its buttons and title from its edges (DIP)
+  ButtonGap = 2;   // between its buttons, across and down
+
+// A card with buttons laid out at a place: its buttons' boxes, side by side, each as wide as its content (at most the
+// card's inner width), wrapping onto the next row; the result is the card's height.
+function GroupLayout(V: TViewCard; Left, Top, Width: Single; out Rects: TArray<TD2D1RectF>): Single;
+var
+  I: Integer;
+  X, Y, W, Inner: Single;
+begin
+  SetLength(Rects, V.Buttons.Count);
+  Inner := Max(1, Width - 2 * GroupPad);
+  X := 0;
+  Y := GroupPad + TitleHeight + ButtonGap;
+  for I := 0 to V.Buttons.Count - 1 do
+  begin
+    W := Min(Inner, CardNeed(V.Buttons[I]));
+    if (X > 0) and (X + W > Inner) then
+    begin
+      X := 0;
+      Y := Y + ItemHeight + ButtonGap;
+    end;
+    Rects[I] := D2D1RectF(Left + GroupPad + X, Top + Y, Left + GroupPad + X + W, Top + Y + ItemHeight);
+    X := X + W + ButtonGap;
+  end;
+  Result := Y + ItemHeight + GroupPad;
+end;
+
+function GroupNeed(V: TViewCard): Single;
+var
+  B: TViewCard;
+begin
+  Result := TextWidth(V.Title, BoldFormat);
+  for B in V.Buttons do
+    Result := Max(Result, CardNeed(B));
+  Result := Result + 2 * GroupPad;
+end;
+
 // The layout card's size settings (plan 03 3.5); a view card without one (Windows' items in a submenu, the most used
 // row) has the defaults.
 function CardMin(V: TViewCard): Single;
@@ -355,11 +399,16 @@ begin
     Result := V.Card.Weight;
 end;
 
-// A card's own height at a width: a note's wrapped text, a fixed height in lines, else one line.
+// A card's own height at a width: a note's wrapped text, a card with buttons its rows, a fixed height in lines, else
+// one line.
 function CardHeight(V: TViewCard; Width: Single): Single;
+var
+  Rects: TArray<TD2D1RectF>;
 begin
   Result := ItemHeight;
-  if V.Kind = vkNote then
+  if V.Kind = vkGroup then
+    Exit(GroupLayout(V, 0, 0, Width, Rects))
+  else if V.Kind = vkNote then
     Result := NoteHeight(V, Width)
   else if (V.LookCard <> nil) and (V.LookCard.Extra <> '') then
     Result := ItemHeight + ExtraHeight;   // the title and its extra text
@@ -394,6 +443,8 @@ var
   Box: TBox;
   Fit: TCardFit;
   RowLines: TList<TViewLine>;
+  Rects: TArray<TD2D1RectF>;
+  K: Integer;
 begin
   EnsureFactories;
   LevelMin := MinWidth;
@@ -524,6 +575,18 @@ begin
         Box.Rect := D2D1RectF(X, Top, X + Widths[J], Top + OwnH);
         Box.Alone := N = 1;
         Result.Boxes := Result.Boxes + [Box];
+        // a card with buttons: its buttons' boxes follow its own, inside it
+        if V.Kind = vkGroup then
+        begin
+          GroupLayout(V, X, Top, Widths[J], Rects);
+          for K := 0 to High(Rects) do
+          begin
+            Box.Card := V.Buttons[K];
+            Box.Rect := Rects[K];
+            Box.Alone := False;
+            Result.Boxes := Result.Boxes + [Box];
+          end;
+        end;
         X := X + Widths[J] + CardGap;
       end;
       Y := Y + H;
@@ -544,8 +607,8 @@ begin
   Y := Y + ScrollY;
   for I := 0 to High(G.Boxes) do
     with G.Boxes[I].Rect do
-      if (X >= left) and (X < right) and (Y >= top) and (Y < bottom) then
-        Exit(I);
+      if (X >= left) and (X < right) and (Y >= top) and (Y < bottom) and (G.Boxes[I].Card.Kind <> vkGroup) then
+        Exit(I);   // a card with buttons is no button itself: its buttons are
   Result := -1;
 end;
 
@@ -723,6 +786,30 @@ begin
       Element := 'item'
     else
       Element := 'card';
+    if V.Kind = vkGroup then
+    begin
+      // a card with buttons (plan 02 3.3): its background and a frame (its border, else the dividers' colour), its
+      // title at the top; its buttons are boxes of their own, drawn after it
+      CardRadius := Theme.Number(Element, 'normal', 'radius', ItemRadius, Own);
+      Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
+      FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
+      BorderColor := Theme.Color(Element, 'normal', 'border', RGBA(0, 0, 0, 0), Own);
+      if BorderColor.A > 0 then
+        T.CreateSolidColorBrush(ToD2D(BorderColor), nil, CardBorder)
+      else
+        CardBorder := Sep;
+      T.DrawRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), CardBorder,
+        Theme.Number(Element, 'normal', 'borderWidth', 1, Own));
+      if (Marked <> '') and (V.CardId = Marked) then
+        T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
+          CardRadius, CardRadius), Accent, 1.5);
+      T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, 'normal', 'foreground', RGBA($1B, $1B, $1B), Own)), nil, Brush);
+      Title := V.Title;
+      if Title <> '' then
+        T.DrawText(PWideChar(Title), Length(Title), BoldFormat, D2D1RectF(R.left + GroupPad + 4, R.top + GroupPad,
+          R.right - GroupPad, R.top + GroupPad + TitleHeight), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      Continue;
+    end;
     if not V.Enabled then
       State := 'disabled'
     else if I = G.Pressed then
