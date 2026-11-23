@@ -163,10 +163,10 @@ function listMinimum(list) {
 }
 
 // Each panel's minimum height, measured at its minimum width: everything in it at its own height, a list at its
-// minimum (three rows). Set as --general-min-h and --layouts-min-h, so the panels' arrangement and the window's
+// minimum (three rows). Set as --general-min-h, --rightclicks-min-h and --layouts-min-h, so the panels' arrangement and the window's
 // minimum follow what the panel holds.
 function measureMinimums() {
-  for (const id of ["general", "layouts"]) {
+  for (const id of ["general", "rightclicks", "layouts"]) {
     const panel = $(id), saved = panel.getAttribute("style");
     panel.style.display = "flex";
     panel.style.flex = "none";
@@ -190,13 +190,13 @@ function arrange() {
   for (const b of document.querySelectorAll("#tabs button[data-panel]")) b.classList.toggle("on", b.dataset.panel === shownTab);
 }
 
-// The window's minimum: one panel at its minimum, as a tab (the largest of both), with the margins and
+// The window's minimum: one panel at its minimum, as a tab (the largest of them), with the margins and
 // the tabs.
 function minimumSize() {
   const m = px("--margin");
   return {
-    w: Math.max(px("--general-min-w"), px("--layouts-min-w")) + 2 * m,
-    h: Math.max(px("--general-min-h"), px("--layouts-min-h")) + 2 * m + px("--tabs-h"),
+    w: Math.max(px("--general-min-w"), px("--rightclicks-min-w"), px("--layouts-min-w")) + 2 * m,
+    h: Math.max(px("--general-min-h"), px("--rightclicks-min-h"), px("--layouts-min-h")) + 2 * m + px("--tabs-h"),
   };
 }
 

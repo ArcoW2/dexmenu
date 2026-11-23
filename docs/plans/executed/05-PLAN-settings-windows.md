@@ -285,6 +285,10 @@ None.
   the panels' three arrangements by resizing, the theme switch, closing with unsaved changes, the clipboard between
   two windows.
 
+- Later: the main window has three tabs. General holds the registration and every menu's settings in groups by what
+  they are about (Action: how submenus open; Collecting: the states rules take; Look: themes, text size, marks,
+  widths); Right-clicks holds which layout each kind of right-click gets; Layouts as before.
+
 ### 6.4 The layout versions' warning
 
 - A layout file whose `format` is newer than the DLL's: `Dexmenu.Layout.CurrentLayout` gives a layout made on the

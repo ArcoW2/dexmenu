@@ -6,6 +6,7 @@
   /* each panel's minimum (plan 05 3.3): a list shows at least three rows; the heights are measured by main.js */
   --general-min-w: 440px; --general-min-h: 380px;
   --layouts-min-w: 380px; --layouts-min-h: 300px;
+  --rightclicks-min-w: 380px; --rightclicks-min-h: 300px;
   --margin: 12px; --tabs-h: 38px;
   color-scheme: light dark;
 }
@@ -34,6 +35,11 @@ button.lit { background: var(--accent); color: var(--on-accent); border-color: v
   padding: 8px 12px 12px; box-sizing: border-box; }
 #general { min-width: var(--general-min-w); min-height: var(--general-min-h); flex: 1.2 1 0; }
 #layouts { min-width: var(--layouts-min-w); min-height: var(--layouts-min-h); flex: 1 1 0; }
+#rightclicks { min-width: var(--rightclicks-min-w); min-height: var(--rightclicks-min-h); flex: 1 1 0; }
+#rightclicks > .hint { margin-bottom: 6px; }
+/* General's groups: Action, Collecting, Look */
+fieldset.group { border: 1px solid var(--line); border-radius: 6px; margin: 10px 0 0; padding: 4px 10px 8px; min-width: 0; }
+fieldset.group legend { font-weight: 600; padding: 0 4px; }
 body.tabs .panel { flex: 1 1 0; }
 body.tabs .panel:not(.shown) { display: none; }
 h2 { font-size: 14px; margin: 2px 0 8px; }

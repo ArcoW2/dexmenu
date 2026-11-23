@@ -10,6 +10,7 @@
   <!-- docs/plans/executed/05-PLAN-settings-windows.md 3.3 - 3.5: only about Dexmenu itself; editing is in a layout's window -->
   <nav id="tabs">
     <button data-panel="general" class="on">General</button>
+    <button data-panel="rightclicks">Right-clicks</button>
     <button data-panel="layouts">Layouts</button>
     <button id="themeSwitch" class="theme"></button>
   </nav>
@@ -24,35 +25,52 @@
           <button id="restart" title="Explorer takes a registration change only when it starts again; its windows close">Restart Explorer</button>
         </div>
       </div>
-      <h3>Every menu</h3>
-      <div id="menuSettings" class="settings">
-        <label>Submenus open <select id="submenus">
-          <option value="next">next to their card</option>
-          <option value="under">under their card</option>
-          <option value="replace">in place of the menu (&lt;&lt; back)</option>
-        </select></label>
-        <label><input type="checkbox" id="onClickOnly"> only on a click, not on hover</label>
-        <div class="hint">Shift held while right-clicking: Windows' own menu (in Explorer its extended menu).</div>
-        <label>Mark on a submenu <input type="text" id="submenuMark" maxlength="3" placeholder="chevron" title="Empty: the chevron"></label>
-        <label>Mark on an item <input type="text" id="actionMark" maxlength="3" placeholder="none" title="Empty: none"></label>
-        <label title="Ctrl+scroll while the menu is open sets it too">Text size <input type="number" id="textSize" min="60" max="250" step="10"> %</label>
-        <label>Theme when Windows is light <select id="themeLight"></select></label>
-        <label>when dark <select id="themeDark"></select></label>
-        <label title="A rule without states of its own takes these; each rule can set its own in its panel (States)">Rules take, unless a rule sets its own <select id="states">
-          <option value="both">enabled and disabled items</option>
-          <option value="enabled">enabled items only</option>
-          <option value="disabled">disabled items only</option>
-        </select></label>
-        <div class="widthsLabel">Menu width, in pixels at 100% scaling: each menu grows with its items from its
-          minimum up to its maximum
-        <table id="widths">
-          <tr><th></th><th>minimum</th><th>maximum</th></tr>
-          <tr><td>The menu</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
-          <tr><td>A submenu</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
-          <tr><td>Deeper</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
-        </table></div>
-      </div>
-      <h3>Which layout each right-click gets <span class="hint">(tried from the top: the first that fits and is set decides, Not set passes to the next; drag to reorder)</span></h3>
+      <!-- every menu's settings, by what they are about: how it acts, what its rules collect, how it looks -->
+      <fieldset class="group">
+        <legend>Action</legend>
+        <div class="settings">
+          <label>Submenus open <select id="submenus">
+            <option value="next">next to their card</option>
+            <option value="under">under their card</option>
+            <option value="replace">in place of the menu (&lt;&lt; back)</option>
+          </select></label>
+          <label><input type="checkbox" id="onClickOnly"> only on a click, not on hover</label>
+          <div class="hint">Shift held while right-clicking: Windows' own menu (in Explorer its extended menu).</div>
+        </div>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Collecting</legend>
+        <div class="settings">
+          <label title="A rule without states of its own takes these; each rule can overrule it in its panel (States)">Rules take <select id="states">
+            <option value="both">enabled and disabled items</option>
+            <option value="enabled">enabled items only</option>
+            <option value="disabled">disabled items only</option>
+          </select></label>
+          <div class="hint">A rule can overrule this in its own panel: "Overrule general setting: States".</div>
+        </div>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Look</legend>
+        <div class="settings">
+          <label>Theme when Windows is light <select id="themeLight"></select></label>
+          <label>when dark <select id="themeDark"></select></label>
+          <label title="Ctrl+scroll while the menu is open sets it too">Text size <input type="number" id="textSize" min="60" max="250" step="10"> %</label>
+          <label>Mark on a submenu <input type="text" id="submenuMark" maxlength="3" placeholder="chevron" title="Empty: the chevron"></label>
+          <label>Mark on an item <input type="text" id="actionMark" maxlength="3" placeholder="none" title="Empty: none"></label>
+          <div class="widthsLabel">Menu width, in pixels at 100% scaling: each menu grows with its items from its
+            minimum up to its maximum
+          <table id="widths">
+            <tr><th></th><th>minimum</th><th>maximum</th></tr>
+            <tr><td>The menu</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
+            <tr><td>A submenu</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
+            <tr><td>Deeper</td><td><input type="number" min="100" max="2000"></td><td><input type="number" min="100" max="2000"></td></tr>
+          </table></div>
+        </div>
+      </fieldset>
+    </section>
+    <section class="panel" id="rightclicks">
+      <h2>Which layout each right-click gets</h2>
+      <div class="hint">Tried from the top: the first that fits and is set decides; Not set passes to the next. Drag to reorder.</div>
       <ol id="kinds" class="list"></ol>
     </section>
     <section class="panel" id="layouts">
