@@ -73,6 +73,8 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .toggle { padding: 0; width: 15px; height: 15px; line-height: 12px; font-size: 12px; font-weight: 700; border-radius: 3px; }
 .toggle.fold { position: absolute; left: 7px; }
 /* a card's use count, small and dim, right in the gutter beside the card */
+.line-grip { position: absolute; left: 1px; width: 7px; cursor: grab; border-radius: 3px; background: var(--accent); opacity: .35; }
+.line-grip:hover { opacity: .7; }
 .use-count { position: absolute; right: 8px; font-size: 10px; line-height: 12px; color: var(--dim); }
 .card-icon { width: 14px; height: 10px; vertical-align: -1px; }
 /* a card's actions: over its top right while hovered, so the card does not change size */

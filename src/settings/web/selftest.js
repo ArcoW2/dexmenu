@@ -289,6 +289,21 @@
       "every id once; the priorities 1..n");
   }
 
+  // a line's cards moved together (the gutter's line drag): the first placed as a dragged card, the others after it
+  {
+    const L5 = M.ensureIds({ format: M.formatVersion, lines: [
+      { line: [ { card: "A", rules: [ { name: { equals: "a" } } ] }, { card: "B", rules: [ { name: { equals: "b" } } ] } ] },
+      { line: [ { card: "X", rules: [ { name: { equals: "x" } } ] } ] },
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
+    const names = () => L5.lines.map(e => e.line.map(c => c.card).join("|")).join(" / ");
+    const idOf = n => [...M.cards(L5.lines)].find(c => c.card.card === n).card.id;
+    const ids = [idOf("A"), idOf("B")];
+    const moveLine = place => { if (!place(ids[0])) return false; for (let i = 1; i < ids.length; i++) M.moveCardNext(L5.lines, ids[i], ids[i - 1], "after"); return true; };
+    check(moveLine(id => M.moveCard(L5.lines, id, null, 3)) && names() === "X / Rest / A|B", "a line moved below the last: " + names());
+    check(moveLine(id => M.moveCardNext(L5.lines, id, idOf("X"), "after")) && names() === "X|A|B / Rest", "into another line, beside a card: " + names());
+    check(moveLine(id => M.moveCardNext(L5.lines, id, idOf("Rest"), "above")) && names() === "X / A|B / Rest", "as a line of its own again: " + names());
+  }
+
   // a rule's states: its own, else what General sets
   check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
     M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",

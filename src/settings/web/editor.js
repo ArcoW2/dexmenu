@@ -21,6 +21,7 @@ let kind = "default";
 let selectedId = null;
 let selectedRule = -1;   // index on the selected card
 let hoverId = null;
+let selectedLine = null;   // the cards of a line selected in the gutter (their ids, in order), dragged together; null none
 const collapsed = new Set();   // cards with a menu shown folded (this session only)
 let generalStates = "both";   // what a rule without states of its own takes (the main window's General)
 let palette = {};  // the theme's palette, { name: "#rrggbbaa" } (the app, DexmenuThemePalette): the colour pickers
@@ -131,6 +132,14 @@ function dropZone(cls, onDrop) {
 // the end, then moved by the drop like any; taken out again when the drop cannot place it). place(id, isDivider)
 // moves it and says whether it did.
 function withDragged(e, place) {
+  // a line selected in the gutter: its first card placed as a dragged card is, the others after it in its line
+  if (e.dataTransfer.types.includes("text/line")) {
+    const ids = JSON.parse(e.dataTransfer.getData("text/line") || "[]");
+    if (!ids.length || !place(ids[0], false)) return;
+    for (let i = 1; i < ids.length; i++) M.moveCardNext(linesOf(), ids[i], ids[i - 1], "after");
+    changed();
+    return;
+  }
   const isDivider = e.dataTransfer.types.includes("text/divider");
   let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
   if (!id) return;
@@ -209,7 +218,7 @@ function renderLines(lines, parentId) {
 
 function renderCard(card) {
   const classes = ["card"];
-  if (card.id === selectedId) classes.push("selected");
+  if (card.id === selectedId || (selectedLine && selectedLine.includes(card.id))) classes.push("selected");
   if (card.id === hoverId) classes.push("hover");
   if (M.useless(card)) classes.push("useless");
   if (M.isRemaining(card)) classes.push("remaining");
@@ -286,6 +295,8 @@ function renderCard(card) {
       if (placed) { selectedId = card.id; selectedRule = card.rules.indexOf(placed); post({ type: "mark", cardId: card.id }); changed(); }
       return;
     }
+    // a selected line dropped onto one of its own cards: nothing
+    if (e.dataTransfer.types.includes("text/line") && selectedLine && selectedLine.includes(card.id)) return;
     const zone = dropZoneOf(box, e, e.dataTransfer.types.includes("text/divider"));
     withDragged(e, (id, isDiv) => isDiv ? M.moveDividerNext(linesOf(), id, card.id, zone)
       : zone === "onto" ? M.dropOnCard(layout, linesOf(), id, card.id) : M.moveCardNext(linesOf(), id, card.id, zone));
@@ -344,6 +355,7 @@ function dropZoneOf(box, e, divider = false) {
 const zoneClass = zone => zone === "onto" ? "over" : "over-" + zone;
 
 function select(id, ruleIndex) {
+  selectedLine = null;
   selectedId = id;
   selectedRule = ruleIndex;
   post({ type: "mark", cardId: id || "" });
@@ -800,6 +812,13 @@ function renderCardPane() {
     box.append(row);
     return;
   }
+  if (selectedLine) {
+    $("cardHeading").textContent = "A line of cards";
+    $("card").replaceChildren(el("div", "hint", "The " + selectedLine.length + (selectedLine.length === 1 ? " card" : " cards") +
+      " of this line are selected. Drag the grip in the gutter beside them to move them together: between lines as a line " +
+      "of their own, beside a card into its line, onto a card into its menu. Esc while dragging cancels."));
+    return;
+  }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
   if (!at) {
     $("cardHeading").textContent = "Card";
@@ -1124,8 +1143,23 @@ function render() {
 // the pane resized, a card's text wrapping differently).
 function placeToggles() {
   const gutter = $("cardsGutter");
-  for (const t of gutter.querySelectorAll(".fold, .rest-mark, .use-count")) t.remove();
+  for (const t of gutter.querySelectorAll(".fold, .rest-mark, .use-count, .line-grip")) t.remove();
   const top = gutter.getBoundingClientRect().top;
+  // a line selected in the gutter: a grip beside it, as high as the line, to drag its cards by
+  const firstBox = selectedLine && $("cards").querySelector(`.card[data-id="${selectedLine[0]}"]`);
+  const row = firstBox && firstBox.closest(".line");
+  if (row) {
+    const r = row.getBoundingClientRect(), grip = el("div", "line-grip");
+    grip.title = "Drag to move this line's cards together; Esc cancels";
+    grip.draggable = true;
+    grip.style.top = (r.top - top) + "px";
+    grip.style.height = r.height + "px";
+    grip.addEventListener("dragstart", e => {
+      e.dataTransfer.setData("text/line", JSON.stringify(selectedLine));
+      e.dataTransfer.effectAllowed = "move";
+    });
+    gutter.append(grip);
+  }
   // the remaining card: a coloured line beside it
   const rest = $("cards").querySelector(".card.remaining");
   if (rest) {
@@ -1172,6 +1206,24 @@ function useCount(id) {
   return sum(at.card);
 }
 new ResizeObserver(() => { if (layout) placeToggles(); }).observe($("cards"));
+
+// A click in the gutter selects the cards of the line beside it (the innermost line there: a line in a card's menu
+// before the line of that card), to drag them together by the grip that then shows.
+$("cardsGutter").addEventListener("click", e => {
+  if (!layout || e.target.closest("button, .line-grip")) return;
+  let best = null;
+  for (const row of $("cards").querySelectorAll(".line")) {
+    const r = row.getBoundingClientRect();
+    if (e.clientY >= r.top && e.clientY <= r.bottom && (!best || r.height < best.getBoundingClientRect().height)) best = row;
+  }
+  const ids = best ? [...best.children].filter(c => c.classList.contains("card")).map(c => c.dataset.id) : [];
+  if (!ids.length) return;
+  selectedId = null;
+  selectedRule = -1;
+  selectedLine = ids;
+  post({ type: "mark", cardId: "" });
+  render();
+});
 
 function load(state) {
   kind = state.kind;   // chosen above the preview (the app)

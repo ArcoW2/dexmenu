@@ -289,6 +289,12 @@ None.
   they are about (Action: how submenus open; Collecting: the states rules take; Look: themes, text size, marks,
   widths); Right-clicks holds which layout each kind of right-click gets; Layouts as before.
 
+- Later, in the editor's cards view: a click in the gutter selects the cards of the line beside it (the innermost
+  line there) and shows a grip beside that line; dragging the grip moves the cards together, by the drop places a
+  card has (a gap or a card's top or bottom edge: a line of their own there; a card's side: into its line; onto a
+  card: into its menu); Esc while dragging cancels. A right-click on a card copies or pastes the card or its style;
+  outside a card it pastes a copied card at that place (plan 03 6.8).
+
 ### 6.4 The layout versions' warning
 
 - A layout file whose `format` is newer than the DLL's: `Dexmenu.Layout.CurrentLayout` gives a layout made on the
