@@ -72,9 +72,10 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
     notes, the search box (`{ "search": true }`). A card with rules among them shows what it found at its own place,
     in the order its rules found it.
   - `show`: how it shows its found items or its content:
-    - `item` (the default for a card with rules): as now, one found item is the card itself; several found each a
-      card of their own under each other at the card's place;
-    - `submenu`: the card is one item with its title; its found items and content are its submenu (a card with a
+    - `item` (the default for a card with rules): the card multiplied: one found item is the card itself; several
+      found, the card once for each, under each other at the card's place, each in the card's own layout and style
+      (as now);
+    - `submenu`: the card is one item with its title; its found items or its content are its submenu (a card with a
       menu as now);
     - `row`: side by side inside it; `perRow` the most per row (not set: as many as fit; too many for the width wrap,
       as a line's cards do now); `rows` the most rows;
@@ -91,9 +92,11 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
     anything inside it. Its title, when it has one (`title`), stands above its content: as a card's title, or with
     `"titleAs": "divider"` drawn as a divider with that text (its line and text in the dividers' look). With no style
     and no title it draws nothing itself (what a line or a group was).
-  - `items`: the style of the cards made for its found items when it shows them in a row or column: the size and
-    look fields of a card (`height`, `square`, `background`, `foreground`, `border`, `radius`, `hover`, ...). Not set:
-    the theme's card look (as buttons are now).
+  - `items`: the layout and style of the inner cards made for its found items when it shows them in a `row` or
+    `column`, their own and apart from the card's (the card's own layout and style are its box around them): the
+    layout fields (`height`, `square`, `minWidth`, `wrap`, `cardFit`, `extraAt`) and the style fields (`background`,
+    `foreground`, `border`, `borderWidth`, `radius`, `hover`, `pressed`). Not set: the theme's card look, each as high
+    as its content (as buttons are now).
   - `square`: a card as high as it is wide.
   - `cardFit` (on a holder: how its cards fit a taller row, as a line's now) and `weight`, `minWidth`, `height`,
     `wrap`, `cardFit` on a card as now, within its holder.
@@ -141,8 +144,9 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
   at the end). The gutter's line selection becomes a holder's selection: a click beside a holder selects it.
 - "+ Card" in a card's actions adds one to its content; "+ Group" adds a holder without a style.
 - The card panel's Inside panel: Shows (item, submenu, row, column), Per row and Rows (row), Per column and Columns
-  (column), The rest (in a More submenu, left out), Shown when; the Names panel: Title shown as (a title, a divider);
-  the Style panel a second part, "Its found items", with the size and look fields of `items` and Square.
+  (column), The rest (in a More submenu, left out), Shown when; the Names panel: Title shown as (a title, a divider).
+- Two more panels for a card with rules shown in a `row` or `column`: Item layout and Item style, the layout and
+  style fields of `items` (the inner cards'), beside the card's own Layout and Style; arranged as any panel (plan 13).
 - No conversion in the editor: it reads and writes format 2 only.
 
 ### 3.6 Shipped layouts
