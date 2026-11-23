@@ -11,6 +11,7 @@ Status: partly executed; see Status.
 - 2026-11-23: partly executed: a note's date and time.
 - 2026-11-23: partly executed: the see-through menu; the menu's shadow.
 - 2026-11-23: partly executed: a divider's own look.
+- 2026-11-23: partly executed: the focus ring.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -58,6 +59,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Submenu panels | `next`, `under` and `replace` (with `<<` and the path); opening on hover after Windows' menu delay, or on click only as the settings say; per card or for the layout | 3.9 |
 | Other elements | a divider with its label left, middle or right; the search box (plan 02 3.6); `<<`; the most used as cards with used rules (plan 09); an icon on top of a tall or square card (icon rows as rows of square cards, plan 11) | 3.8 |
 | Divider look | a divider's own `height`, `background`, line colour (`border`, `none`: no line), label colour (`foreground`) and `font` (as a note's); the divider panel's fields | 3.8; 6.13 |
+| Focus ring | the card the keys moved to drawn with a ring in the theme's focused colour, until the mouse moves | 3.7; 6.14 |
 | States | hover, pressed, disabled, checked (a check mark), default (bold); unavailable stripes in the preview | 3.7; 3.10 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
@@ -69,7 +71,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 |---|---|---|---|
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | -- | 3.9 |
 | Scrollbar | a thin scrollbar on hover for a menu taller than the work area (it scrolls with the wheel already) | -- | 3.4 |
-| Focus ring | the keyboard's focused card drawn with a ring, apart from the hover (the keys now move the hover) | -- | 3.7 |
 | Own cards' icons | an icon of their own for Dexmenu's own cards ("Edit menu...", "Windows' menu", command cards) where the layout gives none | -- | 3.8 |
 | Preview marks | a badge on items seen for the first time; the red outline of a card that never shows, in the preview too (the editor's cards view has it) | -- | 3.10 |
 | Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient; every `fit` | -- | 3.4; 3.6 |
@@ -557,3 +558,12 @@ None.
   default). In the editor the divider panel has Height, Background, Line colour, Text colour and Font.
 - Tested: a unit test (the look read; none when not given) and the preview captured as a picture (a tall divider
   with a background, a coloured line and an italic Georgia label; a label without a line; a plain line as before).
+
+### 6.14 The focus ring; the shadow's blur
+
+- A level's geometry has `KeyFocus`: set when the keys move the selection (`MoveSelection`, which also notes where the
+  mouse is), cleared on every level when the mouse really moves (a mouse message at the same screen point keeps it).
+  The selected card then gets a 2 DIP ring in the theme's `card.focused.border` inside its box. Tested: a unit test
+  rendering a level with and without `KeyFocus` (the pixel on the ring differs).
+- A shadow's blur is at most 16 DIP (one ring per DIP); in the editor Blur is a slider with its number, 0 to 16. The
+  3D border's and the shadow's parts are drawn under them with a tree line, as a note's own font under Font.

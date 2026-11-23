@@ -72,6 +72,7 @@ type
     FChosen: UINT;
     FRefreshPosted: Boolean;
     FHoverTimerLevel: Integer;
+    FLastMouse: TPoint;   // the mouse's last screen position: a move that is no move keeps the keys' focus ring
     FSettings: TMenuSettings;   // the global settings (settings.json "menu"), read when the menu shows
     FCommand: TCommand;         // Dexmenu's own item chosen ("Windows' menu", "Edit menu..."); ccNone else
     function OpensOnHover(V: TViewCard): Boolean;
@@ -619,6 +620,8 @@ begin
     if (V.Kind <> vkSeparator) and V.Enabled then
     begin
       L.Selected := I;
+      L.Geometry.KeyFocus := True;   // chosen by the keys: the focus ring, until the mouse moves from here
+      GetCursorPos(FLastMouse);
       // keep the selection in view
       with L.Geometry.Boxes[I].Rect do
       begin
@@ -1070,6 +1073,7 @@ var
   X, Y: Single;
   TME: TTrackMouseEvent;
   V: TViewCard;
+  Moved: TPoint;
 begin
   L := LevelOf(Wnd);
   if L = nil then
@@ -1081,6 +1085,18 @@ begin
       Exit(MA_NOACTIVATE);
     WM_MOUSEMOVE:
       begin
+        // the mouse really moved: the keys' focus ring goes
+        GetCursorPos(Moved);
+        if (Moved.X <> S.FLastMouse.X) or (Moved.Y <> S.FLastMouse.Y) then
+        begin
+          S.FLastMouse := Moved;
+          for I := 0 to S.FLevels.Count - 1 do
+            if S.FLevels[I].Geometry.KeyFocus then
+            begin
+              S.FLevels[I].Geometry.KeyFocus := False;
+              S.FLevels[I].Redraw;
+            end;
+        end;
         X := SmallInt(LP and $FFFF) / L.Scale;
         Y := SmallInt((LP shr 16) and $FFFF) / L.Scale;
         Box := BoxAt(L.Geometry, X, Y, L.ScrollY);

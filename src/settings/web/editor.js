@@ -755,6 +755,40 @@ function partOf(card, key, name) {
   };
 }
 
+// The rows after the first drawn as its sub-options: indented, a tree line to the first (as Font's own font).
+function asTree(rows) {
+  rows.slice(1).forEach((r, i, all) => r.classList.add("sub", ...(i === all.length - 1 ? ["last"] : [])));
+  return rows;
+}
+
+// A number as a slider with the exact value beside it (as a colour's intensity): from min to max; empty the default.
+function sliderRow(label, min, max, value, fallback, onChange, title = "") {
+  const r = el("input");
+  r.type = "range";
+  r.min = min;
+  r.max = max;
+  r.value = value ?? fallback;
+  const shown = el("input", "slider-value");
+  shown.type = "number";
+  shown.min = min;
+  shown.max = max;
+  shown.step = 1;
+  shown.value = value ?? fallback;
+  const box = el("span", "slider");
+  if (title) box.title = title;
+  box.append(r, shown);
+  r.addEventListener("input", () => { shown.value = r.value; });
+  r.addEventListener("change", () => onChange(+r.value));
+  shown.addEventListener("change", () => {
+    const n = Math.max(min, Math.min(max, Math.round(+shown.value || 0)));
+    shown.value = r.value = n;
+    onChange(n);
+  });
+  const row = el("label", "field");
+  row.append(el("span", "", label), box);
+  return row;
+}
+
 // A number in such an object: empty the default.
 function partNumber(card, key, name, label, placeholder, min = 0) {
   const p = partOf(card, key, name);
@@ -778,7 +812,7 @@ function bevelFields(card) {
     partNumber(card, "border3d", "angle", "Light from", "135 (degrees: 90 the top, 135 top left, 180 the left)", -360),
     colorField("Light edges", partOf(card, "border3d", "light").get, partOf(card, "border3d", "light").set),
     colorField("Dark edges", partOf(card, "border3d", "shadow").get, partOf(card, "border3d", "shadow").set));
-  return rows;
+  return asTree(rows);
 }
 
 // A card's shadow (plan 03 3.6): its shape at a distance away from the light, under the card, its edge blurred; only
@@ -786,11 +820,12 @@ function bevelFields(card) {
 function shadowFields(card) {
   const rows = [checkRow("Shadow", !!card.shadow, on => { if (on) card.shadow = { distance: 3 }; else delete card.shadow; changed(); })];
   if (!card.shadow) return rows;
-  rows.push(colorField("Shadow colour", partOf(card, "shadow", "color").get, partOf(card, "shadow", "color").set),
-    partNumber(card, "shadow", "distance", "Shadow distance", "3 (DIP)"),
+  rows.push(colorField("Colour", partOf(card, "shadow", "color").get, partOf(card, "shadow", "color").set),
+    partNumber(card, "shadow", "distance", "Distance", "3 (DIP)"),
     partNumber(card, "shadow", "angle", "Light from", "135 (degrees; the shadow falls away from it)", -360),
-    partNumber(card, "shadow", "blur", "Shadow blur", "0 (a sharp edge; higher: softer and wider)"));
-  return rows;
+    sliderRow("Blur", 0, 16, card.shadow.blur, 0, v => { partOf(card, "shadow", "blur").set(v || undefined); changed(); },
+      "0 a sharp edge; up to 16: softer and wider (DIP)"));
+  return asTree(rows);
 }
 
 let fonts = [];   // the installed font families, from the settings app
@@ -824,8 +859,7 @@ function fontFields(card) {
     checkRow("Bold", f.bold, on => { if (on) f.bold = true; else delete f.bold; changed(); }),
     checkRow("Italic", f.italic, on => { if (on) f.italic = true; else delete f.italic; changed(); }));
   // its own font's parts under Font, indented with a tree line to it
-  rows.slice(1).forEach((r, i, all) => r.classList.add("sub", ...(i === all.length - 1 ? ["last"] : [])));
-  return rows;
+  return asTree(rows);
 }
 
 // A card's own look over the theme's (plan 03 3.6): its colours as pickers (colorField), the hover background the

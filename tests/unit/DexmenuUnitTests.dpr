@@ -1634,6 +1634,8 @@ var
   G: TGeometry;
   I, Box: Integer;
   Inside: Boolean;
+  Pic: TPicture;
+  Plain, Ring: COLORREF;
 begin
   Menu := TestMenu;
   Top := ReadLevel(Menu, '');
@@ -1809,6 +1811,32 @@ begin
           Box := I;
       Check((Box >= 0) and (Abs(G.Boxes[Box + 4].Rect.right - (G.Boxes[Box].Rect.right - 6)) < 1),
         'the flowing row filled to its card''s width (less its padding)');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // the keys' focus ring (plan 03 3.7): drawn on the selected card only while the keys moved it
+    L := Level(Card('Cut', '{ "name": { "equals": "Cut" } }'), P);
+    try
+      G := Measure(L);
+      Box := -1;
+      for I := 0 to High(G.Boxes) do
+        if (Box < 0) and (G.Boxes[I].Card.Kind = vkItem) then
+          Box := I;
+      Pic := Render(G, Box, 0, 1, G.Height);
+      try
+        Plain := GetPixel(Pic.DC, Round(G.Boxes[Box].Rect.left + 3), Round((G.Boxes[Box].Rect.top + G.Boxes[Box].Rect.bottom) / 2));
+      finally
+        Pic.Free;
+      end;
+      G.KeyFocus := True;
+      Pic := Render(G, Box, 0, 1, G.Height);
+      try
+        Ring := GetPixel(Pic.DC, Round(G.Boxes[Box].Rect.left + 3), Round((G.Boxes[Box].Rect.top + G.Boxes[Box].Rect.bottom) / 2));
+      finally
+        Pic.Free;
+      end;
+      Check((Box >= 0) and (Ring <> Plain), Format('the keys'' focus ring on the selected card (%.6x, without it %.6x)', [Ring, Plain]));
     finally
       L.Free;
       P.Free;

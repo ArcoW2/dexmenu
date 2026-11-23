@@ -21,6 +21,7 @@ type
     Width, Height: Single;   // DIP, the whole level
     Boxes: TArray<TBox>;
     Pressed: Integer;        // the box the mouse button is down on (the "pressed" state), or -1; Measure sets -1
+    KeyFocus: Boolean;       // the selection moved by the keys (plan 03 3.7): it gets the focus ring; Measure sets False
     MenuCard: TCard;         // the top level's: the layout's menu card, its style over the theme's menu (plan 11 3.9)
   end;
 
@@ -904,6 +905,7 @@ begin
   Result.Height := OuterPad + LayLines(Level, OuterPad, OuterPad, W - 2 * OuterPad, True, Result.Boxes,
     LevelMax - 2 * OuterPad, False) + OuterPad;
   Result.Pressed := -1;
+  Result.KeyFocus := False;
   Result.MenuCard := Level.MenuCard;
 end;
 
@@ -935,9 +937,12 @@ end;
 // A card's shadow (plan 03 3.6; "shadow": { color, distance, angle, blur }): its shape in the colour, moved the distance
 // away from the light, under the card; a blur softens its edge over that many DIP (rings of growing size, each adding
 // a little of the colour). Drawn inside the menu's clip only: never outside the menu window's background.
+const
+  MaxBlur = 16;   // a shadow's blur at most (DIP): one ring per DIP
+
 procedure DrawShadow(T: ID2D1RenderTarget; Theme: TTheme; Own: TJSONObject; const R: TD2D1RectF; Radius: Single);
 const
-  MaxRings = 16;
+  MaxRings = MaxBlur;
 var
   S: TJSONObject;
   C: TRGBA;
@@ -953,7 +958,7 @@ begin
   if C.A <= 0 then
     Exit;
   Distance := Max(0, Theme.Number('card', 'normal', 'distance', 3, S));
-  Blur := Max(0, Theme.Number('card', 'normal', 'blur', 0, S));
+  Blur := EnsureRange(Theme.Number('card', 'normal', 'blur', 0, S), 0, MaxBlur);   // at most 16 rings, one DIP apart
   LightFrom(Theme.Number('card', 'normal', 'angle', 135, S), LX, LY);
   DX := -LX * Distance;
   DY := -LY * Distance;
@@ -1425,6 +1430,10 @@ begin
     if (Marked <> '') and (V.CardId = Marked) then
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
         CardRadius, CardRadius), Accent, 1.5);
+    // the keyboard's card (plan 03 3.7): a focus ring in the theme's focused border, as Windows' focus rectangle
+    if G.KeyFocus and (I = Selected) then
+      T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(Inner.left + 1, Inner.top + 1, Inner.right - 1, Inner.bottom - 1),
+        Max(0, CardRadius - 1), Max(0, CardRadius - 1)), Accent, 2);
     // the title's colour (a disabled card's from the theme's "disabled"), the mark's in it unless the theme gives one
     if V.Enabled then
       Foreground := Theme.Color(Element, State, 'foreground', RGBA($1B, $1B, $1B), Own)
@@ -1644,7 +1653,7 @@ begin
     Exit;   // no window to shade: the cards' own shadows
   S := TJSONObject(MenuOwn.GetValue('shadow'));
   // room for the shadow: its distance and half its blur, a little more
-  M := Max(0, Theme.Number('card', 'normal', 'distance', 3, S)) + Max(0, Theme.Number('card', 'normal', 'blur', 0, S)) / 2 + 2;
+  M := Max(0, Theme.Number('card', 'normal', 'distance', 3, S)) + EnsureRange(Theme.Number('card', 'normal', 'blur', 0, S), 0, MaxBlur) / 2 + 2;
   Margin := Ceil(M * Scale);
   Radius := Theme.Number('menu', 'normal', 'radius', WindowRadius, MenuOwn);
   Result := NewPicture(Ceil(G.Width * Scale) + 2 * Margin, Ceil(VisibleHeight * Scale) + 2 * Margin, Scale, Target);
