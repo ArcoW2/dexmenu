@@ -1837,6 +1837,21 @@ begin
         Pic.Free;
       end;
       Check((Box >= 0) and (Ring <> Plain), Format('the keys'' focus ring on the selected card (%.6x, without it %.6x)', [Ring, Plain]));
+      // a level shown shorter than it is: the scrollbar at its right edge, at the top while not scrolled
+      G.KeyFocus := False;
+      Pic := Render(G, -1, 0, 1, G.Height);
+      try
+        Plain := GetPixel(Pic.DC, Round(G.Width - 4.5), 10);
+      finally
+        Pic.Free;
+      end;
+      Pic := Render(G, -1, 0, 1, G.Height / 2);
+      try
+        Ring := GetPixel(Pic.DC, Round(G.Width - 4.5), 10);
+      finally
+        Pic.Free;
+      end;
+      Check(Ring <> Plain, Format('a level taller than shown: a scrollbar (%.6x, shown whole %.6x)', [Ring, Plain]));
     finally
       L.Free;
       P.Free;

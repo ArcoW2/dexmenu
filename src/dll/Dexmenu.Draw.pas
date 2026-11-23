@@ -1177,6 +1177,7 @@ var
   Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
   DivLine, DivText: ID2D1SolidColorBrush;   // a divider's line and label, its own or the theme's
   Outline: ID2D1SolidColorBrush;            // the editor's selected card's outline (the preview)
+  Track, Thumb: Single;                     // the scrollbar of a level taller than shown
   Clear_: Boolean;                 // a see-through menu (no background): each card on an opaque base of its own
   Base: ID2D1SolidColorBrush;      // that base: the theme's card background, opaque
   BaseColor: TRGBA;
@@ -1550,6 +1551,17 @@ begin
         TitleBottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
   end;
   T.PopAxisAlignedClip;
+  // a level taller than it is shown (the work area's height): a thin bar at its right edge, where the shown part is
+  // (plan 03 3.4); the wheel and the keys scroll it
+  if G.Height > VisibleHeight + 0.5 then
+  begin
+    Track := VisibleHeight - 2 * OuterPad - 4;
+    Thumb := Max(16, Track * VisibleHeight / G.Height);
+    Y := OuterPad + 2 + (Track - Thumb) * EnsureRange(ScrollY / (G.Height - VisibleHeight), 0, 1);
+    Dim.SetOpacity(0.7);
+    T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(G.Width - 6, Y, G.Width - 3, Y + Thumb), 1.5, 1.5), Dim);
+    Dim.SetOpacity(1);
+  end;
   // the boxes of the card selected in the settings app's editor (the preview only): a red outline around each, 2.5 DIP
   // outside it on every side, so it stays clear of the card's own border; drawn after every card, so none covers it
   if Marked <> '' then

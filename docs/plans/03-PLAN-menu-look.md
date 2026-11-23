@@ -61,6 +61,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Divider look | a divider's own `height`, `background`, line colour (`border`, `none`: no line), label colour (`foreground`) and `font` (as a note's); the divider panel's fields | 3.8; 6.13 |
 | Focus ring | the card the keys moved to drawn with a ring in the theme's focused colour, until the mouse moves | 3.7; 6.14 |
 | Own cards' icons | Dexmenu's own items with a glyph of their own where the layout gives none: Edit menu... a pencil (E70F), Windows' menu three lines (E700) | 3.8 |
+| Scrollbar | a level taller than the work area: a thin bar at its right edge where the shown part is; the wheel and the keys scroll it | 3.4; 6.17 |
 | States | hover, pressed, disabled, checked (a check mark), default (bold); unavailable stripes in the preview | 3.7; 3.10 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
@@ -71,8 +72,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | -- | 3.9 |
-| Scrollbar | a thin scrollbar on hover for a menu taller than the work area (it scrolls with the wheel already) | -- | 3.4 |
-| Preview marks | a badge on items seen for the first time; the red outline of a card that never shows, in the preview too (the editor's cards view has it) | -- | 3.10 |
+| New badge | a badge in the preview on items seen for the first time | open question 1 | 3.10 |
 | Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient; every `fit` | -- | 3.4; 3.6 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step | Image fill | 3.4 |
 | Tests | the parts of 3.11 for what is not built yet (pictures compared with approved ones, images, animation, see-through) | -- | 3.11 |
@@ -329,8 +329,8 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   3.8), in the theme's `unavailable` colours.
 - **New:** a badge on items seen for the first time.
 - **Useless:** a red outline around a card that can never show anything (no rules, or an invalid rule; plan 02 3.5),
-  in the editor and the preview only; the theme's `invalid` colour. Distinct from the stripes: a striped card is
-  sometimes there, an outlined one never.
+  in the editor's cards view; the preview has nothing of such a card to outline. Distinct from the stripes: a striped
+  card is sometimes there, an outlined one never.
 
 ### 3.11 Tests
 
@@ -358,7 +358,9 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 
 ## 4. Open questions
 
-None.
+1. The "new" badge in the preview: what makes an item new? Items seen for the first time are already striped as
+   "sometimes" (earlier right-clicks did not have them). New could mean: first seen today; first seen since the editor
+   opened; or new until it was clicked once. Or is the stripe enough, and the badge dropped?
 
 ## 6. As built
 
@@ -587,3 +589,10 @@ None.
   shadow colours under it), or none; the flat border's colour and the 3D border are no longer two fields.
 - Tested: the preview captured as a picture (raised and sunk, square and rounded, on a light and a dark face), the
   editor's fields in the headless harness, the editor's self-test.
+
+### 6.17 The scrollbar
+
+- A level taller than it is shown gets a thin bar (3 DIP, the dim colour) at its right edge: its length the shown
+  part's share, its place the scroll position. It shows whenever the level scrolls, not only on hover: the level
+  window does not know the mouse is over it when it draws. It is a sign of where one is, not a control: the wheel and
+  the keys scroll. Tested: a unit test rendering a level whole and at half its height (the pixel at the bar differs).
