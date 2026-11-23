@@ -51,7 +51,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | None | "none" for Background, Hover background and Border: nothing drawn (a framed card's border "none": no frame line, where not set gives the dividers' colour) | 3.6; 6.9 |
 | Note style | a note's own style (background, text colour, border, radius, 3D border, shadow) and its font: the items' text, the smaller extra text, or its own (family, size, bold, italic) | 3.6; 6.10 |
 | Note date and time | `{date}` and `{time}` in a note's text (Windows' short formats), or `{date:<picture>}` and `{time:<picture>}`; `{{` and `}}` a brace; filled when the menu opens | 3.6; 6.11 |
-| 3D border | a card's border raised (outset) or sunk (inset) as Windows' classic buttons, lit from an angle, its width and light and dark edge colours; in the card panel's Style | 3.6; 6.10 |
+| 3D border | a card's border raised (outset) or sunk (inset) as a lit panel: soft light inside the edges facing the light, soft shadow inside the others; its width, light angle, light and shadow colours; in the card panel's Style as a style of Border | 3.6; 6.10; 6.16 |
 | Shadow | a card's shadow in a colour at a distance away from the light, its edge blurred, under the card and inside the menu only; in the card panel's Style | 3.6; 6.10 |
 | Menu window | at the mouse or the program's point, flipped at the work area's edges, on that point's monitor; as tall as the work area at most, then scrolling with the wheel; corners and border from the theme and the menu card | 3.4 |
 | See-through menu | the menu card's background `none`: no background or border of the menu's own, only its cards, dividers and rows; each card, framed holder and note on an opaque base; the editor says so | 3.4; 6.12 |
@@ -271,9 +271,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   Windows' date and time pictures (`dddd d MMMM`, `HH:mm`). `{{` and `}}` are a brace; anything else in braces, or a
   brace that is not closed, shows as typed. The menu does not change while it is open.
 - A note showing what a file holds is plan 14.
-- **A 3D border:** besides a flat border, a card's border can look raised (`outset`) or sunk (`inset`), as
-  Windows' classic buttons: a bevel of a width, its edges on the light side drawn in a light colour, those on the
-  other side in a shadow colour, the light coming from an angle (degrees, 135 when not given: from the top left).
+- **A 3D border:** a style of the border, besides flat and none: raised (`outset`) or sunk (`inset`), shaded as a
+  real lit panel: inside the edges facing the light a soft band of light, inside the others a soft band of shadow
+  (sunk the other way round), each as wide as the border's width and fading into the face, the light coming from an
+  angle (degrees, 135 when not given: from the top left).
 - **A shadow:** the card's shape in a colour, at a distance from it in the direction away from the light, under the
   card, its edge blurred by an intensity (0 a sharp edge; the higher, the softer and wider). Only on the menu's own
   background: it is cut off at the menu window's edge, never drawn on what is behind the menu.
@@ -509,10 +510,8 @@ None.
   kept (`NoteFormatOf`); a family that is not there falls back to the items' font. A note with a text colour of its
   own uses it, else the dim colour as before. In the editor a note's fields are Text, Text placed, Font (with family,
   size, bold, italic for its own), its size fields and the Style fields without the hover background.
-- `DrawBorder` draws every card's and framed holder's border: the bevel when `border3d` says outset or inset (the
-  box less the box inside it by the width, cut into four edges with 45 degree corners, each edge light, dark, or
-  between the two when the light runs along it), else the flat border as before. Defaults: width 2, light from 135,
-  light edges white at 90%, dark edges black at 35%.
+- `DrawBorder` draws every card's and framed holder's border: the 3D border when `border3d` says outset or inset
+  (6.16), else the flat border as before.
 - `DrawShadow` draws under a card, a framed holder and a styled note: the shape moved the distance away from the
   light, a blur as rings from blur/2 outside to blur/2 inside the shape (at most 16), each adding what is still
   missing so the colour ramps evenly to its own alpha. Cards are drawn inside the menu's clip, so a shadow never
@@ -576,3 +575,15 @@ None.
 - In the card panel every option with options of its own shows them under it with a tree line: Shows (per row, rows,
   the rest, templates picked), Rename (replace with), Extra text (placed), Hint regex (replace with), Font (family,
   size, bold, italic), 3D border, Shadow.
+
+### 6.16 The 3D border as a lit panel; Border as one style
+
+- The first 3D border (a two-coloured bevel with mitred corners) looked flat and drawn. It is now two inner
+  shadows (`InnerBand`): the box less the box moved the width away from the light, in the light colour, and less the
+  box moved towards the light, in the shadow colour; each band's inner edge blurred over the width (rings as the
+  shadow's), so the shading fades into the face and runs round rounded corners. Defaults: width 2, light from 135,
+  light white at 75%, shadow black at 50%.
+- In the card panel Border is one choice: flat (its colour under it), raised, sunk (width, light from, light and
+  shadow colours under it), or none; the flat border's colour and the 3D border are no longer two fields.
+- Tested: the preview captured as a picture (raised and sunk, square and rounded, on a light and a dark face), the
+  editor's fields in the headless harness, the editor's self-test.

@@ -799,19 +799,29 @@ function partNumber(card, key, name, label, placeholder, min = 0) {
   }, placeholder);
 }
 
-// A card's 3D border (plan 03 3.6): flat (its border), or raised or sunk as Windows' classic buttons, lit from an
-// angle, its width and its light and shadow colours.
-function bevelFields(card) {
-  const style = (card.border3d && card.border3d.style) || "flat";
-  const rows = [selectRow("3D border", [["flat", "flat (the border above)"], ["outset", "raised (outset)"], ["inset", "sunk (inset)"]], style, v => {
-    if (v === "flat") delete card.border3d; else card.border3d = Object.assign(card.border3d || {}, { style: v });
+// A card's border (plan 03 3.6) as one style: flat (its colour, the theme's when none is set), raised or sunk (a 3D
+// border as a lit panel: its width, where the light comes from, the light and dark colours), or none; each style's
+// settings under it with a tree line.
+function borderFields(card) {
+  const style = card.border3d && ["outset", "inset"].includes(card.border3d.style) ? card.border3d.style
+    : card.border === "none" ? "none" : "flat";
+  const rows = [selectRow("Border", [["flat", "flat"], ["outset", "raised (3D)"], ["inset", "sunk (3D)"], ["none", "none (not drawn)"]], style, v => {
+    if (v === "outset" || v === "inset") {
+      card.border3d = Object.assign(card.border3d || {}, { style: v });
+      delete card.border;
+    } else {
+      delete card.border3d;
+      if (v === "none") card.border = "none"; else if (card.border === "none") delete card.border;
+    }
     changed();
-  }, "Raised or sunk as Windows' classic buttons: the edges facing the light light, the others dark")];
-  if (style === "flat") return rows;
-  rows.push(partNumber(card, "border3d", "width", "Bevel width", "2 (DIP)", 0.5),
-    partNumber(card, "border3d", "angle", "Light from", "135 (degrees: 90 the top, 135 top left, 180 the left)", -360),
-    colorField("Light edges", partOf(card, "border3d", "light").get, partOf(card, "border3d", "light").set),
-    colorField("Dark edges", partOf(card, "border3d", "shadow").get, partOf(card, "border3d", "shadow").set));
+  }, "Flat: a line in a colour; raised or sunk: lit as a panel, light inside the edges facing the light, shadow inside the others")];
+  if (style === "flat")
+    rows.push(colorField("Colour", () => card.border, v => { if (v === undefined) delete card.border; else card.border = v; }));
+  else if (style !== "none")
+    rows.push(partNumber(card, "border3d", "width", "Width", "2 (DIP)", 0.5),
+      partNumber(card, "border3d", "angle", "Light from", "135 (degrees: 90 the top, 135 top left, 180 the left)", -360),
+      colorField("Light", partOf(card, "border3d", "light").get, partOf(card, "border3d", "light").set),
+      colorField("Shadow", partOf(card, "border3d", "shadow").get, partOf(card, "border3d", "shadow").set));
   return asTree(rows);
 }
 
@@ -876,13 +886,12 @@ function lookFields(card, note = false) {
   return [colorField("Background", own("background").get, own("background").set, true, true),
     colorField("Text colour", own("foreground").get, own("foreground").set),
     ...(note ? fontFields(card) : []),
-    colorField("Border", own("border").get, own("border").set, false, true),
+    ...borderFields(card),
     textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
       const n = Number(v.trim());
       if (v.trim() && n >= 0) card.radius = n; else delete card.radius;
       changed();
     }, "(the theme's) corners, in DIP"),
-    ...bevelFields(card),
     ...shadowFields(card),
     ...(note ? [] : [colorField("Hover background", hover.get, hover.set, true, true)])];
 }

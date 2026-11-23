@@ -982,30 +982,60 @@ begin
   end;
 end;
 
-// A card's border (plan 03 3.6): a 3D border ("border3d": { style "outset" | "inset", angle, width, light, shadow }) as
-// Windows' classic buttons, a bevel whose edges facing the light are drawn in the light colour and the others in the
-// shadow colour (inset the other way round), an edge across the light half of each; else a flat border in its colour
-// ("border"); not set: Fallback (nil: none); "none": none.
+// A band inside a rounded box (an inner shadow): the box less the box moved by (OX, OY), its inner edge blurred over
+// Blur DIP (rings, each adding what is still missing, as DrawShadow), in the colour C.
+procedure InnerBand(T: ID2D1RenderTarget; const R: TD2D1RectF; Radius, OX, OY, Blur: Single; const C: TRGBA);
+const
+  MaxRings = 16;
+var
+  Shape, Hole: ID2D1RoundedRectangleGeometry;
+  Band: ID2D1PathGeometry;
+  Sink: ID2D1GeometrySink;
+  Brush: ID2D1SolidColorBrush;
+  Identity: TD2DMatrix3x2F;
+  Solid: TRGBA;
+  Rings, K: Integer;
+  E: Single;
+begin
+  if (C.A <= 0) or Failed(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(R, Radius, Radius), Shape)) then
+    Exit;
+  FillChar(Identity, SizeOf(Identity), 0);
+  Identity._11 := 1;
+  Identity._22 := 1;
+  Solid := C;
+  Solid.A := 1;
+  T.CreateSolidColorBrush(ToD2D(Solid), nil, Brush);
+  Rings := Max(1, Min(MaxRings, Ceil(Blur)));
+  for K := 0 to Rings - 1 do
+  begin
+    // from the widest band (the hole shrunk by Blur/2) to the narrowest (grown by Blur/2): where they all lie, the
+    // colour as given; towards the face less and less
+    if Rings = 1 then
+      E := 0
+    else
+      E := -Blur / 2 + Blur * K / (Rings - 1);
+    if Failed(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(D2D1RectF(R.left + OX - E, R.top + OY - E,
+      R.right + OX + E, R.bottom + OY + E), Max(0, Radius + E), Max(0, Radius + E)), Hole)) or
+      Failed(D2D.CreatePathGeometry(Band)) or Failed(Band.Open(Sink)) then
+      Exit;
+    Shape.CombineWithGeometry(Hole, D2D1_COMBINE_MODE_EXCLUDE, Identity, 0.25, Sink);
+    Sink.Close;
+    Brush.SetOpacity(1 - (1 - C.A * (K + 1) / Rings) / (1 - C.A * K / Rings));
+    T.FillGeometry(Band, Brush, nil);
+  end;
+end;
+
+// A card's border (plan 03 3.6): a 3D border ("border3d": { style "outset" | "inset", angle, width, light, shadow })
+// as a lit panel, raised or sunk (InnerBand: soft light inside the edges facing the light, soft shadow inside the
+// others); else a flat border in its colour ("border"); not set: Fallback (nil: none); "none": none.
 procedure DrawBorder(T: ID2D1RenderTarget; Theme: TTheme; const Element, State: string; Own: TJSONObject;
   const R: TD2D1RectF; Radius: Single; Fallback: ID2D1Brush);
 var
   B: TJSONObject;
   Style: string;
-  W, LX, LY, D, Facing: Single;
+  W, LX, LY: Single;
   Light, Shade, C: TRGBA;
-  Outer, Inside: ID2D1RoundedRectangleGeometry;
-  Ring, Side, Part: ID2D1PathGeometry;
-  Sink: ID2D1GeometrySink;
   Brush: ID2D1SolidColorBrush;
-  Edge: Integer;
-  P: array[0..3] of TD2D1Point2F;
-  Identity: TD2DMatrix3x2F;
-
-  function Path(out G: ID2D1PathGeometry; out S: ID2D1GeometrySink): Boolean;
-  begin
-    Result := Succeeded(D2D.CreatePathGeometry(G)) and Succeeded(G.Open(S));
-  end;
-
 begin
   B := nil;
   if (Own <> nil) and (Own.GetValue('border3d') is TJSONObject) then
@@ -1015,78 +1045,22 @@ begin
     Style := B.GetValue('style').Value;
   if (Style = 'outset') or (Style = 'inset') then
   begin
-    FillChar(Identity, SizeOf(Identity), 0);
-    Identity._11 := 1;
-    Identity._22 := 1;
+    // as a lit panel: inside its edges a soft band of light on the side facing the light and a soft band of shadow
+    // on the other (sunk: the other way round); each band the shape less itself moved the width away, its inner edge
+    // blurred over the width, so it fades into the face and runs round the corners
     W := Max(0.5, Min(Theme.Number('card', 'normal', 'width', 2, B), Min(R.right - R.left, R.bottom - R.top) / 2));
     LightFrom(Theme.Number('card', 'normal', 'angle', 135, B), LX, LY);
-    Light := Theme.Color('card', 'normal', 'light', RGBA(255, 255, 255, 0.9), B);
-    Shade := Theme.Color('card', 'normal', 'shadow', RGBA(0, 0, 0, 0.35), B);
+    Light := Theme.Color('card', 'normal', 'light', RGBA(255, 255, 255, 0.75), B);
+    Shade := Theme.Color('card', 'normal', 'shadow', RGBA(0, 0, 0, 0.5), B);
     if Style = 'inset' then
     begin
       C := Light;
       Light := Shade;
       Shade := C;
     end;
-    // the bevel: the box less the box inside it by its width
-    if Failed(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(R, Radius, Radius), Outer)) or
-      Failed(D2D.CreateRoundedRectangleGeometry(D2D1RoundedRect(D2D1RectF(R.left + W, R.top + W, R.right - W,
-        R.bottom - W), Max(0, Radius - W), Max(0, Radius - W)), Inside)) or not Path(Ring, Sink) then
-      Exit;
-    Outer.CombineWithGeometry(Inside, D2D1_COMBINE_MODE_EXCLUDE, Identity, 0.25, Sink);
-    Sink.Close;
-    // each edge: a trapezoid with 45 degree corners, deep enough for a rounded corner, cut out of the bevel
-    D := Min(Max(W, Radius) + 1, Min(R.right - R.left, R.bottom - R.top) / 2);
-    for Edge := 0 to 3 do
-    begin
-      case Edge of
-        0: begin   // top
-             P[0] := D2D1PointF(R.left, R.top); P[1] := D2D1PointF(R.right, R.top);
-             P[2] := D2D1PointF(R.right - D, R.top + D); P[3] := D2D1PointF(R.left + D, R.top + D);
-             Facing := -LY;
-           end;
-        1: begin   // right
-             P[0] := D2D1PointF(R.right, R.top); P[1] := D2D1PointF(R.right, R.bottom);
-             P[2] := D2D1PointF(R.right - D, R.bottom - D); P[3] := D2D1PointF(R.right - D, R.top + D);
-             Facing := LX;
-           end;
-        2: begin   // bottom
-             P[0] := D2D1PointF(R.right, R.bottom); P[1] := D2D1PointF(R.left, R.bottom);
-             P[2] := D2D1PointF(R.left + D, R.bottom - D); P[3] := D2D1PointF(R.right - D, R.bottom - D);
-             Facing := LY;
-           end;
-      else         // left
-             P[0] := D2D1PointF(R.left, R.bottom); P[1] := D2D1PointF(R.left, R.top);
-             P[2] := D2D1PointF(R.left + D, R.top + D); P[3] := D2D1PointF(R.left + D, R.bottom - D);
-             Facing := -LX;
-      end;
-      // facing the light: light; away: shadow; across it (light from straight above, for a side): between the two
-      if Facing > 0.01 then
-        C := Light
-      else if Facing < -0.01 then
-        C := Shade
-      else
-      begin
-        C.R := (Light.R + Shade.R) / 2;
-        C.G := (Light.G + Shade.G) / 2;
-        C.B := (Light.B + Shade.B) / 2;
-        C.A := (Light.A + Shade.A) / 2;
-      end;
-      if not Path(Side, Sink) then
-        Exit;
-      Sink.BeginFigure(P[0], D2D1_FIGURE_BEGIN_FILLED);
-      Sink.AddLine(P[1]);
-      Sink.AddLine(P[2]);
-      Sink.AddLine(P[3]);
-      Sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-      Sink.Close;
-      if not Path(Part, Sink) then
-        Exit;
-      Ring.CombineWithGeometry(Side, D2D1_COMBINE_MODE_INTERSECT, Identity, 0.25, Sink);
-      Sink.Close;
-      T.CreateSolidColorBrush(ToD2D(C), nil, Brush);
-      T.FillGeometry(Part, Brush, nil);
-    end;
+    // the light band on the lit side: the shape less itself moved away from the light; the dark band the reverse
+    InnerBand(T, R, Radius, -LX * W, -LY * W, W, Light);
+    InnerBand(T, R, Radius, LX * W, LY * W, W, Shade);
     Exit;
   end;
   C := Theme.Color(Element, State, 'border', RGBA(0, 0, 0, -1), Own);
