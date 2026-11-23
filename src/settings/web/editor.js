@@ -307,7 +307,9 @@ function renderTemplates(card) {
       const type = await clipboardType();
       showContextMenu(x, y, [
         ["Copy style", "This template's background, text colour, border, radius, hover look, height, square, wrap and fit (Ctrl+Shift+C)", copyStyle],
-        ["Paste style", "The copied style onto this template: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style"]]);
+        ["Paste style", "The copied style onto this template: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style"],
+        null,
+        ["Copy template", "This template (its texts, layout and style), to paste onto another card, also in another layout (Ctrl+C)", copyTemplate]]);
     });
     box.append(chip);
   });
@@ -363,7 +365,9 @@ function renderCard(card) {
         () => pasteCardAt({ into: card.id }), type !== "card" || !M.canHold(card)],
       null,
       ["Copy style", "Its background, text colour, border, radius, hover look, height, wrap, fit in line, extra text at and submenus open (Ctrl+Shift+C)", copyStyle, remaining],
-      ["Paste style", "The copied style onto this card: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style" || remaining]]);
+      ["Paste style", "The copied style onto this card: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style" || remaining],
+      ["Paste template", "The copied template added to this card's templates (what the items it shows inside it follow)", () => pasteTemplate(card),
+        type !== "template" || !M.canTakeTemplate(card)]]);
   });
   // a double click on a card with a menu (its own space, not a card in it or a button) folds or unfolds it
   box.addEventListener("dblclick", e => {
@@ -1404,6 +1408,21 @@ async function pasteCardAt(where) {
   changed();
 }
 
+// The selected template copied (plan 11): its texts, layout and style, to paste onto another card.
+async function copyTemplate() {
+  const t = /~t\d+$/.test(selectedId || "") ? styledCard() : null;
+  if (!t) return;
+  try { await navigator.clipboard.writeText(M.clip("template", t)); } catch (e) { /* not copied */ }
+}
+
+// A copied template added to a card's templates, then selected.
+async function pasteTemplate(card, text) {
+  if (text === undefined) { try { text = await navigator.clipboard.readText(); } catch (e) { return; } }
+  if (!M.paste(layout, linesOf(), text, null, card)) return;
+  select(card.id + "~t" + (card.templates.length - 1), -1);
+  changed();
+}
+
 // A small right-click menu at x, y (page pixels): items [label, title, action, disabled], null a line between them;
 // closed by a choice, a click elsewhere, Esc, or scrolling.
 function showContextMenu(x, y, items) {
@@ -1884,6 +1903,7 @@ document.addEventListener("keydown", async e => {
   if (e.shiftKey && key === "v") { pasteStyle(); return; }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
   const div = selectedId ? M.findDivider(linesOf(), selectedId) : null;
+  if (key === "c" && /~t\d+$/.test(selectedId || "")) { copyTemplate(); return; }   // a template selected: the template
   if (key === "c" || key === "x") {
     let text = null;
     if (at && selectedRule >= 0 && at.card.rules && at.card.rules[selectedRule] !== undefined && at.card.rules[selectedRule] !== "remaining")
@@ -1903,6 +1923,12 @@ document.addEventListener("keydown", async e => {
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch (err) { return; }
   if (text.includes('"dexmenu":"style"')) { pasteStyle(text); return; }   // a style: onto the selected card
+  if (M.clipType(text) === "template") {
+    // a template: onto the selected card, or the card of the selected template
+    const holder = M.find(linesOf(), (selectedId || "").replace(/~t\d+$/, ""));
+    if (holder) pasteTemplate(holder.card, text);
+    return;
+  }
   const onto = at && !M.isHolder(at.card) && !M.isRemaining(at.card) ? at.card : null;
   const pasted = M.paste(layout, linesOf(), text, at ? selectedId : null, onto);
   if (!pasted) return;

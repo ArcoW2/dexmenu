@@ -662,7 +662,12 @@ const LayoutModel = (() => {
     }
   }
 
-  // What the clipboard's text holds: "card", "divider", "rule", "style", or "" (nothing of Dexmenu's).
+  // Whether a card can take a template: a card with rules (not the remaining card, a note, or one holding cards).
+  function canTakeTemplate(card) {
+    return !!card && !isHolder(card) && !isNote(card) && !isRemaining(card) && !isOwn(card);
+  }
+
+  // What the clipboard's text holds: "card", "divider", "rule", "style", "template", or "" (nothing of Dexmenu's).
   function clipType(text) {
     try { const d = JSON.parse(text); return d && typeof d.dexmenu === "string" && d.item ? d.dexmenu : ""; } catch (e) { return ""; }
   }
@@ -708,6 +713,13 @@ const LayoutModel = (() => {
       if (!onto || isRemaining(onto)) return null;
       applyStyle(onto, item);
       return onto;
+    }
+    if (data.dexmenu === "template") {
+      // a template (plan 11 3.1): a copy added to the card's templates (a card with rules)
+      if (!canTakeTemplate(onto)) return null;
+      onto.templates = onto.templates || [];
+      onto.templates.push(item);
+      return item;
     }
     if (data.dexmenu === "rule") {
       if (!onto || isHolder(onto) || isRemaining(onto) || item === "remaining") return null;
@@ -769,7 +781,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { canTakeTemplate, isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

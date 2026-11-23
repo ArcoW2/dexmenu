@@ -293,3 +293,7 @@ None.
 - A row of found items without `perRow` is a grid: as many per row as its widest card lets fit, every row the same
   number in equal columns over the card's width (before: each card at its text's width, so six could wrap 3, 2, 1).
   Tested: a unit test (six found: rows of the same number).
+- A template is copied on its own (its right-click menu "Copy template", or Ctrl+C with it selected) and pasted onto
+  another card with rules (the card's right-click menu "Paste template", or Ctrl+V with the card or one of its
+  templates selected): a copy added to that card's templates, through the clipboard, so also in another layout.
+  Tested in the editor's self-test (pasted as a copy; not onto the remaining card or a card holding cards).

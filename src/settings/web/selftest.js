@@ -293,6 +293,18 @@
     check(M.paste(L3, L3.lines, M.clip("style", style), null, at(L3.lines, 1, 0)) === null, "no style onto the remaining card");
   }
 
+  // a template copied onto another card: a copy added to its templates; not onto a card holding cards
+  {
+    const L6 = mk([ { line: [ { card: "A", show: "row", templates: [ { background: "#ff0000", square: true } ], rules: [ { name: { equals: "a" } } ] } ] },
+      { line: [ { card: "B", rules: [ { name: { equals: "b" } } ] } ] }, { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ]);
+    const a = L6.lines[0], b = L6.lines[1];
+    const text = M.clip("template", a.templates[0]);
+    check(M.clipType(text) === "template" && M.paste(L6, L6.lines, text, null, b) && b.templates.length === 1 &&
+      b.templates[0].background === "#ff0000" && b.templates[0] !== a.templates[0], "a template pasted onto another card: a copy in its templates");
+    check(M.paste(L6, L6.lines, text, null, L6.lines[2]) === null && !M.canTakeTemplate({ card: "G", content: [] }),
+      "not onto the remaining card or a card holding cards");
+  }
+
   // a card copied and pasted as a duplicate: at the top, at a place, inside a card; not inside a note
   {
     const L4 = mk([
