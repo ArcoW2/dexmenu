@@ -225,6 +225,29 @@
   const cur = M.upToDate({ format: M.formatVersion, lines: [] });
   check(!cur.changed, "a current file: unchanged");
 
+  // a rule's type (plan 09 3.3): Name or Usage, the other type's keys taken out on a switch; the rank checked
+  {
+    const r = { name: { contains: "x" }, caseSensitive: true, scope: "anywhere", states: ["enabled"], also: true, priority: 2 };
+    check(M.ruleType(r) === "name", "a rule with a name: type Name");
+    M.setRuleType(r, "usage");
+    check(M.ruleType(r) === "usage" && r.used === "most" && r.name === undefined && r.caseSensitive === undefined &&
+      r.scope === undefined && r.states.length === 1 && r.also && r.priority === 2 && M.ruleProblem(r) === "",
+      "to Usage: most used, the name, case sensitive and where taken out, the shared fields kept, valid");
+    r.rank = "1-3";
+    M.setRuleType(r, "name");
+    check(M.ruleType(r) === "name" && r.used === undefined && r.rank === undefined && r.name.contains === "" && r.also,
+      "back to Name: used and rank taken out, an empty contains");
+    const used = rank => M.ruleProblem({ used: "recent", rank });
+    check([undefined, 1, 3, "2", "1-3", "3-1", " 2 - 5 "].every(k => used(k) === ""),
+      "a rank: none, a number, a text with one, a range, a range from high to low");
+    check([0, -1, 1.5, "0", "0-3", "3-0", "x", "", "1-"].every(k => used(k) !== ""),
+      "a wrong rank outlined red: 0 or lower, a fraction, text, half a range");
+    check(M.ruleProblem({ used: "often" }) !== "" && M.ruleProblem({ used: "most", name: { equals: "a" } }) !== "",
+      "an unknown use, or both a name and a use: outlined red");
+    check(M.useless({ card: "U", rules: [ { used: "most", rank: 0 } ] }) && !M.useless({ card: "U", rules: [ { used: "most", rank: "3-1" } ] }),
+      "a card with a wrong rank outlined red, with a reversed range not");
+  }
+
   // comments
   check(M.withoutComments('{ "r": "a//b" } // c') === '{ "r": "a//b" } \n', "// inside a string kept, after it a comment");
 

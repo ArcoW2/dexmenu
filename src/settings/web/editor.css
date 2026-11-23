@@ -127,6 +127,9 @@ textarea { font: inherit; color: inherit; background: var(--card); border: 1px s
 .rule .number { font-weight: 600; min-width: 1.6em; }
 .rule .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 3px 0; }
 .rule .row input[type=text] { flex: 1; min-width: 120px; }
+/* the rule's type's own fields (Name or Usage, plan 09 3.3) */
+.rulegroup { border-left: 2px solid var(--line); padding-left: 8px; margin: 4px 0; }
+.rule .row input.rank { flex: 0 0 70px; min-width: 0; }
 .problem { color: var(--bad); font-size: 12px; }
 
 /* the rules view */

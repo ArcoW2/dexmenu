@@ -5,7 +5,7 @@ unit Dexmenu.Usage;
 //   { "format": 1, "kinds": { "file": { "Open": 12, "7-Zip > Add to archive...": 3 } } }
 // An item is known by its path in Windows' menu and its text (UsageKey), so a count holds across right-clicks.
 // Beside "kinds", "last" holds the time of each item's last use by the same kind and key, in UTC, as a text that
-// sorts as the time does (docs/plans/09-PLAN-used-rules.md 3.2):
+// sorts as the time does (docs/plans/executed/09-PLAN-used-rules.md 3.2):
 //   "last": { "file": { "Open": "2026-11-23T14:05:09.120Z" } }
 // An older DLL reads "kinds" only and keeps "last" when it writes a count.
 

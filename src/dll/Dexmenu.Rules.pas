@@ -12,7 +12,7 @@ unit Dexmenu.Rules;
 //     "skipDuplicates": false,                      true: of items of one name it finds, only the first shows
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
-// Or by use instead of by name (docs/plans/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
+// Or by use instead of by name (docs/plans/executed/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
 // the most used or most recently used items of this menu, at any depth; no rank: all of them, in order; a range from
 // high to low ("3-1") the same items in reverse order. The match kind, caseSensitive, scope and path have no function
 // there. A rank of 0 or lower, or one that is no number or range, makes the rule invalid.

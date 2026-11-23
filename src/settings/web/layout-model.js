@@ -83,10 +83,41 @@ const LayoutModel = (() => {
 
   // ---- rules ----------------------------------------------------------------------------------------------------
 
+  // A used rule's rank (plan 09 3.1): none, a number from 1, or a text with one ("3") or a range ("1-3", "3-1").
+  function rankProblem(rank) {
+    if (rank === undefined) return "";
+    if (typeof rank === "number") return Number.isInteger(rank) && rank >= 1 ? "" : "rank: a number from 1, or a range as 1-3";
+    const m = typeof rank === "string" ? /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(rank) : null;
+    return m && +m[1] >= 1 && (m[2] === undefined || +m[2] >= 1) ? "" : "rank: a number from 1, or a range as 1-3";
+  }
+
+  // The rule's type: "usage" (it has "used"), else "name".
+  function ruleType(rule) { return rule && typeof rule === "object" && rule.used !== undefined ? "usage" : "name"; }
+
+  // Switch a rule to the other type: the other type's keys taken out, the new type's start put in.
+  function setRuleType(rule, type) {
+    if (ruleType(rule) === type) return;
+    if (type === "usage") {
+      for (const k of ["name", "caseSensitive", "scope", "path"]) delete rule[k];
+      rule.used = "most";
+    } else {
+      delete rule.used;
+      delete rule.rank;
+      rule.name = { contains: "" };
+    }
+  }
+
   function ruleProblem(rule) {
     if (rule === "remaining") return "";
     if (typeof rule !== "object" || rule === null) return "a rule is an object";
     if (rule.verb !== undefined) return "a rule on the verb is not yet possible";
+    if (rule.used !== undefined) {
+      if (rule.name !== undefined) return "a rule has a name or a use, not both";
+      if (rule.used !== "most" && rule.used !== "recent") return "used is most or recent";
+      const rank = rankProblem(rule.rank);
+      if (rank) return rank;
+      return commonProblem(rule);
+    }
     if (rule.scope !== undefined && rule.path !== undefined) return "a scope and a path: only one of them";
     if (rule.scope !== undefined && rule.scope !== "top" && rule.scope !== "anywhere") return "scope is top or anywhere";
     for (const field of ["name", "path"]) {
@@ -98,6 +129,11 @@ const LayoutModel = (() => {
         return field + ": nothing to match";
       if (keys[0] === "regex") { try { new RegExp(m.regex); } catch (e) { return field + ": the regex does not compile"; } }
     }
+    return commonProblem(rule);
+  }
+
+  // What a rule of either type may get wrong
+  function commonProblem(rule) {
     if (rule.consume !== undefined && typeof rule.consume !== "boolean") return "consume is true or false";
     if (rule.states !== undefined && (!Array.isArray(rule.states) || rule.states.some(s => s !== "enabled" && s !== "disabled")))
       return "states: enabled and/or disabled";
@@ -442,7 +478,8 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
+  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem,
+    ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addMostUsed, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

@@ -453,8 +453,46 @@ function ruleEditor(card, rule, index) {
   const number = el("span", "number", (index + 1) + ".");
   const priority = el("span", "badge", "#" + rule.priority);
   priority.title = "Its place in the priority list";
-  head.append(handle, number, priority, el("span", "", "Name"),
-    ...matchEditor(rule.name, m => { rule.name = m; changed(); }));
+  // the rule's type (plan 09 3.3): Name or Usage, each with its own group of fields; only the chosen one shown
+  const typeSel = el("select");
+  for (const [t, label] of [["name", "Name"], ["usage", "Usage"]]) { const o = el("option", "", label); o.value = t; typeSel.append(o); }
+  typeSel.value = M.ruleType(rule);
+  typeSel.title = "What the rule finds items by: their name, or their use (the most used or most recently used)";
+  typeSel.addEventListener("change", () => { M.setRuleType(rule, typeSel.value); changed(); });
+  head.append(handle, number, priority, typeSel);
+  const group = el("div", "rulegroup");
+  if (M.ruleType(rule) === "usage") {
+    const row = el("div", "row");
+    const usedSel = el("select");
+    for (const [u, label] of [["most", "most used"], ["recent", "most recently used"]]) { const o = el("option", "", label); o.value = u; usedSel.append(o); }
+    usedSel.value = rule.used === "recent" ? "recent" : "most";
+    usedSel.addEventListener("change", () => { rule.used = usedSel.value; changed(); });
+    const rank = el("input");
+    rank.type = "text";
+    rank.className = "rank";
+    rank.placeholder = "all";
+    rank.title = "Empty: all of them, in order; a number from 1 (3: the third); a range (1-3), or from high to low (3-1: the same in reverse)";
+    rank.value = rule.rank === undefined ? "" : String(rule.rank);
+    rank.addEventListener("change", () => {
+      const v = rank.value.trim();
+      if (v === "") delete rule.rank;
+      else rule.rank = /^\d+$/.test(v) ? +v : v;
+      changed();
+    });
+    row.append(el("span", "", "Finds the"), usedSel, el("span", "", "Rank"), rank);
+    group.append(row);
+  } else {
+    const nameRow = el("div", "row");
+    nameRow.append(...matchEditor(rule.name, m => { rule.name = m; changed(); }));
+    const cs = el("input");
+    cs.type = "checkbox";
+    cs.checked = !!rule.caseSensitive;
+    cs.addEventListener("change", () => { if (cs.checked) rule.caseSensitive = true; else delete rule.caseSensitive; changed(); });
+    const csl = el("label");
+    csl.append(cs, " case sensitive");
+    nameRow.append(csl);
+    group.append(nameRow);
+  }
   const where = el("div", "row");
   const placeSel = el("select");
   for (const p of ["top", "anywhere", "path"]) { const o = el("option", "", placeNames[p]); o.value = p; placeSel.append(o); }
@@ -468,6 +506,7 @@ function ruleEditor(card, rule, index) {
   });
   where.append(el("span", "", "Where"), placeSel);
   if (rule.path) where.append(...matchEditor(rule.path, m => { rule.path = m; changed(); }));
+  if (M.ruleType(rule) === "name") group.append(where);
   const opts = el("div", "row");
   const states = rule.states || ["enabled", "disabled"];
   for (const s of ["enabled", "disabled"]) {
@@ -485,7 +524,7 @@ function ruleEditor(card, rule, index) {
     l.append(cb, " " + s);
     opts.append(l);
   }
-  for (const [flag, label] of [["caseSensitive", "case sensitive"], ["also", "also when taken"],
+  for (const [flag, label] of [["also", "also when taken"],
     ["skipDuplicates", "skip duplicates (one per name)"]]) {
     const cb = el("input");
     cb.type = "checkbox";
@@ -508,7 +547,7 @@ function ruleEditor(card, rule, index) {
   const del = el("button", "", "Delete rule");
   del.addEventListener("click", () => { M.deleteRule(linesOf(), card, index); selectedRule = -1; changed(); });
   opts.append(del);
-  box.append(head, where, opts);
+  box.append(head, group, opts);
   const problem = M.ruleProblem(rule);
   if (problem) box.append(el("div", "problem", problem));
   // selecting the rule only moves the highlights: a full render here would replace the checkbox or field this same
@@ -710,9 +749,14 @@ function renderCardPane() {
 
 function summary(rule) {
   const show = m => { const k = Object.keys(m || {})[0]; return k ? k + " " + (k === "any" ? "[" + m.any.join(", ") + "]" : '"' + m[k] + '"') : "?"; };
-  let s = "name " + show(rule.name);
-  if (rule.path) s += ", in a submenu " + show(rule.path);
-  else if (rule.scope === "anywhere") s += ", anywhere";
+  let s;
+  if (M.ruleType(rule) === "usage") {
+    s = (rule.used === "recent" ? "most recent" : "most used") + (rule.rank === undefined ? "" : " " + rule.rank);
+  } else {
+    s = "name " + show(rule.name);
+    if (rule.path) s += ", in a submenu " + show(rule.path);
+    else if (rule.scope === "anywhere") s += ", anywhere";
+  }
   if (rule.states && rule.states.length === 1) s += ", " + rule.states[0] + " only";
   if (rule.also) s += ", also";
   if (rule.consume === false) s += ", not consumed";

@@ -560,7 +560,7 @@ begin
   end;
 end;
 
-// Used rules (docs/plans/09-PLAN-used-rules.md): a rule finding the most used or most recently used items by rank; the
+// Used rules (docs/plans/executed/09-PLAN-used-rules.md): a rule finding the most used or most recently used items by rank; the
 // time of last use kept with each choice.
 procedure TestUsedRules;
 var

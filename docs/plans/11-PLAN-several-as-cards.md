@@ -6,7 +6,7 @@ Status: not started; see Status.
 
 Builds on plan 02 (`executed/02-PLAN-own-menu.md`): a card places what it found where it stands (3.3), items as
 buttons in a card (3.3, 6.1); plan 03 (`03-PLAN-menu-look.md`): a card's size on its line (3.5) and its own look
-(3.6); plan 09 (`09-PLAN-used-rules.md`): used rules, whose ranks often find several items.
+(3.6); plan 09 (`executed/09-PLAN-used-rules.md`): used rules, whose ranks often find several items.
 
 ## 1. What this is about
 

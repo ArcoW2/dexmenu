@@ -117,7 +117,7 @@ type
     function Hides(Node: TNode): Boolean;
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes); overload;
     // With the use counts and times known before the rules are evaluated: used rules rank by them
-    // (docs/plans/09-PLAN-used-rules.md).
+    // (docs/plans/executed/09-PLAN-used-rules.md).
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes; AUsage: TDictionary<string, Integer>;
       ALastUse: TDictionary<string, string>); overload;
     destructor Destroy; override;
@@ -139,7 +139,7 @@ function KeyOf(Node: TNode): string;
 function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
 // Whether a kind's layout has a most used row (plan 02 3.9), at any level.
 function HasMostUsed(const Layout: ILayout; const Kind: string): Boolean;
-// Whether a kind's layout uses the use counts: a most used row, or a used rule (docs/plans/09-PLAN-used-rules.md).
+// Whether a kind's layout uses the use counts: a most used row, or a used rule (docs/plans/executed/09-PLAN-used-rules.md).
 function UsesUsage(const Layout: ILayout; const Kind: string): Boolean;
 // The hint shown on hover over a card: its layout card's hint (a text, or a regex on the item's own hint), else the
 // item's own hint (Regular: from the seen items, Dexmenu.Seen.HintsOf); '' for none.
@@ -688,7 +688,7 @@ var
     end;
   end;
 
-  // A used rule (docs/plans/09-PLAN-used-rules.md 3.1): the items of this menu with a use, at any depth, in its states,
+  // A used rule (docs/plans/executed/09-PLAN-used-rules.md 3.1): the items of this menu with a use, at any depth, in its states,
   // ranked (most: by count, a tie by the last use; recent: by the last use, those without one after, by count); the
   // ranks counted whether or not another rule took the item, then the ranks asked for taken in their order.
   procedure TakeUsed(R: TRule; Names: TDictionary<string, Boolean>);

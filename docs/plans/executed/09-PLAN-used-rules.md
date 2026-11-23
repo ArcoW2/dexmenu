@@ -1,8 +1,9 @@
 # Plan 09: Used rules, cards filled with the most used and most recently used items
 
-Status: not started; see Status.
+Status: executed; see Status.
 
 - 2026-11-23: draft.
+- 2026-11-23: executed.
 
 Builds on plan 02 (`executed/02-PLAN-own-menu.md`): its rules (3.3), the priority list, and the use counts with the most used
 row (3.9).
@@ -28,15 +29,15 @@ chosen type's group is shown.
 
 | Part | What | Reference |
 |---|---|---|
+| Last use | the time of each item's last use kept in `usage.json` with its count | 3.2; 6.1 |
+| Used rules | a rule with `used` (`most`, `recent`) and `rank` (none, one, a range, a range from high to low) finds items by use | 3.1; 6.2 |
+| In the editor | the rule panel: the type (Name, Usage) showing its own group (Name: match kind, text, case sensitive, where; Usage: most used or most recent, Rank); the rules view's text for such a rule | 3.3; 6.3 |
+| Tests | 3.4: unit tests, the editor's self-test, the preview | 3.4; 6.4 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Last use | the time of each item's last use kept in `usage.json` with its count | -- | 3.2 |
-| Used rules | a rule with `used` (`most`, `recent`) and `rank` (none, one, a range) finds items by use | Last use | 3.1 |
-| In the editor | the rule panel: the type (Name, Usage) showing its own group (Name: match kind, text, case sensitive, where; Usage: most used or most recent, Rank); the rules view's text for such a rule | Used rules | 3.3 |
-| Tests | 3.4 | -- | 3.4 |
 
 ## 3. Details
 
@@ -59,7 +60,7 @@ chosen type's group is shown.
 
 ### 3.2 The last use
 
-- `usage.json` per kind gets `last` beside the counts, by the same key: the time of the item's last use, written with
+- `usage.json` gets `last` beside `kinds`, per kind and by the same key: the time of the item's last use, written with
   each choice (as the count is, after the menu has closed).
 - An item counted before this has no time and ranks after those that have one.
 - A `usage.json` without `last` is read as before; the format number stays, as an older DLL ignores the new part.
@@ -91,3 +92,45 @@ chosen type's group is shown.
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 Last use
+
+- `"last": { "<kind>": { "<key>": "2026-11-23T14:05:09.120Z" } }` at the top of `usage.json`, beside `kinds`: a
+  separate object, so an item key can never clash with it. The time is UTC in a fixed form, so comparing the texts
+  orders the times; nothing parses them.
+- Written in the same write as the count (`CountChoice`, under the same mutex). An older DLL keeps the object when it
+  writes a count, as it rewrites the whole file it read.
+
+### 6.2 Used rules
+
+- The DLL parses `used` and `rank` in the rule itself (`Dexmenu.Rules`): a rule with both `name` and `used`, an
+  unknown `used` or a wrong rank is invalid and finds nothing. A rank is a whole number from 1, or a text with one
+  (`"2"`) or a range (`"1-3"`, `"3-1"`, spaces allowed).
+- In the priority list a used rule ranks this menu's items with a count (at any depth, in its states, one per key),
+  then takes the ranks asked for in their order, each unless an earlier rule took it (with `also`: all the same).
+  The rest is as for a rule by name (`Take`: duplicates, `consume`, the subitems following).
+- The counts and times are given to the placement when it is made (a second constructor), as the rules run then.
+  At a right-click a used rule opens the submenus an extension fills only when opened when a count is of an item in
+  one (`UsesUsage`), as the most used row does.
+
+### 6.3 In the editor
+
+- The type is a select at the top of the rule (Name, Usage). Switching rewrites the rule (`setRuleType`): to Usage
+  `used: "most"` and the name, case sensitive, scope and path gone; to Name an empty `contains` (outlined red until
+  filled) and `used` and `rank` gone. The Name group holds the match kind and text, case sensitive and Where; the
+  Usage group "most used" or "most recently used" and Rank (a number written as a number, else as text).
+- The rules view: "most used 1-3", "most recent 2", "most used" (no rank), then the shared parts as for a name.
+
+### 6.4 Tests
+
+- Unit tests (TestUsedRules): the ranks valid and wrong; most used and most recent with no rank, one, a range, a
+  reversed range, ranges partly past the items, a rank past them; ranks fixed when an earlier rule took an item;
+  `also`, `consume: false`; the default states taking a disabled item; no counts; `UsesUsage`; the time written with a
+  choice, an older `usage.json` without times.
+- The editor's self-test: the type switched both ways and the keys rewritten; ranks valid and wrong; a card with a
+  wrong rank outlined red, a reversed range not. Which group shows is not in the self-test (it tests the model, not
+  the page).
+- In the preview, from the test data's counts: a card with `"1-2"` and one with `"4-3"` showing the two most used,
+  then the fourth and third. The rule panel itself not yet looked at by hand.
