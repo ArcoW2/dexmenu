@@ -102,8 +102,8 @@ Submenus open sits in Inside: it is about what opens from the card.
   border, so it is seen where a card has something of its own.
 - The Rules group shows the number of the card's rules ("Rules 3") and is red when one of them is invalid, as the card
   is outlined red in the cards view.
-- In a set of tabs, the tab chosen stays chosen when another card is selected; when that card's kind has none of its
-  panels, the set's first tab that applies shows. Selecting a rule (in the rules view, or by clicking an item in the
+- In a set of tabs, the first tab shows until the user chooses another; the tab chosen stays chosen when another card
+  is selected; when that card's kind has none of its panels, the set's first tab that applies shows. Selecting a rule (in the rules view, or by clicking an item in the
   preview) shows the Rules group (its tab chosen when it is one) and scrolls to the rule.
 - The tabs chosen last the editor window's session; the arrangement is what is remembered.
 
@@ -119,5 +119,4 @@ Submenus open sits in Inside: it is about what opens from the card.
 
 ## 4. Open questions
 
-1. In a set of tabs, which tab first, for a card selected for the first time in a session: the set's first tab in the
-   arrangement, or the tab holding Rules whenever the set has it (what is edited most)?
+None.
