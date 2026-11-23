@@ -83,6 +83,12 @@ const LayoutModel = (() => {
   // Ids on every card, each once, and a priority on every rule, so the editor, the file and the DLL name the same
   // things. A card whose id an earlier card has already gets a new one (a layout saved with a duplicate).
   function ensureIds(layout) {
+    // the menu itself a card (plan 11 3.9): its id, its name, under each other unless it says otherwise
+    if (layout && layout.menu) {
+      layout.menu.id = "menu";
+      if (typeof layout.menu.card !== "string") layout.menu.card = "Menu";
+      if (!layout.menu.show) layout.menu.show = "column";
+    }
     let next = +newId(layout).slice(1);
     const seen = new Set();
     for (const c of [...allCards(layout), ...allDividers(layout)]) {

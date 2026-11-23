@@ -43,6 +43,13 @@
   }
   const id = (layout, name) => [...M.cards(layout.default)].find(a => a.card.card === name).card.id;
 
+  // the menu itself a card (plan 11 3.9): every layout has it, with its id, name and how it shows its cards
+  {
+    const B = M.ensureIds({ format: M.formatVersion, menu: { content: [ { card: "Rest", rules: [ "remaining" ] } ] } });
+    check(B.menu.id === "menu" && B.menu.card === "Menu" && B.menu.show === "column" && !M.find(M.rootOf(B), "menu"),
+      "the menu card: its id, its name, under each other; not one of the cards it holds");
+  }
+
   // ids and priorities
   let L = sample();
   check([...M.cards(L.default)].every(a => /^c\d+$/.test(a.card.id)), "every card gets an id");

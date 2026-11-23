@@ -174,6 +174,8 @@ begin
   SetMenuLook(Settings);
   if (Menu = 0) or (Layout = nil) then
     Exit;
+  if Layout.MenuCard.SubmenuMode <> smDefault then
+    Settings.Submenus := Layout.MenuCard.SubmenuMode;   // the layout's own (its menu card's) over the general one
   Top := ReadLevel(Menu, '');
   FreeAndNil(Usage);
   FreeAndNil(LastUse);

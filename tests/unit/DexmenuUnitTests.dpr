@@ -1545,6 +1545,7 @@ var
   Menu: HMENU;
   Top: TNodes;
   Error: string;
+  Layout: ILayout;
 
   // the top level of a format 2 layout with this content (and the remaining card), at a right-click or in the preview
   function Level(const Content: string; out P: TPlacement; AtRightClick: Boolean = True): TViewLevel;
@@ -1723,6 +1724,28 @@ begin
     finally
       L.Free;
       P.Free;
+    end;
+    // the menu as a card (plan 11 3.9): its cards in columns of 2, its own style and submenus default
+    Layout := ParseLayout('{ "format": 2, "menu": { "id": "menu", "card": "Menu", "show": "column", "perColumn": 2, ' +
+      '"background": "#102030", "submenus": "under", "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" } }') + ', ' +
+      Card('Copy', '{ "name": { "equals": "Copy" } }') + ', ' + Card('Del', '{ "name": { "equals": "Delete" } }') + ', ' + Rest + ' ] } }',
+      'test', Error);
+    Check((Layout <> nil) and (Layout.MenuCard.PerColumn = 2) and (Layout.MenuCard.Look <> nil) and
+      (Layout.MenuCard.SubmenuMode = smUnder), 'the menu card read: its columns, its style, its submenus: ' + Error);
+    if Layout <> nil then
+    begin
+      P := TPlacement.Create(Layout, 'default', Top);
+      L := P.TopLevel;
+      try
+        Check((L.MenuCard = Layout.MenuCard) and (L.Lines.Count = 2) and (L.Lines[0].Cards[0].Title = 'Cut') and
+          (L.Lines[1].Cards[0].Title = 'Copy') and (L.Lines[0].Cards[1].Title = 'Delete'),
+          'the menu''s cards in columns of 2, filled column by column: ' + Describe(L));
+        G := Measure(L);
+        Check(G.MenuCard = Layout.MenuCard, 'the menu window drawn in the menu card''s style');
+      finally
+        L.Free;
+        P.Free;
+      end;
     end;
     // errors
     Check(Pos('"show"', ErrorOf('{ "format": 2, "menu": { "content": [ { "card": "X", "show": "grid", "rules": [] }, ' + Rest + ' ] } }')) > 0,
@@ -1938,8 +1961,10 @@ begin
     begin
       Inc(Result);
       Writeln('DIFFERENT ', Kind);
-      TFile.WriteAllText(ChangeFileExt(ParamStr(3), '') + '.' + Kind + '.old.txt', A);
-      TFile.WriteAllText(ChangeFileExt(ParamStr(3), '') + '.' + Kind + '.new.txt', B);
+      // the two pictures in the temp folder (never beside the layouts)
+      TFile.WriteAllText(TPath.Combine(TPath.GetTempPath, ChangeFileExt(ExtractFileName(ParamStr(3)), '') + '.' + Kind + '.old.txt'), A);
+      TFile.WriteAllText(TPath.Combine(TPath.GetTempPath, ChangeFileExt(ExtractFileName(ParamStr(3)), '') + '.' + Kind + '.new.txt'), B);
+      Writeln('  the two pictures: ', TPath.GetTempPath);
     end;
   end;
 end;

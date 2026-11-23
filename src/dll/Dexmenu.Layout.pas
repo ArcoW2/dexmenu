@@ -167,6 +167,9 @@ type
     // The layout's menu (one for every kind of right-click that uses the layout; Kind is not looked at).
     function Lines(const Kind: string): TLines;
     function Source: string;   // the file it came from, or '(built in)'
+    // The menu as a card (plan 11 3.9): holding the menu's lines (its Menu), with how it shows them, its own style
+    // and its submenus' default; a format 1 layout's has the defaults.
+    function MenuCard: TCard;
   end;
 
 // Parses a layout; nil and Error set when it is not valid.
@@ -193,7 +196,8 @@ const
   // the layout files' form this DLL reads (older forms are read too): 2, the menu one card holding cards (plan 11)
   FormatVersion = 2;
   BaseLayout = '// the base layout: Windows'' menu as cards'#10 +
-    '{ "format": 2, "menu": { "content": [ { "card": "Remaining", "rules": [ "remaining" ] } ] } }';
+    '{ "format": 2, "menu": { "id": "menu", "card": "Menu", "show": "column", "content": [ ' +
+    '{ "card": "Remaining", "rules": [ "remaining" ] } ] } }';
 
 implementation
 
@@ -203,13 +207,15 @@ uses
 type
   TLayout = class(TInterfacedObject, ILayout)
   private
-    FKinds: TObjectDictionary<string, TLines>;
+    FKinds: TObjectDictionary<string, TLines>;   // not owned: the menu card owns its lines
     FSource: string;
+    FMenu: TCard;
   public
     constructor Create(const ASource: string);
     destructor Destroy; override;
     function Lines(const Kind: string): TLines;
     function Source: string;
+    function MenuCard: TCard;
   end;
 
 destructor TRule.Destroy;
@@ -284,13 +290,23 @@ constructor TLayout.Create(const ASource: string);
 begin
   inherited Create;
   FSource := ASource;
-  FKinds := TObjectDictionary<string, TLines>.Create([doOwnsValues]);
+  FKinds := TObjectDictionary<string, TLines>.Create;
+  FMenu := TCard.Create;
+  FMenu.Id := 'menu';
+  FMenu.Title := 'Menu';
+  FMenu.Show := csColumn;
 end;
 
 destructor TLayout.Destroy;
 begin
   FKinds.Free;
+  FMenu.Free;
   inherited;
+end;
+
+function TLayout.MenuCard: TCard;
+begin
+  Result := FMenu;
 end;
 
 function TLayout.Lines(const Kind: string): TLines;
@@ -798,7 +814,18 @@ begin
         Exit;
       end;
       Lines := TLines.Create;
+      Layout.FMenu.Menu := Lines;
       Layout.FKinds.Add('default', Lines);
+      // the menu card's own: how it shows its cards, its style, its submenus' default (plan 11 3.9)
+      if TJSONObject(Menu).GetValue('card') is TJSONString then
+        Layout.FMenu.Title := TJSONObject(Menu).GetValue('card').Value;
+      if not ParseShow(TJSONObject(Menu), Layout.FMenu, Source, Error) then
+        Exit;
+      if Layout.FMenu.Show in [csDefault, csItem, csSubmenu] then
+        Layout.FMenu.Show := csColumn;
+      ParseCardLook(TJSONObject(Menu), Layout.FMenu);
+      if TJSONObject(Menu).GetValue('submenus') is TJSONString then
+        Layout.FMenu.SubmenuMode := ParseSubmenuMode(TJSONObject(Menu).GetValue('submenus').Value);
       if not ParseContent(TJSONObject(Menu).GetValue('content'), Source, nil, Lines, Error) then
         Exit;
     end
@@ -817,6 +844,7 @@ begin
         Exit;
       end;
       Lines := TLines.Create;
+      Layout.FMenu.Menu := Lines;
       Layout.FKinds.Add('default', Lines);
       if not ParseLines(Menu, Source, nil, Lines, Error) then
         Exit;

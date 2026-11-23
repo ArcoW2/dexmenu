@@ -34,6 +34,8 @@ rows up to a maximum, the rest in a "More" submenu or left out), or under each o
 the next column, the columns sharing the width). A card that only arranges others and has no style of its own draws
 nothing itself: that is what a line was, and what a group was, also in being left out when nothing in it shows. The
 menu is then one tree of cards, so rows of cards (a mosaic) and aligned columns are both a matter of what holds what.
+The menu itself is the base card of that tree, fixed: every layout has it, and it holds how the menu's cards show
+(under each other, side by side, in columns), the layout's submenus default and the menu's own style.
 A card holding cards can have every style a card has (background, border, a title, which may look like a divider),
 and its hover style lights it up while the mouse is over anything inside it. The cards made for found items follow templates the
 card holds: cards of their own, edited as any card, each with its states' looks; with several, the card says how
@@ -57,6 +59,7 @@ shipped layouts are written in it.
 | Editor: tree | format 2 only; the cards view draws holders and rows; drops above, below, beside (a plain row made) and into a card; a click in the gutter selects a row; "+ Group" | 3.5; 6.2 |
 | Editor: panel | Shows, per row, rows, per column, columns, the rest, shown when, templates picked, title shown as, square; templates as dashed cards edited as cards; a rule's template | 3.5; 6.2 |
 | Tests | unit tests, the editor's self-test, the compare on the user's layouts | 3.8; 6.1; 6.2 |
+| The menu card | the menu the base card of every layout (id `menu`): its Shows, columns, submenus default and style read by the DLL and set in the editor; drawn as the fixed outer card; every layout given it (the user's, the shipped, the base layout, the conversion) | 3.9; 6.4 |
 
 ### Not yet built
 
@@ -193,6 +196,17 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
   the converted layouts at once; the user's "First" checked by hand after it. The settings' `shipped` list is left as it is (the shipped layouts already
   written are converted with the others).
 
+### 3.9 The menu card
+
+- The menu is the base card holding every other: `"menu": { "id": "menu", "card": "Menu", "show": "column", ... }`.
+  Every layout has it: new ones start with it (the base layout), the user's and the shipped ones were given it.
+- Its own fields: `show` (`column`, its cards under each other, with `perColumn` and `columns` in columns; or `row`),
+  the limits and `rest`, `submenus` (how submenus open in this layout unless a card says otherwise, over General's),
+  and its style (background, border, radius over the theme's menu look).
+- Fixed: not moved, copied or deleted; no rules, no title, its name the layout's.
+- In the editor the outer card of the cards view, selected by its heading; its panel: Inside (Shows, the limits,
+  Submenus open) and Style.
+
 ### 3.8 Tests
 
 - Unit tests: the format read (every `show`, the limits, `rest`, `shownWhen`, `titleAs`, `template`, rules and
@@ -259,3 +273,16 @@ None.
   selected; before, the menu was its card's and pasted there.
 - Tested: the unit tests (no title without one); the editor page in a browser (delete, undo, redo; a style pasted
   onto a template; a renamed name followed by its title).
+
+### 6.4 The menu card
+
+- The DLL keeps the menu as a card (`ILayout.MenuCard`, owning the menu's lines); a format 1 layout's has the defaults.
+  The top level is placed as its lines, or arranged as the menu card says (a row, or columns of a set number, as any
+  holder); the menu window is drawn in the theme's menu look with the menu card's style over it; its `submenus`
+  overrules General's for the layout (the menu and the preview).
+- The editor gives every layout's menu its id, name and show when it opens it; the cards view draws it as the outer
+  frame, selected by its heading.
+- Every layout given it: the user's five (their menus compared again: the same, but Default B's program cards, which
+  now show their own titles), the shipped ones, the base layout, and the conversion script's output.
+- Tested: unit tests (the menu card read; its cards in columns of 2, filled column by column; the window drawn in its
+  style); the editor's self-test (every layout's menu card); the editor rendered with the menu card selected.

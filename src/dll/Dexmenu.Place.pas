@@ -107,6 +107,9 @@ type
   TViewLevel = class
   public
     Lines: TObjectList<TViewLine>;
+    // the top level: the layout's menu card (plan 11 3.9), whose style the menu window is drawn in (not owned); nil
+    // for a submenu
+    MenuCard: TCard;
     constructor Create;
     destructor Destroy; override;
     function CardCount: Integer;
@@ -1455,8 +1458,17 @@ begin
 end;
 
 function TPlacement.TopLevel: TViewLevel;
+var
+  Root: TCard;
 begin
-  Result := PlaceLines(Self, Layout.Lines(Kind));
+  // the menu card (plan 11 3.9): its cards under each other as placed, or arranged as it says (side by side, or in
+  // columns of a set number)
+  Root := Layout.MenuCard;
+  if (Root.Shows = csRow) or (Root.PerColumn > 0) or (Capacity(Root) > 0) then
+    Result := Arrange(Root, HeldCards(Self, Root), False)
+  else
+    Result := PlaceLines(Self, Layout.Lines(Kind));
+  Result.MenuCard := Root;
 end;
 
 function TPlacement.MenuLevel(Card: TCard): TViewLevel;

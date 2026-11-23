@@ -21,6 +21,7 @@ type
     Width, Height: Single;   // DIP, the whole level
     Boxes: TArray<TBox>;
     Pressed: Integer;        // the box the mouse button is down on (the "pressed" state), or -1; Measure sets -1
+    MenuCard: TCard;         // the top level's: the layout's menu card, its style over the theme's menu (plan 11 3.9)
   end;
 
   TLook = record
@@ -769,6 +770,7 @@ begin
   Result.Height := OuterPad + LayLines(Level, OuterPad, OuterPad, W - 2 * OuterPad, True, Result.Boxes,
     LevelMax - 2 * OuterPad, False) + OuterPad;
   Result.Pressed := -1;
+  Result.MenuCard := Level.MenuCard;
 end;
 
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
@@ -900,11 +902,16 @@ var
   CardBorder, ExtraBrush, MarkBrush: ID2D1SolidColorBrush;
   GroupState: string;
   TitleLine: TLine;
+  MenuOwn: TJSONObject;
 begin
   // every colour and radius from the theme for light or dark (plan 03 3.2; Dexmenu.Theme)
   Theme := CurrentTheme(Look.Dark);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('menu', 'normal', 'background', RGBA($F9, $F9, $F9))), nil, Bg);
-  T.CreateSolidColorBrush(ToD2D(Theme.Color('menu', 'normal', 'border', RGBA($D0, $D0, $D0))), nil, Border);
+  // the menu window in the theme's menu look, the layout's menu card's own style over it (plan 11 3.9)
+  MenuOwn := nil;
+  if G.MenuCard <> nil then
+    MenuOwn := G.MenuCard.Look;
+  T.CreateSolidColorBrush(ToD2D(Theme.Color('menu', 'normal', 'border', RGBA($D0, $D0, $D0), MenuOwn)), nil, Border);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'foreground', RGBA($1B, $1B, $1B))), nil, Text);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'disabled', 'foreground', RGBA($A0, $A0, $A0))), nil, Dim);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'extra', RGBA($A0, $A0, $A0))), nil, Extra);
@@ -913,10 +920,10 @@ begin
   T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0))), nil, LabelBrush);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'focused', 'border', RGBA($2F, $6F, $D6))), nil, Accent);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'unavailable', 'background', RGBA(0, 0, 0, 0.09))), nil, Stripe);
-  MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius);
+  MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius, MenuOwn);
   T.Clear(D2D1ColorF(0, 0, 0, 0));
   R := D2D1RectF(0.5, 0.5, G.Width - 0.5, VisibleHeight - 0.5);
-  if not FillBackground(T, Theme, 'menu', 'normal', R, MenuRadius) then
+  if not FillBackground(T, Theme, 'menu', 'normal', R, MenuRadius, MenuOwn) then
     T.FillRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Bg);
   T.DrawRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Border, 1);
   T.PushAxisAlignedClip(D2D1RectF(1, OuterPad, G.Width - 1, VisibleHeight - OuterPad), D2D1_ANTIALIAS_MODE_ALIASED);

@@ -14,6 +14,9 @@ static class ShippedLayouts
         {
           "format": 2,
           "menu": {
+            "id": "menu",
+            "card": "Menu",
+            "show": "column",
             "content": [
               {
                 "id": "line1",
@@ -184,6 +187,9 @@ static class ShippedLayouts
         {
           "format": 2,
           "menu": {
+            "id": "menu",
+            "card": "Menu",
+            "show": "column",
             "content": [
               {
                 "id": "search",
@@ -430,6 +436,9 @@ static class ShippedLayouts
         {
           "format": 2,
           "menu": {
+            "id": "menu",
+            "card": "Menu",
+            "show": "column",
             "content": [
               {
                 "id": "line1",
@@ -614,6 +623,9 @@ static class ShippedLayouts
         {
           "format": 2,
           "menu": {
+            "id": "menu",
+            "card": "Menu",
+            "show": "column",
             "content": [
               {
                 "id": "search",

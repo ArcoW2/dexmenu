@@ -226,6 +226,21 @@ function focusNew(id) {
 }
 function addAndFocus(card) { select(card.id, -1); changed(); focusNew(card.id); }
 
+// The menu as a card (plan 11 3.9): the fixed outer card holding every other; selected by its heading to set how its
+// cards show (under each other, side by side, in columns), its submenus' default and its style. Not moved, copied or
+// deleted.
+function renderMenuCard() {
+  const frame = el("div", "menu-frame" + (selectedId === "menu" ? " selected" : ""));
+  const head = el("div", "menu-frame-head");
+  const root = layout.menu;
+  const how = root.show === "row" ? "side by side" : root.perColumn ? root.perColumn + " per column" : "under each other";
+  head.append(el("span", "name", "Menu"), el("span", "what", " the layout's menu: its cards " + how + (root.submenus ? ", submenus " + root.submenus : "")));
+  head.title = "The menu itself: how its cards show, its submenus' default and its style";
+  head.addEventListener("click", e => { e.stopPropagation(); select("menu", -1); });
+  frame.append(head, renderLines(linesOf(), null));
+  return frame;
+}
+
 // A container (the menu's content, or a card's holding them under each other): each card on a line of its own, a
 // drop gap before each and at the end. A plain row (what a line was) is drawn as that line, its cards side by side.
 function renderLines(lines, parentId) {
@@ -943,6 +958,22 @@ function renderCardPane() {
       renderPanels(t, { names, layout: sizeFields(t), style: lookFields(t) }));
     return;
   }
+  if (selectedId === "menu") {
+    // the menu card (plan 11 3.9): how its cards show, its submenus' default, its style; its name is the layout's
+    const root = layout.menu;
+    $("cardHeading").textContent = "The menu";
+    const way = el("select");
+    for (const [v, label] of [["", "as set for every menu (General)"], ["next", "next to the card"], ["under", "under the card"],
+      ["replace", "in place of the menu (<< back)"]]) { const o = el("option", "", label); o.value = v; way.append(o); }
+    way.value = root.submenus || "";
+    way.addEventListener("change", () => { if (way.value) root.submenus = way.value; else delete root.submenus; changed(); });
+    const wayRow = el("label", "field");
+    wayRow.title = "How submenus open in this layout, unless a card says otherwise";
+    wayRow.append(el("span", "", "Submenus open"), way);
+    $("card").replaceChildren(el("div", "hint", "The menu itself, holding every card of the layout. It is not moved, copied or deleted."),
+      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: lookFields(root) }));
+    return;
+  }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
   if (!at) {
     $("cardHeading").textContent = "Card";
@@ -1256,7 +1287,7 @@ function renderPanels(card, groups) {
 
 // How a card shows what it found or holds (plan 11 3.1): Shows; a row's per row and rows, a column's per column and
 // columns; the rest beyond them; a holder's shown when; with templates, how they are picked.
-function showFields(card, withRules) {
+function showFields(card, withRules, isMenu = false) {
   const fields = [];
   const select = (label, title, options, value, set) => {
     const sel = el("select");
@@ -1270,6 +1301,7 @@ function showFields(card, withRules) {
   };
   const shows = withRules
     ? [["", "each a card of its own (the card multiplied)"], ["submenu", "in a submenu"], ["row", "side by side inside it"], ["column", "under each other inside it"]]
+    : isMenu ? [["column", "under each other (in columns with a number per column)"], ["row", "side by side"]]
     : [["submenu", "in a submenu"], ["row", "side by side inside it"], ["column", "under each other inside it"]];
   fields.push(select("Shows", withRules ? "How what its rules find shows" : "How the cards it holds show", shows,
     card.show || (withRules ? "" : "column"), v => {
@@ -1287,7 +1319,7 @@ function showFields(card, withRules) {
   if ((card.show === "row" && card.perRow && card.rows) || (card.show === "column" && card.perColumn && card.columns))
     fields.push(select("The rest", "What does not fit", [["", "in a \"More\" submenu"], ["none", "left out"]], card.rest || "",
       v => { if (v) card.rest = v; else delete card.rest; }));
-  if (M.isHolder(card))
+  if (M.isHolder(card) && !isMenu)
     fields.push(select("Shown when", "When this card shows: something in it can be chosen, anything in it shows, or always",
       [["", "something in it can be chosen"], ["anyItem", "anything in it shows"], ["always", "always"]], card.shownWhen || "",
       v => { if (v) card.shownWhen = v; else delete card.shownWhen; }));
@@ -1482,7 +1514,7 @@ function renderRules() {
 
 function render() {
   if (!layout) return;
-  $("cards").replaceChildren(renderLines(linesOf(), null));
+  $("cards").replaceChildren(renderMenuCard());
   placeToggles();
   renderCardPane();
   renderRules();

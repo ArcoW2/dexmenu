@@ -329,6 +329,8 @@ begin
   end;
   FTop := ReadLevel(FOriginal, '');
   FSettings := MenuSettings;
+  if FLayout.MenuCard.SubmenuMode <> smDefault then
+    FSettings.Submenus := FLayout.MenuCard.SubmenuMode;   // the layout's own (its menu card's) over the general one
   FTextSize := FSettings.TextSize;
   SetMenuLook(FSettings);
   FHints := HintsOf(ReadSeenText(FKind));

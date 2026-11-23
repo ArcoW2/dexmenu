@@ -120,7 +120,8 @@ def convert(layout):
         return None
     lines = layout.get("lines") if version >= 1 else layout.get("default")
     converter = Converter(layout)
-    return {"format": 2, "menu": {"content": converter.lines(lines)}}
+    # the menu itself the base card holding every other (plan 11 3.9)
+    return {"format": 2, "menu": {"id": "menu", "card": "Menu", "show": "column", "content": converter.lines(lines)}}
 
 
 def main(argv):
