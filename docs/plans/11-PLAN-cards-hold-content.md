@@ -33,8 +33,9 @@ the next column, the columns sharing the width). A card that only arranges other
 nothing itself: that is what a line was, and what a group was, also in being left out when nothing in it shows. The
 menu is then one tree of cards, so rows of cards (a mosaic) and aligned columns are both a matter of what holds what.
 A card holding cards can have every style a card has (background, border, a title, which may look like a divider),
-and its hover style lights it up while the mouse is over anything inside it. The cards made for found items take a
-style the holder gives them. It is built in two steps: the DLL and the layout
+and its hover style lights it up while the mouse is over anything inside it. The cards made for found items are made from a
+template the card holds: a card of its own, edited as any card, which every inner card follows; how they are
+aligned stays the holding card's. It is built in two steps: the DLL and the layout
 format first, then the editor. The user's layouts (their "First" among them) are converted once to the new form; the
 shipped layouts are written in it.
 
@@ -49,14 +50,14 @@ shipped layouts are written in it.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Format | format 2: the menu a card; a card's rules or its `content` (cards, dividers, notes, the search box), and `show` (`item`, `submenu`, `row`, `column`) with `perRow`, `rows`, `perColumn`, `columns`, `rest`, `shownWhen`, `titleAs`, `items` | -- | 3.1 |
+| Format | format 2: the menu a card; a card's rules or its `content` (cards, dividers, notes, the search box), and `show` (`item`, `submenu`, `row`, `column`) with `perRow`, `rows`, `perColumn`, `columns`, `rest`, `shownWhen`, `titleAs`, `template` | -- | 3.1 |
 | Placement | the tree placed: found items and placed cards in a card's content, shown as it says; a holder left out by `shownWhen` | Format | 3.2; 3.3 |
-| Measure and draw | a card's content measured and drawn inside it as its `show` says, recursively; a holder's style, title (or title as a divider) and hover while the mouse is inside it; found items in the `items` style; square cards | Placement | 3.4 |
+| Measure and draw | a card's content measured and drawn inside it as its `show` says, recursively; a holder's style, title (or title as a divider) and hover while the mouse is inside it; found items made from the `template`; square cards | Placement | 3.4 |
 | Keys and hit tests | the arrows, a click and the hover through the tree of cards | Measure and draw | 3.4 |
 | Shipped layouts | Default A - D in format 2 | Format | 3.6 |
 | Conversion once | the user's layouts converted once to format 2 (a backup kept); nothing reads format 1 afterwards | Format | 3.7 |
 | Editor: tree | the cards view shows the tree: a card's content inside it; dragging into a card, beside a card, above or below it | Format | 3.5 |
-| Editor: panel | the card panel's Inside: Shows, per row, rows, per column, columns, the rest, shown when; Names: Title shown as; the found items' style | Editor: tree | 3.5 |
+| Editor: panel | the card panel's Inside: Shows, per row, rows, per column, columns, the rest, shown when; Names: Title shown as; the template a card in the cards view, edited as a card | Editor: tree | 3.5 |
 | Tests | 3.8 | -- | 3.8 |
 
 Moved in: all of plan 07 (groups), as holders without a style and their `shownWhen`.
@@ -92,11 +93,14 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
     anything inside it. Its title, when it has one (`title`), stands above its content: as a card's title, or with
     `"titleAs": "divider"` drawn as a divider with that text (its line and text in the dividers' look). With no style
     and no title it draws nothing itself (what a line or a group was).
-  - `items`: the layout and style of the inner cards made for its found items when it shows them in a `row` or
-    `column`, their own and apart from the card's (the card's own layout and style are its box around them): the
-    layout fields (`height`, `square`, `minWidth`, `wrap`, `cardFit`, `extraAt`) and the style fields (`background`,
-    `foreground`, `border`, `borderWidth`, `radius`, `hover`, `pressed`). Not set: the theme's card look, each as high
-    as its content (as buttons are now).
+  - `template`: a card every inner card made for its found items follows when it shows them in a `row`, a `column` or
+    a `submenu`: its own and apart from the card's (the card's own layout and style are its box around them). A
+    template is a card without rules or content: its texts that apply to every item (`rename`, `extra`, `extraAt`,
+    `icon`, `hint`), its layout (`height`, `square`, `minWidth`, `wrap`, `cardFit`) and its style (`background`,
+    `foreground`, `border`, `borderWidth`, `radius`, `hover`, `pressed`). Each inner card's title is its item's text
+    (with the template's rename). How the inner cards are aligned (`perRow`, `rows`, `perColumn`, `columns`, the
+    holder's `cardFit`) stays the holding card's. No template: the theme's card look, each as high as its content (as
+    buttons are now).
   - `square`: a card as high as it is wide.
   - `cardFit` (on a holder: how its cards fit a taller row, as a line's now) and `weight`, `minWidth`, `height`,
     `wrap`, `cardFit` on a card as now, within its holder.
@@ -145,8 +149,10 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
 - "+ Card" in a card's actions adds one to its content; "+ Group" adds a holder without a style.
 - The card panel's Inside panel: Shows (item, submenu, row, column), Per row and Rows (row), Per column and Columns
   (column), The rest (in a More submenu, left out), Shown when; the Names panel: Title shown as (a title, a divider).
-- Two more panels for a card with rules shown in a `row` or `column`: Item layout and Item style, the layout and
-  style fields of `items` (the inner cards'), beside the card's own Layout and Style; arranged as any panel (plan 13).
+- A card with rules shown in a `row`, a `column` or a `submenu` shows its template in the cards view as a card of its
+  own inside it, marked as the template (dashed, "Template"), first in it; "+ Template" adds one, "x" removes it.
+  Selected, it is edited in the card panel as any card: its Names (rename, extra text, icon, hint), Layout and Style
+  panels; no Rules or Inside. Its style is copied and pasted as any card's.
 - No conversion in the editor: it reads and writes format 2 only.
 
 ### 3.6 Shipped layouts
@@ -167,7 +173,7 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
 
 ### 3.8 Tests
 
-- Unit tests: the format read (every `show`, the limits, `rest`, `shownWhen`, `titleAs`, `items`, rules and
+- Unit tests: the format read (every `show`, the limits, `rest`, `shownWhen`, `titleAs`, `template`, rules and
   content together refused); placement: found
   items and placed cards in each `show`, `perRow` and `rows` with the rest in "More" and left out, `perColumn` and
   `columns`; `shownWhen` for each value with nested holders and dividers; measure: rows sharing the width, columns
