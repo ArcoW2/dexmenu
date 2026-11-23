@@ -1126,12 +1126,12 @@ function renderCardPane() {
   if (holderAt && Array.isArray(holderAt.card.templates) && holderAt.card.templates[+tm[2]]) {
     const t = holderAt.card.templates[+tm[2]];
     $("cardHeading").textContent = "Template " + (+tm[2] + 1) + " of " + holderAt.card.card;
-    const names = [textField("Rename (regex)", t.rename && t.rename.regex, v => {
+    const names = [...asTree([textField("Rename (regex)", t.rename && t.rename.regex, v => {
       if (v) t.rename = { regex: v, replace: (t.rename && t.rename.replace) || "" }; else delete t.rename;
       changed();
-    }), textField("... replace with", t.rename && t.rename.replace, v => { if (t.rename) { t.rename.replace = v; changed(); } }),
-    textField("Extra text", t.extra, v => { if (v) t.extra = v; else delete t.extra; changed(); }, "(none) a smaller text with each title"),
-    extraAtField(t),
+    }), textField("Replace with", t.rename && t.rename.replace, v => { if (t.rename) { t.rename.replace = v; changed(); } })]),
+    ...asTree([textField("Extra text", t.extra, v => { if (v) t.extra = v; else delete t.extra; changed(); }, "(none) a smaller text with each title"),
+    extraAtField(t)]),
     textField("Icon", t.icon, v => { if (v.trim()) t.icon = v.trim(); else delete t.icon; changed(); }, "(each item's own) e.g. E8C8"),
     textField("Hint", typeof t.hint === "string" ? t.hint : "", v => { if (v) t.hint = v; else delete t.hint; changed(); }, "(each item's own hint)")];
     $("card").replaceChildren(el("div", "hint", "Every inner card made for what " + holderAt.card.card + " finds follows a template: its title is the item's text."),
@@ -1271,14 +1271,14 @@ function cardGroups(card) {
     row.append(el("span", "", "Title shown as"), titleAs);
     names.push(row);
   }
-  if (withRules) names.push(textField("Rename (regex)", card.rename && card.rename.regex, v => {
+  if (withRules) names.push(...asTree([textField("Rename (regex)", card.rename && card.rename.regex, v => {
     if (v) card.rename = { regex: v, replace: (card.rename && card.rename.replace) || "" }; else delete card.rename;
     changed();
-  }), textField("... replace with", card.rename && card.rename.replace, v => {
+  }), textField("Replace with", card.rename && card.rename.replace, v => {
     if (card.rename) { card.rename.replace = v; changed(); }
-  }));
-  names.push(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
-    "(none) a smaller text with the title"), extraAtField(card));
+  })]));
+  names.push(...asTree([textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
+    "(none) a smaller text with the title"), extraAtField(card)]));
   // its icon (plan 02 3.8): a glyph of Segoe Fluent Icons by its code point, or an icon in a file; else the item's own
   if (!rest) names.push(textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); },
     own ? "(none) e.g. E70F" : "(the item's own) e.g. E8C8, or shell32.dll,4"));
@@ -1288,13 +1288,13 @@ function cardGroups(card) {
     names.push(textField("Hint", typeof hint === "string" ? hint : "", v => {
       if (v) card.hint = v; else if (typeof card.hint === "string") delete card.hint;
       changed();
-    }, "(the item's own hint)"), textField("Hint regex", hint && typeof hint === "object" ? hint.regex : "", v => {
+    }, "(the item's own hint)"), ...asTree([textField("Hint regex", hint && typeof hint === "object" ? hint.regex : "", v => {
       if (v) card.hint = { regex: v, replace: (card.hint && typeof card.hint === "object" && card.hint.replace) || "" };
       else if (card.hint && typeof card.hint === "object") delete card.hint;
       changed();
-    }, "e.g. ^(.*)$ to add to it"), textField("... replace with", hint && typeof hint === "object" ? hint.replace : "", v => {
+    }, "e.g. ^(.*)$ to add to it"), textField("Replace with", hint && typeof hint === "object" ? hint.replace : "", v => {
       if (card.hint && typeof card.hint === "object") { card.hint.replace = v; changed(); }
-    }, "e.g. $1 (via LexPen)"));
+    }, "e.g. $1 (via LexPen)")]));
   }
   // the comment: for the editor only, never in the menu
   const comment = el("label", "field");
@@ -1506,16 +1506,18 @@ function showFields(card, withRules, isMenu = false) {
   if ((card.show === "row" && card.perRow && card.rows) || (card.show === "column" && card.perColumn && card.columns))
     fields.push(select("The rest", "What does not fit", [["", "in a \"More\" submenu"], ["none", "left out"]], card.rest || "",
       v => { if (v) card.rest = v; else delete card.rest; }));
-  if (M.isHolder(card) && !isMenu)
-    fields.push(select("Shown when", "When this card shows: something in it can be chosen, anything in it shows, or always",
-      [["", "something in it can be chosen"], ["anyItem", "anything in it shows"], ["always", "always"]], card.shownWhen || "",
-      v => { if (v) card.shownWhen = v; else delete card.shownWhen; }));
   if (withRules && card.show && card.show !== "item") {
     const row = select("Templates picked", "With more than one template: by the inner card's place (in turn), or by the rule that found it",
       [["", "by place, in turn"], ["rule", "by rule"]], card.templatesBy || "", v => { if (v) card.templatesBy = v; else delete card.templatesBy; });
     if (!Array.isArray(card.templates) || card.templates.length < 2) row.querySelector("select").disabled = true;
     fields.push(row);
   }
+  // what depends on Shows under it, with a tree line
+  asTree(fields);
+  if (M.isHolder(card) && !isMenu)
+    fields.push(select("Shown when", "When this card shows: something in it can be chosen, anything in it shows, or always",
+      [["", "something in it can be chosen"], ["anyItem", "anything in it shows"], ["always", "always"]], card.shownWhen || "",
+      v => { if (v) card.shownWhen = v; else delete card.shownWhen; }));
   return fields;
 }
 
@@ -1530,7 +1532,7 @@ function extraAtField(card) {
   extraAt.value = card.extraAt || "";
   extraAt.addEventListener("change", () => { if (extraAt.value) card.extraAt = extraAt.value; else delete card.extraAt; changed(); });
   const extraRow = el("label", "field");
-  extraRow.append(el("span", "", "Extra text at"), extraAt);
+  extraRow.append(el("span", "", "Placed"), extraAt);
   return extraRow;
 }
 

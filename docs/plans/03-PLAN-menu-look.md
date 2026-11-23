@@ -567,3 +567,12 @@ None.
   rendering a level with and without `KeyFocus` (the pixel on the ring differs).
 - A shadow's blur is at most 16 DIP (one ring per DIP); in the editor Blur is a slider with its number, 0 to 16. The
   3D border's and the shadow's parts are drawn under them with a tree line, as a note's own font under Font.
+
+### 6.15 The preview's outline of the selected card; sub-options as a tree
+
+- The card selected in the editor is outlined in the preview in red (the theme's `card.marked.border`), 2.5 DIP
+  outside each of its boxes on every side (5 wider and higher than the card), clear of the card's own border; drawn
+  after every card and outside the cards' clip, so no card covers it. Checked in the preview captured as a picture.
+- In the card panel every option with options of its own shows them under it with a tree line: Shows (per row, rows,
+  the rest, templates picked), Rename (replace with), Extra text (placed), Hint regex (replace with), Font (family,
+  size, bold, italic), 3D border, Shadow.

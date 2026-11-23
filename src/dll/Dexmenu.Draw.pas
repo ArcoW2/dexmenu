@@ -1202,6 +1202,7 @@ procedure DrawLevel(T: ID2D1RenderTarget; const G: TGeometry; Selected: Integer;
 var
   Bg, Border, Text, Dim, Extra, Hover, Sep, LabelBrush, Accent, Stripe: ID2D1SolidColorBrush;
   DivLine, DivText: ID2D1SolidColorBrush;   // a divider's line and label, its own or the theme's
+  Outline: ID2D1SolidColorBrush;            // the editor's selected card's outline (the preview)
   Clear_: Boolean;                 // a see-through menu (no background): each card on an opaque base of its own
   Base: ID2D1SolidColorBrush;      // that base: the theme's card background, opaque
   BaseColor: TRGBA;
@@ -1377,9 +1378,6 @@ begin
       end;
       // its border (or 3D border); none set: the dividers' colour (so the frame shows); "none": no frame line
       DrawBorder(T, Theme, Element, GroupState, Own, Inner, CardRadius, Sep);
-      if (Marked <> '') and (V.CardId = Marked) then
-        T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
-          CardRadius, CardRadius), Accent, 1.5);
       T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, GroupState, 'foreground', RGBA($1B, $1B, $1B), Own)), nil, Brush);
       Title := V.Title;
       if (Title <> '') and (V.Card <> nil) and V.Card.TitleAsDivider then
@@ -1426,10 +1424,6 @@ begin
     if (State = 'hover') and not FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True) then
       T.FillRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), Hover);
     DrawBorder(T, Theme, Element, State, Own, Inner, CardRadius, nil);
-    // the items of the card selected in the settings app's editor (the preview only)
-    if (Marked <> '') and (V.CardId = Marked) then
-      T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
-        CardRadius, CardRadius), Accent, 1.5);
     // the keyboard's card (plan 03 3.7): a focus ring in the theme's focused border, as Windows' focus rectangle
     if G.KeyFocus and (I = Selected) then
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(Inner.left + 1, Inner.top + 1, Inner.right - 1, Inner.bottom - 1),
@@ -1582,6 +1576,29 @@ begin
         TitleBottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
   end;
   T.PopAxisAlignedClip;
+  // the boxes of the card selected in the settings app's editor (the preview only): a red outline around each, 2.5 DIP
+  // outside it on every side, so it stays clear of the card's own border; drawn after every card, so none covers it
+  if Marked <> '' then
+  begin
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'marked', 'border', RGBA($E0, $20, $20), nil)), nil, Outline);
+    for I := 0 to High(G.Boxes) do
+    begin
+      V := G.Boxes[I].Card;
+      if V.CardId <> Marked then
+        Continue;
+      R := G.Boxes[I].Rect;
+      R.top := R.top - ScrollY;
+      R.bottom := R.bottom - ScrollY;
+      if (R.bottom < 0) or (R.top > VisibleHeight) then
+        Continue;
+      Own := nil;
+      if V.LookCard <> nil then
+        Own := V.LookCard.Look;
+      CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius, Own) + 2.5;
+      T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2 - 2.5, R.top + 1 - 2.5, R.right - 2 + 2.5,
+        R.bottom - 1 + 2.5), CardRadius, CardRadius), Outline, 1.5);
+    end;
+  end;
 end;
 
 // A picture of a size (pixels) and a render target on it at a scale; Target nil when Direct2D failed.
