@@ -50,6 +50,10 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Note date and time | `{date}` and `{time}` in a note's text (Windows' short formats), or `{date:<picture>}` and `{time:<picture>}`; `{{` and `}}` a brace; filled when the menu opens | 3.6; 6.11 |
 | 3D border | a card's border raised (outset) or sunk (inset) as Windows' classic buttons, lit from an angle, its width and light and dark edge colours; in the card panel's Style | 3.6; 6.10 |
 | Shadow | a card's shadow in a colour at a distance away from the light, its edge blurred, under the card and inside the menu only; in the card panel's Style | 3.6; 6.10 |
+| Menu window | at the mouse or the program's point, flipped at the work area's edges, on that point's monitor; as tall as the work area at most, then scrolling with the wheel; corners and border from the theme and the menu card | 3.4 |
+| Submenu panels | `next`, `under` and `replace` (with `<<` and the path); opening on hover after Windows' menu delay, or on click only as the settings say; per card or for the layout | 3.9 |
+| Other elements | a divider with its label left, middle or right; the search box (plan 02 3.6); `<<`; the most used as cards with used rules (plan 09); an icon on top of a tall or square card (icon rows as rows of square cards, plan 11) | 3.8 |
+| States | hover, pressed, disabled, checked (a check mark), default (bold); unavailable stripes in the preview | 3.7; 3.10 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
@@ -58,16 +62,17 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
-| Menu window | popup, corners, shadow, border, background image, placement, scrolling | Engine | 3.4 |
-| Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
-| Other elements | icon row, search box, most used row, `<<` | -- | 3.8 |
-| Own cards' icons | an icon of their own for Dexmenu's own cards ("Edit menu...", "Windows' menu", command cards) where the layout gives none | Theme files | 3.8 |
-| Submenu panels | next, under, replace: where they appear and how they look | -- | 3.9 |
-| Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
-| Preview marks | striped unavailable items, new | -- | 3.10 |
-| Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient | Menu window | 3.6 |
-| Tests | 3.11 | -- | 3.11 |
+| Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | -- | 3.9 |
+| See-through menu | `menu.background: none`: only the cards, dividers and rows drawn, the rest see-through; cards then opaque, and the settings app saying so | -- | 3.4 |
+| Menu shadow | a shadow around the menu window itself | -- | 3.4 |
+| Scrollbar | a thin scrollbar on hover for a menu taller than the work area (it scrolls with the wheel already) | -- | 3.4 |
+| Divider look | a divider's own height, background, and label colour and font | -- | 3.8 |
+| Focus ring | the keyboard's focused card drawn with a ring, apart from the hover (the keys now move the hover) | -- | 3.7 |
+| Own cards' icons | an icon of their own for Dexmenu's own cards ("Edit menu...", "Windows' menu", command cards) where the layout gives none | -- | 3.8 |
+| Preview marks | a badge on items seen for the first time; the red outline of a card that never shows, in the preview too (the editor's cards view has it) | -- | 3.10 |
+| Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient; every `fit` | -- | 3.4; 3.6 |
+| Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step | Image fill | 3.4 |
+| Tests | the parts of 3.11 for what is not built yet (pictures compared with approved ones, images, animation, see-through) | -- | 3.11 |
 
 Moved out: a note showing what a file holds, to plan 14.
 
