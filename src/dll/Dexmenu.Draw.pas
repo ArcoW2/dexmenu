@@ -14,11 +14,13 @@ type
   TBox = record
     Card: TViewCard;
     Rect: TD2D1RectF;   // DIP, within the level
+    Alone: Boolean;     // alone on its line: drawn as a menu item (the theme's "item"), else as a card (plan 03 3.5)
   end;
 
   TGeometry = record
     Width, Height: Single;   // DIP, the whole level
     Boxes: TArray<TBox>;
+    Pressed: Integer;        // the box the mouse button is down on (the "pressed" state), or -1; Measure sets -1
   end;
 
   TLook = record
@@ -70,7 +72,7 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, System.Generics.Collections, Winapi.DxgiFormat, Dexmenu.Log,
+  System.SysUtils, System.Math, System.SyncObjs, System.Generics.Collections, System.JSON, Winapi.DxgiFormat, Dexmenu.Log,
   Dexmenu.Icons, Dexmenu.Usage, Dexmenu.Theme;
 
 const
@@ -81,6 +83,9 @@ const
   IconSize = 16;   // an icon's size (DIP), in the slot left of the text
   ShortcutGap = 16;   // between a title and its shortcut
   TextFont = 'Segoe UI';
+  TitleHeight = 18;   // a title's line within a card that has an extra text, or with its icon on top (DIP)
+  ExtraHeight = 14;   // an extra text's line (plan 03 3.6)
+  ExtraSize = 10;     // its font size
 
 function RegGetValueW(Key: HKEY; SubKey, Value: PWideChar; Flags: DWORD; ValueType: PDWORD; Data: Pointer;
   DataSize: PDWORD): LONG; stdcall; external advapi32 name 'RegGetValueW';
@@ -94,6 +99,8 @@ var
   ShortcutFormat: IDWriteTextFormat; // an item's shortcut ("Ctrl+X"), at the right
   DrawScale: Single = 1;             // the scale of the level being drawn: a file's icon is read at its pixel size
   NoteFormat: IDWriteTextFormat;   // a note card's text: wraps, from the top (plan 02 3.3)
+  ExtraFormat: IDWriteTextFormat;  // a card's extra text, smaller (plan 03 3.6)
+  CenterFormat, CenterExtraFormat: IDWriteTextFormat;   // the same centred: a card with its icon on top
 
 var
   ThemeMode: Integer;   // DexmenuSetTheme: 0 as Windows' apps are, 1 light, 2 dark (the settings app's preview)
@@ -153,15 +160,14 @@ end;
 
 // The icon in the slot left of a card's text (plan 02 3.8), the first there is: the layout card's own (a glyph, or an
 // icon in a file), the item's own bitmap, in the preview the one kept for it; else none.
-procedure DrawIcon(T: ID2D1RenderTarget; V: TViewCard; const R: TD2D1RectF; Brush, Dim: ID2D1SolidColorBrush;
+// Slot: where the icon goes, centred in it.
+procedure DrawIcon(T: ID2D1RenderTarget; V: TViewCard; const Slot: TD2D1RectF; Brush: ID2D1SolidColorBrush;
   Editing: Boolean);
 var
   Spec, Glyph: string;
   Pixels: TIconPixels;
-  Slot: TD2D1RectF;
   CX, CY: Single;
 begin
-  Slot := D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom);
   CX := (Slot.left + Slot.right) / 2;
   CY := (Slot.top + Slot.bottom) / 2;
   Spec := V.IconSpec;
@@ -222,6 +228,9 @@ begin
     IconFormat := MakeFormat(IconFont, DWRITE_FONT_WEIGHT_NORMAL, IconSize, True);
     ShortcutFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, FontSize, False);
     ShortcutFormat.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+    ExtraFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, ExtraSize, False);
+    CenterFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, FontSize, True);
+    CenterExtraFormat := MakeFormat(TextFont, DWRITE_FONT_WEIGHT_NORMAL, ExtraSize, True);
     DWrite.CreateTextFormat(PWideChar(TextFont), nil, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
       DWRITE_FONT_STRETCH_NORMAL, FontSize, 'en-us', NoteFormat);
     NoteFormat.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
@@ -321,7 +330,10 @@ begin
       Fmt := BoldFormat
     else
       Fmt := NormalFormat;
-    Result := TextLeft + TextWidth(V.Title, Fmt) + MarkWidth + 8;
+    Result := TextWidth(V.Title, Fmt);
+    if V.LookCard <> nil then
+      Result := Max(Result, TextWidth(V.LookCard.Extra, ExtraFormat));
+    Result := TextLeft + Result + MarkWidth + 8;
     if V.Shortcut <> '' then
       Result := Result + TextWidth(V.Shortcut, ShortcutFormat) + ShortcutGap;
   end;
@@ -348,7 +360,9 @@ function CardHeight(V: TViewCard; Width: Single): Single;
 begin
   Result := ItemHeight;
   if V.Kind = vkNote then
-    Result := NoteHeight(V, Width);
+    Result := NoteHeight(V, Width)
+  else if (V.LookCard <> nil) and (V.LookCard.Extra <> '') then
+    Result := ItemHeight + ExtraHeight;   // the title and its extra text
   if (V.Card <> nil) and (V.Kind <> vkSeparator) and (V.Card.Height > 0) then
     Result := V.Card.Height * ItemHeight;
 end;
@@ -508,6 +522,7 @@ begin
           end;
         end;
         Box.Rect := D2D1RectF(X, Top, X + Widths[J], Top + OwnH);
+        Box.Alone := N = 1;
         Result.Boxes := Result.Boxes + [Box];
         X := X + Widths[J] + CardGap;
       end;
@@ -519,6 +534,7 @@ begin
   end;
   Result.Width := W;
   Result.Height := Y + OuterPad;
+  Result.Pressed := -1;
 end;
 
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
@@ -541,7 +557,7 @@ end;
 // A theme's background for an element and state over a rounded box (plan 03 3.4): a colour, or a linear gradient at
 // its angle across the box; False (nothing drawn) when the theme gives none.
 function FillBackground(T: ID2D1RenderTarget; Theme: TTheme; const Element, State: string; const R: TD2D1RectF;
-  Radius: Single): Boolean;
+  Radius: Single; Own: TJSONObject = nil; StateOnly: Boolean = False): Boolean;
 var
   Colors: TArray<TRGBA>;
   Angle, CX, CY, DX, DY, Half: Single;
@@ -552,7 +568,7 @@ var
   Solid: ID2D1SolidColorBrush;
   Box: TD2D1RoundedRect;
 begin
-  Result := Theme.Background(Element, State, Colors, Angle);
+  Result := Theme.Background(Element, State, Colors, Angle, Own, StateOnly);
   if not Result then
     Exit;
   Box := D2D1RoundedRect(R, Radius, Radius);
@@ -636,11 +652,17 @@ var
   NoteText: IDWriteTextLayout;
   Fmt: IDWriteTextFormat;
   Brush: ID2D1SolidColorBrush;
-  Y, TitleRight: Single;
+  Y, TitleRight, TitleTop, TitleBottom: Single;
   Shortcut: string;
   Access: Integer;
   TitleLayout: IDWriteTextLayout;
   Range: TDwriteTextRange;
+  Own: TJSONObject;
+  ExtraText, Element, State: string;
+  ExtraAbove: Boolean;
+  Inner: TD2D1RectF;
+  BorderColor, Foreground: TRGBA;
+  CardBorder, ExtraBrush, MarkBrush: ID2D1SolidColorBrush;
 begin
   // every colour and radius from the theme for light or dark (plan 03 3.2; Dexmenu.Theme)
   Theme := CurrentTheme(Look.Dark);
@@ -655,7 +677,6 @@ begin
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'focused', 'border', RGBA($2F, $6F, $D6))), nil, Accent);
   T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'unavailable', 'background', RGBA(0, 0, 0, 0.09))), nil, Stripe);
   MenuRadius := Theme.Number('menu', 'normal', 'radius', WindowRadius);
-  CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius);
   T.Clear(D2D1ColorF(0, 0, 0, 0));
   R := D2D1RectF(0.5, 0.5, G.Width - 0.5, VisibleHeight - 0.5);
   if not FillBackground(T, Theme, 'menu', 'normal', R, MenuRadius) then
@@ -687,66 +708,146 @@ begin
         DrawDividerText(T, V.Divider, R, Y, Sep, LabelBrush);
       Continue;
     end;
+    // a card's look (plan 03 3.6, 3.7): the theme's "item" when alone on its line, else its "card"; its own look from
+    // the layout over it; the state: disabled, pressed, hover or normal
+    Own := nil;
+    ExtraText := '';
+    ExtraAbove := False;
+    if V.LookCard <> nil then
+    begin
+      Own := V.LookCard.Look;
+      ExtraText := V.LookCard.Extra;
+      ExtraAbove := V.LookCard.ExtraAbove;
+    end;
+    if G.Boxes[I].Alone then
+      Element := 'item'
+    else
+      Element := 'card';
+    if not V.Enabled then
+      State := 'disabled'
+    else if I = G.Pressed then
+      State := 'pressed'
+    else if I = Selected then
+      State := 'hover'
+    else
+      State := 'normal';
+    CardRadius := Theme.Number(Element, 'normal', 'radius', ItemRadius, Own);
+    Inner := D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1);
     if V.Kind in [vkItem, vkMenu, vkCommand] then
-      FillBackground(T, Theme, 'card', 'normal', D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
-        CardRadius);
+      FillBackground(T, Theme, Element, 'normal', Inner, CardRadius, Own);
     if Editing and V.Sometimes then
-      DrawStripes(T, D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1), Stripe);
+      DrawStripes(T, Inner, Stripe);
+    // hover and pressed over the normal background: the state's own, a pressed card without one as hovered
+    if (State = 'pressed') and not FillBackground(T, Theme, Element, 'pressed', Inner, CardRadius, Own, True) then
+      State := 'hover';
+    if (State = 'hover') and not FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True) then
+      T.FillRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), Hover);
+    BorderColor := Theme.Color(Element, State, 'border', RGBA(0, 0, 0, 0), Own);
+    if BorderColor.A > 0 then
+    begin
+      T.CreateSolidColorBrush(ToD2D(BorderColor), nil, CardBorder);
+      T.DrawRoundedRectangle(D2D1RoundedRect(Inner, CardRadius, CardRadius), CardBorder,
+        Theme.Number(Element, State, 'borderWidth', 1, Own));
+    end;
     // the items of the card selected in the settings app's editor (the preview only)
     if (Marked <> '') and (V.CardId = Marked) then
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 1.5, R.top + 1, R.right - 1.5, R.bottom - 1),
         CardRadius, CardRadius), Accent, 1.5);
-    if (I = Selected) and V.Enabled then
-      if not FillBackground(T, Theme, 'card', 'hover', D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
-        CardRadius) then
-        T.FillRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2, R.top + 1, R.right - 2, R.bottom - 1),
-          CardRadius, CardRadius), Hover);
+    // the title's colour (a disabled card's from the theme's "disabled"), the mark's in it unless the theme gives one
     if V.Enabled then
-      Brush := Text
+      Foreground := Theme.Color(Element, State, 'foreground', RGBA($1B, $1B, $1B), Own)
     else
-      Brush := Dim;
-    if V.Checked then
-      T.DrawText(PWideChar(CheckGlyph), 1, GlyphFormat, D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom),
-        Brush)
-    else if V.Kind in [vkItem, vkMenu, vkCommand] then
-      DrawIcon(T, V, R, Brush, Dim, Editing);
-    // the marks (the global settings): a submenu's (the chevron unless one is set), an action's (none unless set)
-    if V.HasSubmenu and (SubmenuMark = '') then
-      T.DrawText(PWideChar(ChevronGlyph), 1, GlyphFormat, D2D1RectF(R.right - MarkWidth, R.top, R.right - 6, R.bottom),
-        Brush)
-    else if V.HasSubmenu then
-      T.DrawText(PWideChar(SubmenuMark), Length(SubmenuMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
-        R.right - 4, R.bottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP)
-    else if (ActionMark <> '') and (V.Kind in [vkItem, vkCommand]) then
-      T.DrawText(PWideChar(ActionMark), Length(ActionMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
-        R.right - 4, R.bottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      Foreground := Theme.Color(Element, 'disabled', 'foreground', RGBA($A0, $A0, $A0), Own);
+    T.CreateSolidColorBrush(ToD2D(Foreground), nil, Brush);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, State, 'extra', RGBA($A0, $A0, $A0), Own)), nil, ExtraBrush);
     if V.IsDefault then
       Fmt := BoldFormat
     else
       Fmt := NormalFormat;
     Title := V.Title;
+    // a tall or square card: its icon at the top, the title and extra text under it, centred, the mark in the corner
+    if (V.Kind in [vkItem, vkMenu, vkCommand]) and (R.bottom - R.top >= R.right - R.left) then
+    begin
+      Y := R.top + Max(4, (R.bottom - R.top - (IconSize + 8 + TitleHeight + Ord(ExtraText <> '') * ExtraHeight)) / 2);
+      if V.Checked then
+        T.DrawText(PWideChar(CheckGlyph), 1, GlyphFormat, D2D1RectF(R.left, Y, R.right, Y + IconSize + 8), Brush)
+      else
+        DrawIcon(T, V, D2D1RectF(R.left, Y, R.right, Y + IconSize + 8), Brush, Editing);
+      Y := Y + IconSize + 8;
+      if ExtraAbove and (ExtraText <> '') then
+      begin
+        T.DrawText(PWideChar(ExtraText), Length(ExtraText), CenterExtraFormat, D2D1RectF(R.left + 4, Y, R.right - 4,
+          Y + ExtraHeight), ExtraBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        Y := Y + ExtraHeight;
+      end;
+      if Title <> '' then
+        T.DrawText(PWideChar(Title), Length(Title), CenterFormat, D2D1RectF(R.left + 4, Y, R.right - 4,
+          Y + TitleHeight), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      Y := Y + TitleHeight;
+      if not ExtraAbove and (ExtraText <> '') then
+        T.DrawText(PWideChar(ExtraText), Length(ExtraText), CenterExtraFormat, D2D1RectF(R.left + 4, Y, R.right - 4,
+          Y + ExtraHeight), ExtraBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      if V.HasSubmenu then
+        T.DrawText(PWideChar(ChevronGlyph), 1, GlyphFormat, D2D1RectF(R.right - 18, R.top + 2, R.right - 4, R.top + 16),
+          Brush);
+      Continue;
+    end;
+    if V.Checked then
+      T.DrawText(PWideChar(CheckGlyph), 1, GlyphFormat, D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom),
+        Brush)
+    else if V.Kind in [vkItem, vkMenu, vkCommand] then
+      DrawIcon(T, V, D2D1RectF(R.left + 6, R.top, R.left + TextLeft - 6, R.bottom), Brush, Editing);
+    // the marks (the global settings): a submenu's (the chevron unless one is set), an action's (none unless set)
+    T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, State, 'mark', Foreground, Own)), nil, MarkBrush);
+    if V.HasSubmenu and (SubmenuMark = '') then
+      T.DrawText(PWideChar(ChevronGlyph), 1, GlyphFormat, D2D1RectF(R.right - MarkWidth, R.top, R.right - 6, R.bottom),
+        MarkBrush)
+    else if V.HasSubmenu then
+      T.DrawText(PWideChar(SubmenuMark), Length(SubmenuMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
+        R.right - 4, R.bottom), MarkBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP)
+    else if (ActionMark <> '') and (V.Kind in [vkItem, vkCommand]) then
+      T.DrawText(PWideChar(ActionMark), Length(ActionMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
+        R.right - 4, R.bottom), MarkBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+    // the title's line, and the extra text's above or below it, the two centred in the card together
+    TitleTop := R.top;
+    TitleBottom := R.bottom;
+    if ExtraText <> '' then
+    begin
+      TitleTop := R.top + (R.bottom - R.top - TitleHeight - ExtraHeight) / 2;
+      if ExtraAbove then
+      begin
+        T.DrawText(PWideChar(ExtraText), Length(ExtraText), ExtraFormat, D2D1RectF(R.left + TextLeft, TitleTop,
+          R.right - MarkWidth, TitleTop + ExtraHeight), ExtraBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        TitleTop := TitleTop + ExtraHeight;
+      end
+      else
+        T.DrawText(PWideChar(ExtraText), Length(ExtraText), ExtraFormat, D2D1RectF(R.left + TextLeft,
+          TitleTop + TitleHeight, R.right - MarkWidth, TitleTop + TitleHeight + ExtraHeight), ExtraBrush,
+          D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      TitleBottom := TitleTop + TitleHeight;
+    end;
     // the shortcut Windows' text gives ("Ctrl+X"), dim, at the right before the mark; the title stops short of it
     TitleRight := R.right - MarkWidth;
     Shortcut := V.Shortcut;
     if Shortcut <> '' then
     begin
-      T.DrawText(PWideChar(Shortcut), Length(Shortcut), ShortcutFormat, D2D1RectF(R.left + TextLeft, R.top,
-        R.right - MarkWidth, R.bottom), Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      T.DrawText(PWideChar(Shortcut), Length(Shortcut), ShortcutFormat, D2D1RectF(R.left + TextLeft, TitleTop,
+        R.right - MarkWidth, TitleBottom), Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       TitleRight := Max(R.left + TextLeft, TitleRight - TextWidth(Shortcut, ShortcutFormat) - ShortcutGap);
     end;
     // the access key (the letter Windows' text marks with "&") underlined: that key picks the item
     Access := V.AccessIndex;
     if (Title <> '') and (Access >= 0) and Succeeded(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt,
-      Max(1, TitleRight - R.left - TextLeft), R.bottom - R.top, TitleLayout)) then
+      Max(1, TitleRight - R.left - TextLeft), TitleBottom - TitleTop, TitleLayout)) then
     begin
       Range.startPosition := Access;
       Range.length := 1;
       TitleLayout.SetUnderline(True, Range);
-      T.DrawTextLayout(D2D1PointF(R.left + TextLeft, R.top), TitleLayout, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      T.DrawTextLayout(D2D1PointF(R.left + TextLeft, TitleTop), TitleLayout, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
     end
     else if Title <> '' then
-      T.DrawText(PWideChar(Title), Length(Title), Fmt, D2D1RectF(R.left + TextLeft, R.top, TitleRight,
-        R.bottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      T.DrawText(PWideChar(Title), Length(Title), Fmt, D2D1RectF(R.left + TextLeft, TitleTop, TitleRight,
+        TitleBottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
   end;
   T.PopAxisAlignedClip;
 end;
@@ -844,6 +945,9 @@ finalization
   Pointer(IconFormat) := nil;
   Pointer(ShortcutFormat) := nil;
   Pointer(NoteFormat) := nil;
+  Pointer(ExtraFormat) := nil;
+  Pointer(CenterFormat) := nil;
+  Pointer(CenterExtraFormat) := nil;
   Pointer(DWrite) := nil;
   Pointer(D2D) := nil;
 

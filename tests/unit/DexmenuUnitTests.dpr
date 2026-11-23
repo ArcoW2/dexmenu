@@ -764,6 +764,7 @@ var
   Lookup: TFunc<string, string>;
   Stops: TArray<TRGBA>;
   Angle: Single;
+  Own, None: TJSONObject;
 
   function Near(const A: TRGBA; R, G, B: Integer; Alpha: Single = 1): Boolean;
   begin
@@ -822,6 +823,29 @@ begin
         'a colour background: one colour');
     end;
   finally
+    T.Free;
+  end;
+  // a card alone on its line ("item") takes what it does not give from "card"; a card's own look over the theme's
+  // (plan 03 3.5 - 3.7)
+  T := ThemeFromText('{ "base": "dark", "item": { "normal": { "foreground": "#00ff00" } }, ' +
+    '"card": { "normal": { "background": "#111111" } } }', Lookup, Error);
+  Own := TJSONObject.ParseJSONValue('{ "background": "#ff0000", "hover": { "foreground": "#0000ff" } }') as TJSONObject;
+  None := TJSONObject.ParseJSONValue('{ "background": "none" }') as TJSONObject;
+  try
+    Check(Near(T.Color('item', 'normal', 'foreground', RGBA(0, 0, 0)), 0, 255, 0) and
+      Near(T.Color('item', 'hover', 'background', RGBA(0, 0, 0)), 0, 0, 255) and (T.Number('item', 'normal', 'radius', 0) = 4),
+      'an item: its own value, else the card''s (hover background, radius)');
+    Check(Near(T.Color('card', 'normal', 'background', RGBA(0, 0, 0), Own), 255, 0, 0) and
+      Near(T.Color('card', 'hover', 'background', RGBA(0, 0, 0), Own), 0, 0, 255) and
+      Near(T.Color('card', 'hover', 'foreground', RGBA(0, 0, 0), Own), 0, 0, 255) and
+      Near(T.Color('card', 'normal', 'foreground', RGBA(0, 0, 0), Own), 255, 255, 255),
+      'a card''s own look: its background over the theme''s, the theme''s hover over its normal, its own hover first');
+    Check(T.Background('card', 'hover', Stops, Angle, nil, True) and not T.Background('card', 'pressed', Stops, Angle, nil, True),
+      'a state''s own background only: hover given, pressed not');
+    Check(not T.Background('card', 'normal', Stops, Angle, None), 'a card''s background "none": none drawn');
+  finally
+    None.Free;
+    Own.Free;
     T.Free;
   end;
   // the theme the settings name, from the user's themes folder
@@ -1262,6 +1286,10 @@ begin
     '"cardFit": "bottom" } ]', W);
   Check((Length(R) = 3) and Near(R[1].bottom, R[0].bottom) and (R[1].top > R[0].top) and Near(R[2].top, R[0].top) and
     (R[2].bottom < R[0].bottom), 'the line''s fit (bottom), a card overruling it (top)');
+  R := NoteBoxes('[ { "line": [ { "card": "Copy", "extra": "to the clipboard", "rules": [ { "name": { "equals": "Copy" } } ] }, ' +
+    '{ "note": "a" } ] } ]', W);
+  Check((Length(R) = 1) and Near(R[0].bottom - R[0].top, ItemHeight + 14),
+    'a card with an extra text: its line one extra line higher');
 end;
 
 begin

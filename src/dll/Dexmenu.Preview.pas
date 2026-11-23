@@ -469,6 +469,8 @@ begin
           if Box <> L.Selected then
           begin
             L.Selected := Box;
+            if Box <> L.Geometry.Pressed then
+              L.Geometry.Pressed := -1;   // the button held, moved off the card: no longer pressed
             if P.Tip <> nil then
               P.Tip.Hide;
             KillTimer(Wnd, TipTimer);
@@ -526,9 +528,27 @@ begin
             Redraw(P);
           end;
         end;
+      WM_LBUTTONDOWN:
+        begin
+          // the card under the button drawn pressed until it is let go (plan 03 3.7)
+          S := P.Scale;
+          Index := P.LevelAt(SmallInt(LP and $FFFF) / S, SmallInt((LP shr 16) and $FFFF) / S, Box);
+          if (Index >= 0) and (Box >= 0) and P.Levels[Index].Geometry.Boxes[Box].Card.Enabled and
+            (P.Levels[Index].Geometry.Boxes[Box].Card.Kind <> vkNote) then
+          begin
+            P.Levels[Index].Geometry.Pressed := Box;
+            Redraw(P);
+          end;
+        end;
       WM_LBUTTONUP:
         begin
           SetFocus(Wnd);
+          for I := 0 to P.Levels.Count - 1 do
+            if P.Levels[I].Geometry.Pressed >= 0 then
+            begin
+              P.Levels[I].Geometry.Pressed := -1;
+              Redraw(P);
+            end;
           S := P.Scale;
           Index := P.LevelAt(SmallInt(LP and $FFFF) / S, SmallInt((LP shr 16) and $FFFF) / S, Box);
           if (Index >= 0) and (Box >= 0) and Assigned(P.Callback) then

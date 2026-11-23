@@ -1068,6 +1068,8 @@ begin
         if Box <> L.Selected then
         begin
           L.Selected := Box;
+          if Box <> L.Geometry.Pressed then
+            L.Geometry.Pressed := -1;   // the button held, moved off the card: no longer pressed
           L.Redraw;
           S.HoverTip(L, Box);
           KillTimer(Wnd, HoverTimer);
@@ -1111,8 +1113,23 @@ begin
         else if (L.Selected >= 0) and (S.FLevels.Count > L.Index + 1) then
           S.CloseFrom(L.Index + 1);
       end;
+    WM_LBUTTONDOWN:
+      begin
+        // the card under the button drawn pressed until it is let go (plan 03 3.7)
+        Box := BoxAt(L.Geometry, SmallInt(LP and $FFFF) / L.Scale, SmallInt((LP shr 16) and $FFFF) / L.Scale, L.ScrollY);
+        if (Box >= 0) and L.Geometry.Boxes[Box].Card.Enabled and (L.Geometry.Boxes[Box].Card.Kind <> vkNote) then
+        begin
+          L.Geometry.Pressed := Box;
+          L.Redraw;
+        end;
+      end;
     WM_LBUTTONUP:
       begin
+        if L.Geometry.Pressed >= 0 then
+        begin
+          L.Geometry.Pressed := -1;
+          L.Redraw;
+        end;
         X := SmallInt(LP and $FFFF) / L.Scale;
         Y := SmallInt((LP shr 16) and $FFFF) / L.Scale;
         Box := BoxAt(L.Geometry, X, Y, L.ScrollY);

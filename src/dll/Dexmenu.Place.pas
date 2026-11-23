@@ -53,6 +53,10 @@ type
     // The layout card's own icon ("icon") where it is this card's: a card with a menu, or the items a card places
     // (not the remaining card's: each its own); '' otherwise.
     function IconSpec: string;
+    // The layout card whose look and extra text it shows (plan 03 3.6): the card itself for a card with a menu, a
+    // note, Dexmenu's own item and the items a card places; nil for the remaining card's items (each its own) and
+    // items without a card.
+    function LookCard: TCard;
     // The access key in the title: the index (0-based) of the letter Windows' text marks with "&", when the title is
     // the item's own text; -1 otherwise.
     function AccessIndex: Integer;
@@ -225,6 +229,13 @@ begin
   P := Pos(#9, Node.Item.Text);
   if P > 0 then
     Result := Trim(Copy(Node.Item.Text, P + 1, MaxInt));
+end;
+
+function TViewCard.LookCard: TCard;
+begin
+  Result := nil;
+  if (Card <> nil) and ((Kind in [vkMenu, vkCommand, vkNote]) or ((Kind = vkItem) and not Card.IsRemaining)) then
+    Result := Card;
 end;
 
 function TViewCard.IconSpec: string;

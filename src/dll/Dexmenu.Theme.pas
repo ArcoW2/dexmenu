@@ -21,7 +21,7 @@ type
   private
     FRoot: TJSONObject;     // the theme with its bases merged in (owned)
     FPalette: TJSONObject;  // FRoot's palette (not owned)
-    function Value(const Element, State, Prop: string): TJSONValue;
+    function Value(const Element, State, Prop: string; Own: TJSONObject; StateOnly: Boolean = False): TJSONValue;
     function Resolve(V: TJSONValue; out Color: TRGBA; Depth: Integer = 0): Boolean;
     procedure Problem(const Text: string);
   public
@@ -29,14 +29,18 @@ type
     Problems: string;       // what could not be read (an unknown palette name, a bad colour), for the log
     constructor Create(Root: TJSONObject; const AName: string);
     destructor Destroy; override;
-    // A property's colour: Element.State.Prop, else Element.normal.Prop, else Default.
-    function Color(const Element, State, Prop: string; const Default: TRGBA): TRGBA;
+    // A property's colour: Element.State.Prop, else Element.normal.Prop, else Default. Element "item" (a card alone on
+    // its line) takes what it does not give from "card". Own: a card's own look from the layout (plan 03 3.6; its
+    // properties for normal at the top, a state's in an object by the state's name), before the theme's: its
+    // State.Prop, the theme's State.Prop, its Prop, the theme's normal.Prop. Its colours use this theme's palette.
+    function Color(const Element, State, Prop: string; const Default: TRGBA; Own: TJSONObject = nil): TRGBA;
     // A background (plan 03 3.4): its colours, one for a colour, two or more for a gradient ("gradient": [ colours ],
     // spread evenly, "angle" in degrees, 0 left to right, 90 top to bottom, the default); False when the theme gives
-    // none.
-    function Background(const Element, State: string; out Colors: TArray<TRGBA>; out Angle: Single): Boolean;
+    // none. StateOnly: only what the state itself gives (drawn over the normal background), not normal's.
+    function Background(const Element, State: string; out Colors: TArray<TRGBA>; out Angle: Single;
+      Own: TJSONObject = nil; StateOnly: Boolean = False): Boolean;
     // A property's number (a radius, a width): as Color, a number.
-    function Number(const Element, State, Prop: string; Default: Single): Single;
+    function Number(const Element, State, Prop: string; Default: Single; Own: TJSONObject = nil): Single;
   end;
 
 // A colour from its text: "#rgb", "#rrggbb", "#rrggbbaa", "rgba(r, g, b, a)", "rgb(r, g, b)".
@@ -235,22 +239,45 @@ begin
     Problems := Problems + Text + '; ';
 end;
 
-function TTheme.Value(const Element, State, Prop: string): TJSONValue;
-var
-  E, S: TJSONValue;
-begin
-  Result := nil;
-  E := FRoot.GetValue(Element);
-  if not (E is TJSONObject) then
-    Exit;
-  S := TJSONObject(E).GetValue(State);
-  if S is TJSONObject then
-    Result := TJSONObject(S).GetValue(Prop);
-  if (Result = nil) and (State <> 'normal') then
+function TTheme.Value(const Element, State, Prop: string; Own: TJSONObject; StateOnly: Boolean): TJSONValue;
+
+  // The theme's Element.AState.Prop, an item's from the card's when it gives none.
+  function InTheme(const AElement, AState: string): TJSONValue;
+  var
+    E, S: TJSONValue;
   begin
-    S := TJSONObject(E).GetValue('normal');
-    if S is TJSONObject then
-      Result := TJSONObject(S).GetValue(Prop);
+    Result := nil;
+    E := FRoot.GetValue(AElement);
+    if E is TJSONObject then
+    begin
+      S := TJSONObject(E).GetValue(AState);
+      if S is TJSONObject then
+        Result := TJSONObject(S).GetValue(Prop);
+    end;
+    if (Result = nil) and (AElement = 'item') then
+      Result := InTheme('card', AState);
+  end;
+
+  function InOwn(const AState: string): TJSONValue;
+  begin
+    Result := nil;
+    if Own = nil then
+      Exit;
+    if AState = 'normal' then
+      Result := Own.GetValue(Prop)
+    else if Own.GetValue(AState) is TJSONObject then
+      Result := TJSONObject(Own.GetValue(AState)).GetValue(Prop);
+  end;
+
+begin
+  Result := InOwn(State);
+  if Result = nil then
+    Result := InTheme(Element, State);
+  if (Result = nil) and (State <> 'normal') and not StateOnly then
+  begin
+    Result := InOwn('normal');
+    if Result = nil then
+      Result := InTheme(Element, 'normal');
   end;
 end;
 
@@ -299,20 +326,23 @@ begin
   end;
 end;
 
-function TTheme.Color(const Element, State, Prop: string; const Default: TRGBA): TRGBA;
+function TTheme.Color(const Element, State, Prop: string; const Default: TRGBA; Own: TJSONObject): TRGBA;
 begin
-  if not Resolve(Value(Element, State, Prop), Result) then
+  if not Resolve(Value(Element, State, Prop, Own), Result) then
     Result := Default;
 end;
 
-function TTheme.Background(const Element, State: string; out Colors: TArray<TRGBA>; out Angle: Single): Boolean;
+function TTheme.Background(const Element, State: string; out Colors: TArray<TRGBA>; out Angle: Single;
+  Own: TJSONObject; StateOnly: Boolean): Boolean;
 var
   V, Stop: TJSONValue;
   C: TRGBA;
 begin
   Colors := nil;
   Angle := 90;
-  V := Value(Element, State, 'background');
+  V := Value(Element, State, 'background', Own, StateOnly);
+  if (V is TJSONString) and (V.Value = 'none') then
+    Exit(False);
   if (V is TJSONObject) and (TJSONObject(V).GetValue('gradient') is TJSONArray) then
   begin
     for Stop in TJSONArray(TJSONObject(V).GetValue('gradient')) do
@@ -329,11 +359,11 @@ begin
     Colors := [C];
 end;
 
-function TTheme.Number(const Element, State, Prop: string; Default: Single): Single;
+function TTheme.Number(const Element, State, Prop: string; Default: Single; Own: TJSONObject): Single;
 var
   V: TJSONValue;
 begin
-  V := Value(Element, State, Prop);
+  V := Value(Element, State, Prop, Own);
   if V is TJSONNumber then
     Result := TJSONNumber(V).AsDouble
   else

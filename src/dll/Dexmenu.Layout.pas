@@ -94,6 +94,12 @@ type
     MinWidth: Single;
     Height: Single;
     CardFit: TCardFit;
+    // "extra": a smaller text with the title, above it ("extraAt": "above") or below it (plan 03 3.6); '' none
+    Extra: string;
+    ExtraAbove: Boolean;
+    // Its own look over the theme's (plan 03 3.6): "background", "foreground", "border", "borderWidth", "radius", and
+    // the same per state in "hover" / "pressed"; nil when it has none. Owned.
+    Look: TJSONObject;
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -186,6 +192,7 @@ destructor TCard.Destroy;
 begin
   Rules.Free;
   Menu.Free;
+  Look.Free;
   inherited;
 end;
 
@@ -281,6 +288,25 @@ begin
   Card.CardFit := ParseCardFit(Obj.GetValue('cardFit'));
 end;
 
+// A card's extra text and its own look (plan 03 3.6).
+procedure ParseCardLook(Obj: TJSONObject; Card: TCard);
+const
+  Props: array[0..6] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed');
+var
+  P: string;
+begin
+  if Obj.GetValue('extra') is TJSONString then
+    Card.Extra := Obj.GetValue('extra').Value;
+  Card.ExtraAbove := (Obj.GetValue('extraAt') is TJSONString) and (Obj.GetValue('extraAt').Value = 'above');
+  for P in Props do
+    if Obj.GetValue(P) <> nil then
+    begin
+      if Card.Look = nil then
+        Card.Look := TJSONObject.Create;
+      Card.Look.AddPair(P, TJSONValue(Obj.GetValue(P).Clone));
+    end;
+end;
+
 function ParseCard(Value: TJSONValue; const Where: string; Parent: TCard; out Card: TCard; var Error: string): Boolean;
 var
   Obj: TJSONObject;
@@ -327,6 +353,7 @@ begin
     Card.Title := Obj.GetValue('card').Value;
     Card.Parent := Parent;
     ParseCardSize(Obj, Card);
+    ParseCardLook(Obj, Card);
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then
       Card.Id := Obj.GetValue('id').Value

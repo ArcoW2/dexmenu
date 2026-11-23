@@ -4,7 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-21: draft.
 - 2026-11-22: partly executed: theme files; the shipped themes; gradients.
-- 2026-11-23: partly executed: lines and cards.
+- 2026-11-23: partly executed: lines and cards; the card.
 
 Plan 02 (`02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -40,6 +40,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Engine | Direct2D and DirectWrite in the DLL (`Dexmenu.Draw`): solid and gradient brushes, rounded boxes, text and text layouts, bitmaps (icons), stripes; drawing into a layered window (the menu) or an image in memory (the preview, the screenshots); image files come with Menu window | 3.1 |
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
+| Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
@@ -49,13 +50,12 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 |---|---|---|---|
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
 | Menu window | popup, corners, shadow, border, background image, placement, scrolling | Engine | 3.4 |
-| Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
 | Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
-| Other elements | icon row, search box, most used row, `<<` | Card | 3.8 |
+| Other elements | icon row, search box, most used row, `<<` | -- | 3.8 |
 | Own cards' icons | an icon of their own for Dexmenu's own cards ("Edit menu...", "Windows' menu", command cards) where the layout gives none | Theme files | 3.8 |
-| Submenu panels | next, under, replace: where they appear and how they look | Card; plan 02 Submenus | 3.9 |
-| Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window; Card | 3.4 |
-| Preview marks | striped unavailable items, new | Card; plan 02 Preview | 3.10 |
+| Submenu panels | next, under, replace: where they appear and how they look | -- | 3.9 |
+| Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
+| Preview marks | striped unavailable items, new | -- | 3.10 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -353,3 +353,31 @@ None.
 - Tested: unit tests on the measured boxes (weights 1 : 3, a minimum width with the other card taking the rest, a
   line wrapped with the level grown, a height of two lines with a card centred and one stretched, a line's fit and a
   card overruling it); the editor's self-test.
+
+### 6.5 The card
+
+- Element: a card alone on its line is drawn with the theme's `item`, cards sharing a line with its `card`; `item`
+  takes every value it does not give from `card`, so the built-in and shipped themes look as before until a theme
+  sets `item` apart.
+- A card's own look in the layout: `background` (a colour, a gradient as in the theme, or `none`), `foreground`,
+  `border`, `borderWidth`, `radius`, and the same per state in `hover` and `pressed`; its colours use the theme's
+  palette. The order: the card's own value for the state, the theme's for the state, the card's normal, the
+  theme's normal; so a theme's hover still shows over a card's own background. On a card with rules or a menu, a
+  note's size only, Dexmenu's own items; the remaining card's items keep the theme's look.
+- States drawn: normal; hover and pressed over the normal background (only what the state itself gives; a pressed
+  card without a pressed background as hovered); disabled (the theme's disabled foreground); a border where the
+  theme or the card gives one. The mouse button down on a card: pressed until let go or moved off. Focused is not
+  drawn apart from hover (the keys move the same selection the mouse does); checked and default as before (the
+  check mark, bold).
+- `extra` (a text) with `extraAt` (`below`, the default, or `above`): smaller, in the theme's `extra` colour; the
+  title and it centred in the card together; such a card is one extra-text line higher.
+- A tall or square card (as high as wide or higher): its icon at the top, the title and extra text under it, centred,
+  a submenu's chevron in the top right corner; no access key underline or shortcut there.
+- A title that does not fit ends in an ellipsis, as before; its full text as a tooltip is not made (the tooltip
+  shows the item's hint).
+- In the editor: "Extra text at", Background, Text colour, Border, Radius and Hover background in the card panel; a
+  colour as `#rrggbb` or a palette name, an object (a gradient, an intensity) as JSON.
+- Tested: unit tests (an item's value from the card's, a card's own look over the theme's in each state, a state's
+  own background only, `none`, the extra text's line height); the editor's self-test; by hand in the editor's
+  preview: tall cards with their icons on top, extra text below and above, a card with its own background, border
+  and radius, a pressed card in `dark-forest`.

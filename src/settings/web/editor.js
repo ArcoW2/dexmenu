@@ -365,6 +365,51 @@ function sizeFields(card) {
     number("height", "Height", "(its content) in lines of text"), fitRow];
 }
 
+// A card's own look over the theme's (plan 03 3.6): a colour as "#rrggbb", a theme palette name ("accent"), or empty
+// for the theme's; the hover background the same. A background or colour given as an object in the file (a gradient,
+// an intensity) shows as JSON and is kept as it is unless changed here.
+function lookFields(card) {
+  const colorField = (label, get, set, placeholder) => {
+    const v = get();
+    return textField(label, v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v), text => {
+      const t = text.trim();
+      let value;
+      if (t.startsWith("{")) { try { value = JSON.parse(t); } catch { value = undefined; } }
+      else if (t) value = t;
+      set(value);
+      changed();
+    }, placeholder);
+  };
+  const own = name => ({ get: () => card[name], set: v => { if (v === undefined) delete card[name]; else card[name] = v; } });
+  const hover = {
+    get: () => card.hover && card.hover.background,
+    set: v => {
+      if (v === undefined) { if (card.hover) { delete card.hover.background; if (!Object.keys(card.hover).length) delete card.hover; } }
+      else card.hover = Object.assign(card.hover || {}, { background: v });
+    }
+  };
+  const extraAt = el("select");
+  for (const [v, label] of [["", "below the title"], ["above", "above the title"]]) {
+    const o = el("option", "", label);
+    o.value = v;
+    extraAt.append(o);
+  }
+  extraAt.value = card.extraAt || "";
+  extraAt.addEventListener("change", () => { if (extraAt.value) card.extraAt = extraAt.value; else delete card.extraAt; changed(); });
+  const extraRow = el("label", "field");
+  extraRow.append(el("span", "", "Extra text at"), extraAt);
+  return [extraRow,
+    colorField("Background", own("background").get, own("background").set, "(the theme's) e.g. #d03030 or accent"),
+    colorField("Text colour", own("foreground").get, own("foreground").set, "(the theme's)"),
+    colorField("Border", own("border").get, own("border").set, "(the theme's: none)"),
+    textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
+      const n = Number(v.trim());
+      if (v.trim() && n >= 0) card.radius = n; else delete card.radius;
+      changed();
+    }, "(the theme's) corners, in DIP"),
+    colorField("Hover background", hover.get, hover.set, "(the theme's)")];
+}
+
 function matchEditor(match, onChange) {
   const kindSel = el("select");
   for (const k of M.matchKinds) { const o = el("option", "", k); o.value = k; kindSel.append(o); }
@@ -554,7 +599,9 @@ function renderCardPane() {
     $("card").replaceChildren(row,
       textField("Title", card.card, v => { card.card = v || (card.own === "windowsMenu" ? "Windows' menu" : "Edit menu..."); changed(); }),
       textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); }, "(none) e.g. E70F"),
-      ...sizeFields(card),
+      textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
+        "(none) a smaller text with the title"),
+      ...sizeFields(card), ...lookFields(card),
       el("div", "hint", "Shown where it stands in the layout; a layout without it does not show it."));
     return;
   }
@@ -568,7 +615,7 @@ function renderCardPane() {
   if (!M.isRemaining(card)) box.append(textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); },
     "(the item's own) e.g. E8C8, or shell32.dll,4"));
   box.append(textField("Extra text", card.extra, v => { if (v) card.extra = v; else delete card.extra; changed(); },
-    "(shown with the look, step 6)"));
+    "(none) a smaller text with the title"));
   // the hint on hover: a text in place of the item's own hint, or a regex on it (so it can be added to)
   const hint = card.hint;
   box.append(textField("Hint", typeof hint === "string" ? hint : "", v => {
@@ -618,8 +665,8 @@ function renderCardPane() {
     row.append(el("span", "", "Submenus open"), way);
     box.append(row);
   }
-  // its size on its line; the remaining card's items each take a line of their own
-  if (!M.isRemaining(card)) box.append(...sizeFields(card));
+  // its size on its line and its own look; the remaining card's items each take a line of their own, in their own look
+  if (!M.isRemaining(card)) box.append(...sizeFields(card), ...lookFields(card));
   if (!card.menu && !M.isRemaining(card)) {
     // one item per name over all its rules (Windows 11 shows some items twice: a newer and an older copy)
     const cb = el("input");
