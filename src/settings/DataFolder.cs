@@ -73,7 +73,7 @@ static class DataFolder
     }
 
     /// <summary>The global menu settings (plan 02 3.4; settings.json "menu"), with their defaults: how submenus open
-    /// (next, under, replace), only on a click, the marks, the most used row, the text size, a rule's states, the
+    /// (next, under, replace), only on a click, the marks, the text size, a rule's states, the
     /// widths.</summary>
     public static System.Text.Json.Nodes.JsonObject Menu()
     {
@@ -82,8 +82,6 @@ static class DataFolder
         {
             ["submenus"] = m?["submenus"]?.GetValue<string>() is "under" or "replace" ? m!["submenus"]!.GetValue<string>() : "next",
             ["onClickOnly"] = m?["onClickOnly"]?.GetValue<bool>() == true,
-            ["mostUsed"] = m?["mostUsed"] is System.Text.Json.Nodes.JsonValue n && n.TryGetValue<int>(out var count)
-                ? Math.Clamp(count, 1, 10) : 3,
             // the menu's size (1 as drawn; Ctrl+scroll in the menu sets it too)
             ["textSize"] = m?["textSize"] is System.Text.Json.Nodes.JsonValue t && t.TryGetValue<double>(out var size)
                 ? Math.Clamp(Math.Round(size, 1), 0.6, 2.5) : 1.0,

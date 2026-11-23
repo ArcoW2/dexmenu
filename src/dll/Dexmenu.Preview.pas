@@ -83,7 +83,7 @@ type
     Settings: TMenuSettings;   // how submenus open (settings.json "menu"), read at each rebuild
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
     Search: string;                       // typed into the preview's search (plan 02 3.6); '' : none
-    Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): the most used row
+    Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): used rules
     LastUse: TDictionary<string, string>; // this kind's times of last use: used rules (plan 09)
     Tip: TTip;
     TipLevel, TipBox: Integer;
@@ -180,7 +180,6 @@ begin
   Usage := ReadUsage(Kind);
   LastUse := ReadLastUse(Kind);
   Placement := TPlacement.Create(Layout, Kind, Top, Usage, LastUse);
-  Placement.MostUsedCount := Settings.MostUsed;
   L := TPreviewLevel.Create;
   L.View := Placement.TopLevel;
   L.Geometry := Measure(L.View);

@@ -275,6 +275,8 @@ sealed class EditorForm : Form, IThemed
     {
         try { Post(new { type = "palette", palette = System.Text.Json.Nodes.JsonNode.Parse(Native.ThemePalette()) }); }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or System.Text.Json.JsonException) { }
+        // what a rule without states of its own takes (the main window's General): the rule panel shows it
+        Post(new { type = "ruleStates", states = DataFolder.Menu()["states"]?.GetValue<string>() ?? "both" });
     }
 
     void Placed(int previewEvent, string cardId, int rule) =>

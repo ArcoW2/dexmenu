@@ -57,7 +57,6 @@ type
     ActionMark: string;       // the mark on an item without one; '' none
     Widths: TArray<TLevelWidth>;   // per level: the top, a first submenu, ...; the last for every deeper one
     States: TStates;          // the states a rule takes when it does not say
-    MostUsed: Integer;        // how many items the most used row shows (plan 02 3.9)
     TextSize: Single;         // the menu's size, 1 as drawn; Ctrl+scroll in the menu changes it (plan 02 3.4)
     ThemeLight, ThemeDark: string;   // the themes for Windows' light and dark mode (plan 03 3.3)
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
@@ -122,7 +121,6 @@ type
     IsDivider: Boolean;
     DividerText: string;
     DividerAlign: TDividerAlign;
-    IsMostUsed: Boolean;   // { "mostUsed": true }: the items chosen most, side by side (plan 02 3.9)
     IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
     CardFit: TCardFit;     // "cardFit" of a line of cards: how its lower cards fit it (cfDefault: stretched)
     constructor Create;
@@ -457,6 +455,8 @@ var
   LineCards: TJSONValue;
   Line: TLine;
   Card: TCard;
+  Made: TJSONValue;
+  I: Integer;
 begin
   Result := False;
   if not (Value is TJSONArray) then
@@ -495,9 +495,22 @@ begin
     end;
     if TJSONObject(Entry).GetValue('mostUsed') is TJSONTrue then
     begin
+      // the most used row of earlier layouts: read as what replaced it, three cards side by side, each with a used
+      // rule (docs/plans/executed/09-PLAN-used-rules.md 6.5)
       Line := TLine.Create;
       Lines.Add(Line);
-      Line.IsMostUsed := True;
+      for I := 1 to 3 do
+      begin
+        Made := TJSONObject.ParseJSONValue(Format('{ "card": "Most used %d", "rules": [ { "used": "most", "rank": %d, ' +
+          '"states": [ "enabled" ], "also": true, "consume": false } ] }', [I, I]));
+        try
+          if not ParseCard(Made, Where, Parent, Card, Error) then
+            Exit;
+          Line.Cards.Add(Card);
+        finally
+          Made.Free;
+        end;
+      end;
       Continue;
     end;
     LineCards := TJSONObject(Entry).GetValue('line');
@@ -674,7 +687,6 @@ begin
   Result.SubmenuMark := '';
   Result.ActionMark := '';
   Result.Widths := nil;
-  Result.MostUsed := 3;
   Result.TextSize := 1;
   Result.ThemeLight := 'light';
   Result.ThemeDark := 'dark';
@@ -694,8 +706,6 @@ begin
       Result.Submenus := smNext;
     if TJSONObject(Menu).GetValue('onClickOnly') is TJSONBool then
       Result.OnClickOnly := TJSONBool(TJSONObject(Menu).GetValue('onClickOnly')).AsBoolean;
-    if TJSONObject(Menu).GetValue('mostUsed') is TJSONNumber then
-      Result.MostUsed := Max(1, Min(10, TJSONNumber(TJSONObject(Menu).GetValue('mostUsed')).AsInt));
     if (TJSONObject(Menu).GetValue('themeLight') is TJSONString) and (TJSONObject(Menu).GetValue('themeLight').Value <> '') then
       Result.ThemeLight := TJSONObject(Menu).GetValue('themeLight').Value;
     if (TJSONObject(Menu).GetValue('themeDark') is TJSONString) and (TJSONObject(Menu).GetValue('themeDark').Value <> '') then

@@ -109,9 +109,8 @@ type
     // A right-click (Dexmenu.Menu): a card with a menu that shows nothing is left out; else (the preview) it shows,
     // striped.
     AtRightClick: Boolean;
-    // The use counts of this kind (Dexmenu.Usage; not owned, may be nil) and how many the most used row shows.
+    // The use counts of this kind (Dexmenu.Usage; not owned, may be nil), for used rules and the cards' counts.
     Usage: TDictionary<string, Integer>;
-    MostUsedCount: Integer;
     // The times of last use of this kind (Dexmenu.Usage; not owned, may be nil), for used rules.
     LastUse: TDictionary<string, string>;
     function Hides(Node: TNode): Boolean;
@@ -137,9 +136,7 @@ function KeyOf(Node: TNode): string;
 // Whether a kind's layout has a rule that looks inside Windows submenus (scope anywhere, or a path): then a
 // right-click opens the submenus an extension fills only when opened, before the rules run (Dexmenu.Menu).
 function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
-// Whether a kind's layout has a most used row (plan 02 3.9), at any level.
-function HasMostUsed(const Layout: ILayout; const Kind: string): Boolean;
-// Whether a kind's layout uses the use counts: a most used row, or a used rule (docs/plans/executed/09-PLAN-used-rules.md).
+// Whether a kind's layout uses the use counts: a used rule (docs/plans/executed/09-PLAN-used-rules.md).
 function UsesUsage(const Layout: ILayout; const Kind: string): Boolean;
 // The hint shown on hover over a card: its layout card's hint (a text, or a regex on the item's own hint), else the
 // item's own hint (Regular: from the seen items, Dexmenu.Seen.HintsOf); '' for none.
@@ -459,7 +456,6 @@ begin
   Layout := ALayout;
   Kind := AKind;
   Top := ATop;
-  MostUsedCount := 3;
   Remaining := TList<TNode>.Create;
   FDirect := TDictionary<string, Boolean>.Create;
   FTaken := TDictionary<string, Boolean>.Create;
@@ -542,37 +538,12 @@ begin
   end;
 end;
 
-function HasMostUsed(const Layout: ILayout; const Kind: string): Boolean;
-
-  function Look(Lines: TLines): Boolean;
-  var
-    Line: TLine;
-    Card: TCard;
-  begin
-    Result := False;
-    if Lines <> nil then
-      for Line in Lines do
-      begin
-        if Line.IsMostUsed then
-          Exit(True);
-        for Card in Line.Cards do
-          if Look(Card.Menu) then
-            Exit(True);
-      end;
-  end;
-
-begin
-  Result := Look(Layout.Lines(Kind));
-end;
-
 function UsesUsage(const Layout: ILayout; const Kind: string): Boolean;
 var
   Rules: TList<TRule>;
   R: TRule;
 begin
-  Result := HasMostUsed(Layout, Kind);
-  if Result then
-    Exit;
+  Result := False;
   Rules := TList<TRule>.Create;
   try
     CollectRules(Layout.Lines(Kind), Rules);
@@ -834,8 +805,6 @@ end;
 
 // ---- the levels ------------------------------------------------------------------------------------------------
 
-procedure AddMostUsed(P: TPlacement; Level: TViewLevel); forward;
-
 function PlaceLines(P: TPlacement; Lines: TLines): TViewLevel;
 var
   Line: TLine;
@@ -856,11 +825,6 @@ begin
   for Line in Lines do
   begin
     Out := nil;
-    if Line.IsMostUsed then
-    begin
-      AddMostUsed(P, Result);
-      Continue;
-    end;
     if Line.IsSearchBox then
     begin
       // the layout's search box: a line saying where typing goes; typing shows the search (SearchLevel)
@@ -1013,69 +977,6 @@ begin
       end;
   end;
   CleanSeparators(Result);
-end;
-
-// The most used row (plan 02 3.9): the items of this menu chosen most, at any depth, side by side, most first; only
-// enabled items with a submenu of their own left out; an item may also show at its own place.
-procedure AddMostUsed(P: TPlacement; Level: TViewLevel);
-var
-  Found: TList<TPair<TNode, Integer>>;
-  Keys: TDictionary<string, Boolean>;
-  Line: TViewLine;
-  V: TViewCard;
-  I: Integer;
-
-  procedure Walk(Nodes: TNodes);
-  var
-    N: TNode;
-    Count: Integer;
-  begin
-    for N in Nodes do
-    begin
-      if N.IsSeparator or P.Hides(N) then
-        Continue;
-      if N.Children <> nil then
-        Walk(N.Children);
-      if (N.SubMenu = 0) and N.Enabled and (N.Name <> '') and P.Usage.TryGetValue(UsageKey(N), Count) and (Count > 0) and
-        not Keys.ContainsKey(UsageKey(N)) then
-      begin
-        Keys.Add(UsageKey(N), True);
-        Found.Add(TPair<TNode, Integer>.Create(N, Count));
-      end;
-    end;
-  end;
-
-begin
-  if (P.Usage = nil) or (P.Usage.Count = 0) or (P.MostUsedCount <= 0) then
-    Exit;
-  Found := TList<TPair<TNode, Integer>>.Create;
-  Keys := TDictionary<string, Boolean>.Create;
-  try
-    if UsageGoesDeeper(P.Usage) then
-      ReadAllChildren(P.Top);   // an item chosen in a submenu: its submenu read
-    Walk(P.Top);
-    Found.Sort(TComparer<TPair<TNode, Integer>>.Construct(
-      function(const A, B: TPair<TNode, Integer>): Integer
-      begin
-        Result := B.Value - A.Value;
-        if Result = 0 then
-          Result := CompareText(UsageKey(A.Key), UsageKey(B.Key));
-      end));
-    if Found.Count = 0 then
-      Exit;
-    Line := TViewLine.Create;
-    Level.Lines.Add(Line);
-    for I := 0 to Min(Found.Count, P.MostUsedCount) - 1 do
-    begin
-      V := TViewCard.Create;
-      V.Kind := vkItem;
-      V.Node := Found[I].Key;
-      Line.Cards.Add(V);
-    end;
-  finally
-    Keys.Free;
-    Found.Free;
-  end;
 end;
 
 function TPlacement.CardCounts: TDictionary<string, Integer>;

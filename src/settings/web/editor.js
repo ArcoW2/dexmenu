@@ -22,6 +22,7 @@ let selectedId = null;
 let selectedRule = -1;   // index on the selected card
 let hoverId = null;
 const collapsed = new Set();   // cards with a menu shown folded (this session only)
+let generalStates = "both";   // what a rule without states of its own takes (the main window's General)
 let palette = {};  // the theme's palette, { name: "#rrggbbaa" } (the app, DexmenuThemePalette): the colour pickers
 let counts = {};   // the stored use counts per card id of what the preview shows (the app, DexmenuPreviewCounts)
 let dirty = false;
@@ -133,9 +134,8 @@ function withDragged(e, place) {
   const isDivider = e.dataTransfer.types.includes("text/divider");
   let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
   if (!id) return;
-  const isNew = id === "new" || id === "newnote" || id === "newmostused";   // "+ Card", "+ Divider", "+ Note", "+ Most used"
+  const isNew = id === "new" || id === "newnote";   // "+ Card", "+ Divider", "+ Note"
   if (id === "newnote") id = M.addNote(layout, linesOf()).id;
-  else if (id === "newmostused") id = M.addMostUsed(layout, linesOf()).id;
   else if (isNew) id = isDivider ? M.addDivider(layout, linesOf(), null).id : M.addCard(layout, linesOf(), null).id;
   if (place(id, isDivider)) {
     if (isNew) select(id, -1);
@@ -149,17 +149,16 @@ function renderDivider(entry) {
   const box = el("div", "divider" + (entry.id === selectedId ? " selected" : "") + " align-" + (entry.align || "left"));
   box.draggable = true;
   box.dataset.id = entry.id;
-  if (entry.mostUsed || entry.search) {
+  if (entry.search) {
     box.classList.add("mostused");
-    box.append(el("span", "text", entry.search ? "Search box: what is typed searches every item"
-      : "Most used row: the items chosen most, side by side"));
+    box.append(el("span", "text", "Search box: what is typed searches every item"));
   } else {
     box.append(el("span", "rule-line"), el("span", "text", entry.divider || ""), el("span", "rule-line"));
     if (!entry.divider) box.classList.add("plain");
   }
   const actions = el("div", "card-actions");
   const x = el("button", "", "x");
-  x.title = entry.search ? "Delete the search box" : entry.mostUsed ? "Delete the most used row" : "Delete this divider";
+  x.title = entry.search ? "Delete the search box" : "Delete this divider";
   x.addEventListener("click", e => { e.stopPropagation(); if (M.deleteDivider(linesOf(), entry.id)) { if (selectedId === entry.id) selectedId = null; changed(); } });
   actions.append(x);
   box.append(actions);
@@ -189,7 +188,7 @@ function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
     box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index) : M.moveCard(linesOf(), id, parentId, index)));
-    if (entry.divider !== undefined || entry.mostUsed || entry.search) { box.append(renderDivider(entry)); return; }
+    if (entry.divider !== undefined || entry.search) { box.append(renderDivider(entry)); return; }
     if (!entry.line) return;
     const row = el("div", "line");
     for (const card of entry.line) row.append(renderCard(card));
@@ -675,23 +674,41 @@ function ruleEditor(card, rule, index) {
   where.append(el("span", "", "Where"), placeSel);
   if (rule.path) where.append(...matchEditor(rule.path, m => { rule.path = m; changed(); }));
   if (M.ruleType(rule) === "name") group.append(where);
-  const opts = el("div", "row");
-  const states = rule.states || ["enabled", "disabled"];
+  // the states it takes: a group whose border holds "Own states"; not ticked, the rule takes what General sets (shown,
+  // greyed); ticked, its own, written even when both (General may say otherwise)
+  const statesBox = el("fieldset", "states");
+  const legend = el("legend");
+  const own = el("input");
+  own.type = "checkbox";
+  own.checked = Array.isArray(rule.states);
+  own.addEventListener("change", () => {
+    if (own.checked) rule.states = M.statesOf(rule, generalStates).slice(); else delete rule.states;
+    changed();
+  });
+  const ownLabel = el("label");
+  ownLabel.title = "Not ticked: as General sets for every rule (the main window); ticked: this rule's own";
+  ownLabel.append(own, " Own states");
+  legend.append(ownLabel);
+  statesBox.append(legend);
+  const states = M.statesOf(rule, generalStates);
   for (const s of ["enabled", "disabled"]) {
     const cb = el("input");
     cb.type = "checkbox";
     cb.checked = states.includes(s);
+    cb.disabled = !own.checked;
     cb.addEventListener("change", () => {
-      const now = new Set(rule.states || ["enabled", "disabled"]);
+      const now = new Set(rule.states);
       cb.checked ? now.add(s) : now.delete(s);
-      rule.states = [...now];
-      if (rule.states.length === 2) delete rule.states;
+      if (now.size === 0) { cb.checked = true; return; }   // it takes something: one stays
+      rule.states = ["enabled", "disabled"].filter(x => now.has(x));
       changed();
     });
     const l = el("label");
     l.append(cb, " " + s);
-    opts.append(l);
+    statesBox.append(l);
   }
+  if (!own.checked) statesBox.append(el("span", "hint", "(as General sets)"));
+  const opts = el("div", "row");
   for (const [flag, label] of [["also", "also when taken"],
     ["skipDuplicates", "skip duplicates (one per name)"]]) {
     const cb = el("input");
@@ -715,7 +732,7 @@ function ruleEditor(card, rule, index) {
   const del = el("button", "", "Delete rule");
   del.addEventListener("click", () => { M.deleteRule(linesOf(), card, index); selectedRule = -1; changed(); });
   opts.append(del);
-  box.append(head, group, opts);
+  box.append(head, group, statesBox, opts);
   const problem = M.ruleProblem(rule);
   if (problem) box.append(el("div", "problem", problem));
   // selecting the rule only moves the highlights: a full render here would replace the checkbox or field this same
@@ -736,12 +753,6 @@ function renderCardPane() {
     $("card").replaceChildren(el("p", "hint", "Shows where typing goes. A letter that is an access key picks its " +
       "item; any other letter starts the search: every item at any depth whose name holds the text (a leading / for a " +
       "regex). Without a search box, typing searches the same way."));
-    return;
-  }
-  if (div && div.entry.mostUsed) {
-    $("cardHeading").textContent = "The most used row";
-    $("card").replaceChildren(el("p", "hint", "The items chosen most in this kind of right-click, side by side, most " +
-      "first; also items inside submenus. How many: in the main window. Empty until items have been chosen."));
     return;
   }
   if (div) {
@@ -1107,14 +1118,6 @@ $("addSearch").addEventListener("click", () => {
   changed();
   focusNew(d.id);
 });
-$("addMostUsed").addEventListener("click", () => {
-  if (!layout) return;
-  const d = M.addMostUsed(layout, linesOf());
-  select(d.id, -1);
-  changed();
-  focusNew(d.id);
-});
-$("addMostUsed").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "newmostused"); e.dataTransfer.effectAllowed = "copy"; });
 $("addDivider").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(layout, linesOf(), null)); });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
@@ -1316,6 +1319,9 @@ chrome.webview.addEventListener("message", e => {
     else if (hoverId !== m.cardId) { hoverId = m.cardId; render(); }
   }
   else if (m.type === "counts") { counts = m.counts || {}; placeToggles(); }
+  else if (m.type === "ruleStates") {
+    if (m.states !== generalStates) { generalStates = m.states; renderCardPane(); }
+  }
   else if (m.type === "palette") {
     const next = m.palette || {};
     if (JSON.stringify(next) !== JSON.stringify(palette)) { palette = next; renderCardPane(); }

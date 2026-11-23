@@ -54,7 +54,7 @@ type
     FEarly: TList<HMENU>;    // submenus opened before the user opened them (FindEmpty): open until the menu closes
     FDeep: Boolean;          // the layout's rules look inside submenus (RulesLookDeeper)
     FHints: TDictionary<string, string>;   // the items' own hints, from the seen items (Dexmenu.Seen.HintsOf)
-    FUsage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage), for the most used row
+    FUsage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage), for used rules
     FLastUse: TDictionary<string, string>; // this kind's times of last use, for used rules (plan 09)
     FChosenKey: string;                    // the chosen item's use count key; '' when none was chosen
     FTextSize: Single;                     // the menu's size (Ctrl+scroll; settings.json menu.textSize)
@@ -334,7 +334,7 @@ begin
   FHints := HintsOf(ReadSeenText(FKind));
   FUsage := ReadUsage(FKind);
   FLastUse := ReadLastUse(FKind);
-  // the rules look inside submenus, or the most used row or a used rule may hold an item of one: those filled only
+  // the rules look inside submenus, or a used rule may hold an item of one: those filled only
   // when opened are opened now
   FDeep := RulesLookDeeper(FLayout, FKind) or (UsesUsage(FLayout, FKind) and UsageGoesDeeper(FUsage));
   FindEmpty(FTop);
@@ -344,7 +344,6 @@ begin
   FPlacement.Empty := FEmpty;
   FPlacement.AtRightClick := True;
   FPlacement.Usage := FUsage;
-  FPlacement.MostUsedCount := FSettings.MostUsed;
 
   L := TLevelWindow.Create;
   L.Session := Self;
@@ -902,7 +901,6 @@ begin
   NewPlacement.Empty := FEmpty;
   NewPlacement.AtRightClick := True;
   NewPlacement.Usage := FUsage;
-  NewPlacement.MostUsedCount := FSettings.MostUsed;
   OldViews := TObjectList<TViewLevel>.Create;
   try
     for I := 0 to FLevels.Count - 1 do

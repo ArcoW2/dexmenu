@@ -476,12 +476,13 @@ end;
 
 // How a submenu opens (plan 02 3.7): a card's own "submenus" before the global setting; "<<" on top of a replacing
 // level.
-// The use counts and the most used row (plan 02 3.9).
+// The use counts (plan 02 3.9); a most used row of an earlier layout read as three used-rule cards (plan 09 6.5).
 procedure TestUsage;
 var
   Data, Error: string;
   I: Integer;
   U: TDictionary<string, Integer>;
+  T: TDictionary<string, string>;
   Layout: ILayout;
   Menu: HMENU;
   Top: TNodes;
@@ -504,6 +505,7 @@ begin
   for I := 1 to 5 do
     CountChoice('folder', 'Cut');
   U := ReadUsage('file');
+  T := ReadLastUse('file');
   Layout := nil;
   P := nil;
   Top := nil;
@@ -516,25 +518,24 @@ begin
       '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
     Menu := TestMenu;
     Top := ReadLevel(Menu, '');
-    P := TPlacement.Create(Layout, 'default', Top);
-    P.Usage := U;
-    P.MostUsedCount := 3;
+    P := TPlacement.Create(Layout, 'default', Top, U, T);
     Level := P.TopLevel;
     try
       Check(Copy(Describe(Level), 1, Length('I:Copy | I:Add to archive... | I:Cut / D: / I:Open')) =
         'I:Copy | I:Add to archive... | I:Cut / D: / I:Open',
-        'the most used row: side by side, most first, a submenu''s item too, a disabled one left out, ties by name');
+        'an earlier layout''s most used row: three cards side by side, most first, a submenu''s item too, a disabled one left out');
     finally
       Level.Free;
     end;
-    P.Usage := nil;
+    P.Free;
+    P := TPlacement.Create(Layout, 'default', Top);
     Level := P.TopLevel;
     try
-      Check(Copy(Describe(Level), 1, Length('I:Open')) = 'I:Open', 'no counts: no row, and its divider not shown first');
+      Check(Copy(Describe(Level), 1, Length('I:Open')) = 'I:Open', 'no counts: nothing in its place, its divider not shown first');
     finally
       Level.Free;
     end;
-    Check(HasMostUsed(Layout, 'default') and UsageGoesDeeper(U), 'a most used row in the layout; a count inside a submenu');
+    Check(UsesUsage(Layout, 'default') and UsageGoesDeeper(U), 'the layout uses the counts; a count inside a submenu');
     P.Free;
     P := nil;
     Layout := ParseLayout('{ "default": [ { "line": [ { "id": "x", "card": "X", "rules": [ { "name": { "equals": "Cut" } } ] }, ' +
@@ -555,6 +556,7 @@ begin
     if Menu <> 0 then
       DestroyMenu(Menu);
     U.Free;
+    T.Free;
     TDirectory.Delete(Data, True);
     SetEnvironmentVariable('DEXMENU_DATA', nil);
   end;

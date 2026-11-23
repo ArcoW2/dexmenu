@@ -248,6 +248,18 @@
       "a card with a wrong rank outlined red, with a reversed range not");
   }
 
+  // a rule's states: its own, else what General sets
+  check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
+    M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",
+    "a rule's states: as General sets unless its own (both kept when General says enabled)");
+  // an earlier layout's most used row: three cards with used rules (plan 09 6.5)
+  {
+    const r = M.upToDate({ format: M.formatVersion, lines: [ { mostUsed: true }, { line: [ { card: "M", menu: [ { mostUsed: true } ] } ] } ] });
+    check(r.changed && r.layout.lines[0].line.map(c => c.rules[0].rank).join() === "1,2,3" &&
+      r.layout.lines[0].line.every(c => c.rules[0].used === "most") && r.layout.lines[1].line[0].menu[0].line.length === 3,
+      "an earlier most used row: three cards with used rules 1, 2, 3, also in a card's menu");
+  }
+
   // the colour pickers (plan 03 3.6): read, written in the shortest form, shown
   {
     const back = v => JSON.stringify(M.colorValue(M.colorState(v)).value);

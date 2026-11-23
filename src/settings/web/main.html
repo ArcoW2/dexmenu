@@ -38,8 +38,7 @@
         <label title="Ctrl+scroll while the menu is open sets it too">Text size <input type="number" id="textSize" min="60" max="250" step="10"> %</label>
         <label>Theme when Windows is light <select id="themeLight"></select></label>
         <label>when dark <select id="themeDark"></select></label>
-        <label>The most used row shows <input type="number" id="mostUsed" min="1" max="10"> items</label>
-        <label>A rule takes, unless it says <select id="states">
+        <label title="A rule without states of its own takes these; each rule can set its own in its panel (States)">Rules take, unless a rule sets its own <select id="states">
           <option value="both">enabled and disabled items</option>
           <option value="enabled">enabled items only</option>
           <option value="disabled">disabled items only</option>

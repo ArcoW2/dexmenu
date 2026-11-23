@@ -43,12 +43,12 @@ const LayoutModel = (() => {
   }
 
   // Every divider entry of some lines, depth first: { entry, lines, index, parent }. A divider: { id, divider: "<text>"
-  // or "", align: "left" | "center" | "right" }, between lines of cards. The most used row ({ id, mostUsed: true },
-  // plan 02 3.9) stands between lines as a divider does, so it is handled as one: moved, deleted, copied.
+  // or "", align: "left" | "center" | "right" }, between lines of cards. The search box ({ id, search: true }) stands
+  // between lines as a divider does, so it is handled as one: moved, deleted, copied.
   function* dividers(lines, parent = null) {
     for (let i = 0; i < lines.length; i++) {
       const entry = lines[i];
-      if (entry.divider !== undefined || entry.mostUsed || entry.search) yield { entry, lines, index: i, parent };
+      if (entry.divider !== undefined || entry.search) yield { entry, lines, index: i, parent };
       if (entry.line) for (const card of entry.line) if (card.menu) yield* dividers(card.menu, card);
     }
   }
@@ -191,6 +191,13 @@ const LayoutModel = (() => {
     if (typeof rank === "number") return Number.isInteger(rank) && rank >= 1 ? "" : "rank: a number from 1, or a range as 1-3";
     const m = typeof rank === "string" ? /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(rank) : null;
     return m && +m[1] >= 1 && (m[2] === undefined || +m[2] >= 1) ? "" : "rank: a number from 1, or a range as 1-3";
+  }
+
+  // The states a rule takes: its own ("states"), else what General sets for every rule ("both", "enabled",
+  // "disabled"), as a list.
+  function statesOf(rule, general) {
+    if (Array.isArray(rule.states)) return rule.states;
+    return general === "enabled" ? ["enabled"] : general === "disabled" ? ["disabled"] : ["enabled", "disabled"];
   }
 
   // The rule's type: "usage" (it has "used"), else "name".
@@ -410,12 +417,6 @@ const LayoutModel = (() => {
     return entry;
   }
 
-  function addMostUsed(layout, lines) {
-    const entry = { id: newId(layout), mostUsed: true };
-    lines.push(entry);
-    return entry;
-  }
-
   function addSearch(layout, lines) {
     const entry = { id: newId(layout), search: true };
     lines.unshift(entry);
@@ -553,9 +554,24 @@ const LayoutModel = (() => {
   // section per kind of right-click) brought to it: its "default" section becomes the menu, its other sections go.
   // Whether it changed, so the editor shows it as not saved.
   const formatVersion = 1;
+  // An older layout brought to the current form: an older file's default menu as its lines; a most used row
+  // ({ mostUsed: true }, which used rules replaced, plan 09 6.5) as three cards side by side, each with a used rule.
   function upToDate(layout) {
-    if (layout.format === formatVersion && Array.isArray(layout.lines)) return { layout, changed: false };
-    return { layout: { format: formatVersion, lines: Array.isArray(layout.default) ? layout.default : [] }, changed: true };
+    let changed = false;
+    if (!(layout.format === formatVersion && Array.isArray(layout.lines))) {
+      layout = { format: formatVersion, lines: Array.isArray(layout.default) ? layout.default : [] };
+      changed = true;
+    }
+    const mostUsed = n => ({ card: "Most used " + n, rules: [ { used: "most", rank: n, states: ["enabled"], also: true, consume: false } ] });
+    const convert = lines => {
+      for (let i = 0; i < lines.length; i++) {
+        const entry = lines[i];
+        if (entry && entry.mostUsed) { lines[i] = { line: [mostUsed(1), mostUsed(2), mostUsed(3)] }; changed = true; }
+        else if (entry && entry.line) for (const card of entry.line) if (Array.isArray(card.menu)) convert(card.menu);
+      }
+    };
+    convert(layout.lines);
+    return { layout, changed };
   }
 
   function remainingCount(lines) {
@@ -580,8 +596,8 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, colorState, colorValue, colorCss, fillState, fillValue,
+  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
-    dividers, findDivider, addDivider, addMostUsed, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
+    dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
 })();

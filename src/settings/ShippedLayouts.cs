@@ -120,7 +120,11 @@ static class ShippedLayouts
           "format": 1,
           "lines": [
             { "id": "search", "search": true },
-            { "id": "most", "mostUsed": true },
+            { "line": [
+              { "id": "most1", "card": "Most used 1", "rules": [ { "used": "most", "rank": 1, "states": [ "enabled" ], "also": true, "consume": false } ] },
+              { "id": "most2", "card": "Most used 2", "rules": [ { "used": "most", "rank": 2, "states": [ "enabled" ], "also": true, "consume": false } ] },
+              { "id": "most3", "card": "Most used 3", "rules": [ { "used": "most", "rank": 3, "states": [ "enabled" ], "also": true, "consume": false } ] }
+            ] },
             { "id": "d1", "divider": "" },
             { "line": [
               { "id": "all", "card": "All items", "icon": "E700", "menu": [

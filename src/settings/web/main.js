@@ -140,7 +140,6 @@ $("submenus").addEventListener("change", () => post({ type: "setMenu", name: "su
 for (const id of ["onClickOnly"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).checked }));
 $("textSize").addEventListener("change", () => post({ type: "setMenu", name: "textSize", value: (+$("textSize").value || 100) / 100 }));
-$("mostUsed").addEventListener("change", () => post({ type: "setMenu", name: "mostUsed", value: Math.round(+$("mostUsed").value || 3) }));
 for (const id of ["submenuMark", "actionMark", "states", "themeLight", "themeDark"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).value }));
 $("widths").addEventListener("change", () => post({ type: "setMenu", name: "widths",
@@ -230,7 +229,6 @@ chrome.webview.addEventListener("message", e => {
       sel.replaceChildren(...m.themes.map(n => { const o = document.createElement("option"); o.value = o.textContent = n; return o; }));
       sel.value = m.menu[id];
     }
-    if (document.activeElement !== $("mostUsed")) $("mostUsed").value = m.menu.mostUsed;
     if (document.activeElement !== $("textSize")) $("textSize").value = Math.round(m.menu.textSize * 100);
     const rows = [...$("widths").querySelectorAll("tr")].slice(1);
     rows.forEach((tr, i) => {

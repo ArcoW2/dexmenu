@@ -136,8 +136,6 @@ sealed class HomeForm : Form, IThemed
                     else if (name is "themeLight" or "themeDark" && Str("value").Length > 0) DataFolder.SetMenu(name, Str("value"));
                     else if (name == "textSize" && m.TryGetProperty("value", out var t) && t.TryGetDouble(out var size))
                         DataFolder.SetMenu(name, Math.Clamp(Math.Round(size, 1), 0.6, 2.5));
-                    else if (name == "mostUsed" && m.TryGetProperty("value", out var count) && count.TryGetInt32(out var n))
-                        DataFolder.SetMenu(name, Math.Clamp(n, 1, 10));
                     else if (name == "states") DataFolder.SetMenu(name, Str("value") is "enabled" or "disabled" ? Str("value") : "both");
                     else if (name == "widths" && m.TryGetProperty("value", out var widths) && widths.ValueKind == JsonValueKind.Array)
                         DataFolder.SetMenu(name, System.Text.Json.Nodes.JsonNode.Parse(widths.GetRawText())!);
