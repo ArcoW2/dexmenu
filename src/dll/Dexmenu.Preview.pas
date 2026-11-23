@@ -88,12 +88,19 @@ type
     Tip: TTip;
     TipLevel, TipBox: Integer;
     HoverLevel: Integer;   // the level whose submenu change waits for the hover timer; -1: none
+    WasOpen: TArray<string>;   // the submenus open before the preview was cleared (OpenerKey), opened again by Rebuild
+    procedure KeepOpen;
     function Hidden(Index: Integer): Boolean;
     procedure ShowTip;
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
+    // The layout read again: the menu built anew, the submenus that were open opened again (the same cards, by
+    // their id and text), and those on the way to the marked card.
     procedure Rebuild;
+    // The submenus on the way to a layout card opened, as clicks would (one open already stays).
+    procedure OpenTo(const CardId: string);
+    procedure RebuildLevels;
     function Scale: Single;
     procedure Open(LevelIndex, Box: Integer);
     procedure CloseFrom(Index: Integer);
@@ -143,6 +150,7 @@ end;
 
 procedure TPreview.Clear;
 begin
+  KeepOpen;
   Levels.Clear;
   FreeAndNil(Placement);
   FreeAndNil(Top);
@@ -163,7 +171,57 @@ begin
     Result := Result * Settings.TextSize;   // the menu's text size (Ctrl+scroll in the menu), as a right-click shows it
 end;
 
+// An opener's key, to find the same submenu after a rebuild (its layout card's id, its text, a "More" or not).
+function OpenerKey(V: TViewCard): string;
+begin
+  Result := V.CardId + #1 + V.Title + #1 + BoolToStr(V.IsMore, True);
+end;
+
+// The open submenus' keys kept, for Rebuild (no levels: what was kept before stays, as after Clear).
+procedure TPreview.KeepOpen;
+var
+  I: Integer;
+begin
+  if Levels.Count = 0 then
+    Exit;
+  WasOpen := nil;
+  for I := 1 to Levels.Count - 1 do
+    if Levels[I].Opener <> nil then
+      WasOpen := WasOpen + [OpenerKey(Levels[I].Opener)];
+end;
+
 procedure TPreview.Rebuild;
+var
+  Was: TArray<string>;
+  I, B, Found: Integer;
+begin
+  KeepOpen;
+  Was := WasOpen;
+  WasOpen := nil;
+  RebuildLevels;
+  // the submenus open before opened again, as far as the same cards are still there
+  for I := 0 to High(Was) do
+  begin
+    if I >= Levels.Count then
+      Break;
+    Found := -1;
+    for B := 0 to High(Levels[I].Geometry.Boxes) do
+      if Levels[I].Geometry.Boxes[B].Card.HasSubmenu and (OpenerKey(Levels[I].Geometry.Boxes[B].Card) = Was[I]) then
+      begin
+        Found := B;
+        Break;
+      end;
+    if Found < 0 then
+      Break;
+    Open(I, Found);
+    if Levels.Count <> I + 2 then
+      Break;   // not opened (disabled now)
+  end;
+  if Marked <> '' then
+    OpenTo(Marked);
+end;
+
+procedure TPreview.RebuildLevels;
 var
   L: TPreviewLevel;
 begin
@@ -843,43 +901,48 @@ begin
     end;
 end;
 
+// A card inside a submenu (in a card showing what it holds in a submenu): the submenus on the way to it opened, as a
+// click on each would (one open already stays); nothing closed for a card at the top.
+procedure TPreview.OpenTo(const CardId: string);
+var
+  Path: TList<TCard>;
+  I, B, Found: Integer;
+begin
+  if (Layout = nil) or (Levels.Count = 0) or (Search <> '') then
+    Exit;
+  Path := TList<TCard>.Create;
+  try
+    if SubmenuPath(Layout.Lines(Kind), CardId, Path) then
+      for I := 0 to Path.Count - 1 do
+      begin
+        if I >= Levels.Count then
+          Break;
+        if (Levels.Count > I + 1) and (Levels[I + 1].Opener <> nil) and (Levels[I + 1].Opener.Card = Path[I]) and
+          not Levels[I + 1].Opener.IsMore then
+          Continue;   // open already
+        Found := -1;
+        for B := 0 to High(Levels[I].Geometry.Boxes) do
+          with Levels[I].Geometry.Boxes[B] do
+            if (Card.Kind = vkMenu) and (Card.Card = Path[I]) and not Card.IsMore then
+              Found := B;
+        if Found < 0 then
+          Break;   // not shown (left out, or the menu searched)
+        Open(I, Found);
+      end;
+  finally
+    Path.Free;
+  end;
+end;
+
 procedure DexmenuPreviewMark(Wnd: HWND; CardId: PWideChar); stdcall;
 var
   P: TPreview;
-  Path: TList<TCard>;
-  I, B, Found: Integer;
 begin
   P := PreviewOf(Wnd);
   if P = nil then
     Exit;
   P.Marked := CardId;
-  // a card inside a submenu (in a card showing what it holds in a submenu): the submenus on the way to it opened, as
-  // a click on each would (one open already stays); nothing closed for a card at the top
-  if (P.Layout <> nil) and (P.Levels.Count > 0) and (P.Search = '') then
-  begin
-    Path := TList<TCard>.Create;
-    try
-      if SubmenuPath(P.Layout.Lines(P.Kind), CardId, Path) then
-        for I := 0 to Path.Count - 1 do
-        begin
-          if I >= P.Levels.Count then
-            Break;
-          if (P.Levels.Count > I + 1) and (P.Levels[I + 1].Opener <> nil) and (P.Levels[I + 1].Opener.Card = Path[I]) and
-            not P.Levels[I + 1].Opener.IsMore then
-            Continue;   // open already
-          Found := -1;
-          for B := 0 to High(P.Levels[I].Geometry.Boxes) do
-            with P.Levels[I].Geometry.Boxes[B] do
-              if (Card.Kind = vkMenu) and (Card.Card = Path[I]) and not Card.IsMore then
-                Found := B;
-          if Found < 0 then
-            Break;   // not shown (left out, or the menu searched)
-          P.Open(I, Found);
-        end;
-    finally
-      Path.Free;
-    end;
-  end;
+  P.OpenTo(CardId);
   Redraw(P);   // as after a click: the preview drawn again, its size following the levels open
 end;
 

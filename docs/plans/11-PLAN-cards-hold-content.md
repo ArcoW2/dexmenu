@@ -301,3 +301,8 @@ None.
   preview open the submenus on the way to it (`DexmenuPreviewMark`), as clicks on them would; one open already stays,
   and nothing closes for a card at the top. Tested by driving the preview from a script: a card two submenus deep
   marked, both submenus open and the card shown in the third level.
+- A change in the editor rebuilds the preview with its submenus open as before: the open path is kept by its cards
+  (layout card id, text, a "More" or not) across the rebuild and opened again as far as those cards are still there,
+  then the path to the marked card opened as a selection does. Tested by driving the preview from a script: a card two
+  submenus deep marked, the layout changed: both submenus open again; a top card marked with the submenus open, the
+  layout changed: they stay open.
