@@ -437,3 +437,14 @@ None.
   longest word (with the icon slot and the mark).
 - Tested: unit tests (a long title without wrap one line; with wrap the card higher; with a height two lines; a
   short title one line). Not yet looked at in the preview or a right-click.
+
+### 6.8 A card's style copied
+
+- In the editor's cards view a card's right-click menu has Copy style and Paste style (also Ctrl+Shift+C and
+  Ctrl+Shift+V; Ctrl+V of a copied style pastes it too). The style: `background`, `foreground`, `border`,
+  `borderWidth`, `radius`, `hover`, `pressed`, `height`, `wrap`, `cardFit`, `extraAt`, `submenus`; not the name, texts,
+  icon, rules or menu. Pasted, it replaces the card's: what the style does not set goes back to the theme's. It goes
+  through the clipboard (`{ "dexmenu": "style", "item" }`), so it pastes in another layout's window too. Not on the
+  remaining card.
+- Tested: the editor's self-test (what the style holds, pasted with the card's own kept, not onto the remaining card);
+  the menu rendered in the editor page.

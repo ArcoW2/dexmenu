@@ -508,7 +508,24 @@ const LayoutModel = (() => {
 
   // ---- copied between layouts (plan 05 3.6: Ctrl+C / Ctrl+V between editor windows) ---------------------------------
 
-  // What goes on the clipboard: { dexmenu: "card" | "divider" | "rule", item }, a deep copy.
+  // A card's style, what "Copy style" takes and "Paste style" puts on another card: its look (background, text
+  // colour, border, radius, the hover and pressed look) and how it sits and opens (height, wrap, fit in line, extra
+  // text at, submenus open). Not its name, texts, icon, rules or menu.
+  const styleKeys = ["background", "foreground", "border", "borderWidth", "radius", "hover", "pressed", "height", "wrap",
+    "cardFit", "extraAt", "submenus"];
+  function styleOf(card) {
+    const style = {};
+    for (const k of styleKeys) if (card[k] !== undefined) style[k] = JSON.parse(JSON.stringify(card[k]));
+    return style;
+  }
+  // The card's style replaced by this one: what the style does not have, the card loses too (the theme's again).
+  function applyStyle(card, style) {
+    for (const k of styleKeys) {
+      if (style[k] !== undefined) card[k] = JSON.parse(JSON.stringify(style[k])); else delete card[k];
+    }
+  }
+
+  // What goes on the clipboard: { dexmenu: "card" | "divider" | "rule" | "style", item }, a deep copy.
   function clip(type, item) { return JSON.stringify({ dexmenu: type, item: JSON.parse(JSON.stringify(item)) }); }
 
   // A card, a divider or a rule from the clipboard into this layout. A card (with its menu) gets new ids and its rules
@@ -522,6 +539,11 @@ const LayoutModel = (() => {
     const item = data.item;
     let nextId = +newId(layout).slice(1);   // counted on: the pasted items are not in the layout yet
     const fresh = () => "c" + nextId++;
+    if (data.dexmenu === "style") {
+      if (!onto || isRemaining(onto)) return null;
+      applyStyle(onto, item);
+      return onto;
+    }
     if (data.dexmenu === "rule") {
       if (!onto || onto.menu || isRemaining(onto) || item === "remaining") return null;
       delete item.priority;
@@ -596,7 +618,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { styleOf, applyStyle, matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

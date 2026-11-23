@@ -248,6 +248,22 @@
       "a card with a wrong rank outlined red, with a reversed range not");
   }
 
+  // a card's style copied and pasted onto another card
+  {
+    const from = { card: "A", rules: [ { name: { equals: "a" } } ], background: { gradient: ["accent", "surface"] }, radius: 8,
+      hover: { background: "accent" }, height: 2, wrap: true, cardFit: "top", extraAt: "above", submenus: "under", icon: "E8C8", extra: "x" };
+    const style = M.styleOf(from);
+    check(Object.keys(style).sort().join() === "background,cardFit,extraAt,height,hover,radius,submenus,wrap",
+      "a card's style: its look, height, wrap, fit, extra text at and submenus; not its name, icon, texts or rules");
+    const L3 = M.ensureIds({ format: M.formatVersion, lines: [ { line: [ { card: "B", rules: [ { name: { equals: "b" } } ], border: "#ff0000", icon: "E700" } ] },
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
+    const to = L3.lines[0].line[0];
+    check(M.paste(L3, L3.lines, M.clip("style", style), null, to) === to && to.radius === 8 && to.wrap && to.border === undefined &&
+      to.icon === "E700" && to.card === "B" && to.rules[0].name.equals === "b" && to.background !== from.background,
+      "the style pasted: the card's look replaced (what the style does not set gone), its name, icon and rules kept, a copy");
+    check(M.paste(L3, L3.lines, M.clip("style", style), null, L3.lines[1].line[0]) === null, "no style onto the remaining card");
+  }
+
   // a rule's states: its own, else what General sets
   check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
     M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",

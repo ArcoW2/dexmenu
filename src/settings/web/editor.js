@@ -224,6 +224,16 @@ function renderCard(card) {
     el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
   if (card.menu && !folded) box.append(renderLines(card.menu, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
+  // its right-click menu: its style copied, or the copied style pasted onto it (not the remaining card: no style)
+  box.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (M.isRemaining(card)) return;
+    select(card.id, -1);
+    showContextMenu(e.clientX, e.clientY, [
+      ["Copy style", "Its background, text colour, border, radius, hover look, height, wrap, fit in line, extra text at and submenus open (Ctrl+Shift+C)", copyStyle],
+      ["Paste style", "The copied style onto this card: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle()]]);
+  });
   // a double click on a card with a menu (its own space, not a card in it or a button) folds or unfolds it
   box.addEventListener("dblclick", e => {
     e.stopPropagation();
@@ -932,6 +942,56 @@ function renderCardPane() {
   if (M.isRemaining(card)) box.append(el("div", "what", "Every item of Windows' menu that no rule took is placed here, each a card of its own, with its submenu. It can be moved, also into a card with a menu, but not deleted."));
 }
 
+// ---- a card's style (its look, how it sits and opens), copied and pasted onto other cards, also in another layout's
+// window (the clipboard) ----
+
+// The selected card (not the remaining card, which has no style of its own), or null.
+function styledCard() {
+  const at = selectedId ? M.find(linesOf(), selectedId) : null;
+  return at && !M.isRemaining(at.card) ? at.card : null;
+}
+
+async function copyStyle() {
+  const card = styledCard();
+  if (!card) return;
+  try { await navigator.clipboard.writeText(M.clip("style", M.styleOf(card))); } catch (e) { /* not copied */ }
+}
+
+async function pasteStyle(text) {
+  const card = styledCard();
+  if (!card) return;
+  if (text === undefined) { try { text = await navigator.clipboard.readText(); } catch (e) { return; } }
+  if (M.paste(layout, linesOf(), text, null, card)) changed();
+}
+
+// A small right-click menu at x, y (page pixels): items [label, title, action]; closed by a choice, a click elsewhere,
+// Esc, or scrolling.
+function showContextMenu(x, y, items) {
+  closeContextMenu();
+  const menu = el("div", "context-menu");
+  menu.id = "contextMenu";
+  for (const [label, title, action] of items) {
+    const b = el("button", "", label);
+    b.title = title;
+    b.addEventListener("click", e => { e.stopPropagation(); closeContextMenu(); action(); });
+    menu.append(b);
+  }
+  document.body.append(menu);
+  // kept inside the window
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(0, Math.min(x, innerWidth - r.width - 4)) + "px";
+  menu.style.top = Math.max(0, Math.min(y, innerHeight - r.height - 4)) + "px";
+  menu.querySelector("button").focus();
+}
+function closeContextMenu() {
+  const m = document.getElementById("contextMenu");
+  if (m) m.remove();
+}
+document.addEventListener("mousedown", e => { if (!e.target.closest("#contextMenu")) closeContextMenu(); }, true);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeContextMenu(); }, true);
+window.addEventListener("blur", closeContextMenu);
+document.addEventListener("scroll", closeContextMenu, true);
+
 // ---- the rules view --------------------------------------------------------------------------------------------
 
 function summary(rule) {
@@ -1288,6 +1348,9 @@ document.addEventListener("keydown", async e => {
   if (!e.ctrlKey || !["c", "x", "v"].includes(e.key.toLowerCase())) return;
   e.preventDefault();
   const key = e.key.toLowerCase();
+  // Ctrl+Shift+C / Ctrl+Shift+V: the selected card's style copied, or pasted onto it
+  if (e.shiftKey && key === "c") { copyStyle(); return; }
+  if (e.shiftKey && key === "v") { pasteStyle(); return; }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
   const div = selectedId ? M.findDivider(linesOf(), selectedId) : null;
   if (key === "c" || key === "x") {
@@ -1308,6 +1371,7 @@ document.addEventListener("keydown", async e => {
   }
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch (err) { return; }
+  if (text.includes('"dexmenu":"style"')) { pasteStyle(text); return; }   // a style: onto the selected card
   const onto = at && !at.card.menu && !M.isRemaining(at.card) ? at.card : null;
   const pasted = M.paste(layout, linesOf(), text, at ? selectedId : null, onto);
   if (!pasted) return;
