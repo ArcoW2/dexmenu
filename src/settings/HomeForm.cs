@@ -110,6 +110,9 @@ sealed class HomeForm : Form, IThemed
         {
             switch (Str("type"))
             {
+                case "closeReady":
+                    BeginInvoke(CloseNow);
+                    break;
                 case "register":
                 case "unregister":
                     if (Str("type") == "register") Registration.Register(); else Registration.Unregister();
@@ -186,6 +189,33 @@ sealed class HomeForm : Form, IThemed
         {
             Problem(e.Message);
         }
+    }
+
+    // Closing by the user: the field being typed in left first, so its change is saved (the page posts it, then
+    // "closeReady"; the page's messages come in the order sent), then closed. A page that does not answer within a
+    // second: closed anyway.
+    bool closeReady;
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!closeReady && e.CloseReason == CloseReason.UserClosing && pageReady && web.CoreWebView2 is not null)
+        {
+            e.Cancel = true;
+            _ = web.CoreWebView2.ExecuteScriptAsync(
+                "if (document.activeElement && document.activeElement.blur) document.activeElement.blur();" +
+                "chrome.webview.postMessage({ type: 'closeReady' });");
+            var fallback = new System.Windows.Forms.Timer { Interval = 1000 };
+            fallback.Tick += (_, _) => { fallback.Dispose(); CloseNow(); };
+            fallback.Start();
+            return;
+        }
+        base.OnFormClosing(e);
+    }
+
+    void CloseNow()
+    {
+        if (closeReady || IsDisposed) return;
+        closeReady = true;
+        Close();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
