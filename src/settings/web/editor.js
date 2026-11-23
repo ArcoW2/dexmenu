@@ -398,7 +398,13 @@ function colorField(label, get, set) {
     r.min = min;
     r.max = max;
     r.value = value;
-    const shown = el("span", "slider-value", String(value));
+    // the exact value typed beside the slider; the two follow each other
+    const shown = el("input", "slider-value");
+    shown.type = "number";
+    shown.min = min;
+    shown.max = max;
+    shown.step = 1;
+    shown.value = value;
     const box = el("label", "slider");
     box.title = title;
     box.append(r, shown);
@@ -421,8 +427,7 @@ function colorField(label, get, set) {
   const show = () => {
     picker.hidden = source.value !== "pick";
     intensityBox.hidden = opacityBox.hidden = state.mode === "json";
-    opacity.disabled = !state.overrule;
-    opacityShown.classList.toggle("off", !state.overrule);
+    opacity.disabled = opacityShown.disabled = !state.overrule;
     json.hidden = state.mode !== "json";
     swatch.hidden = state.mode !== "pick";
     swatch.style.setProperty("--swatch", M.colorCss(state, palette) || "transparent");
@@ -437,14 +442,23 @@ function colorField(label, get, set) {
   const live = () => {
     state.intensity = +intensity.value;
     state.opacity = +opacity.value;
-    intensityShown.textContent = intensity.value;
-    opacityShown.textContent = opacity.value;
+    intensityShown.value = intensity.value;
+    opacityShown.value = opacity.value;
     show();
   };
   intensity.addEventListener("input", live);
   opacity.addEventListener("input", live);
   intensity.addEventListener("change", write);
   opacity.addEventListener("change", write);
+  // a value typed: a whole number within the slider's range, then written as a slider let go
+  for (const [field, range] of [[intensityShown, intensity], [opacityShown, opacity]])
+    field.addEventListener("change", () => {
+      const n = Math.round(Number(field.value));
+      if (field.value.trim() === "" || !Number.isFinite(n)) { field.value = range.value; return; }
+      range.value = Math.max(+range.min, Math.min(+range.max, n));
+      live();
+      write();
+    });
   overrule.addEventListener("change", () => { state.overrule = overrule.checked; write(); });
   picker.addEventListener("change", () => { state.base = picker.value; write(); });
   json.addEventListener("change", () => { state.text = json.value.trim(); write(); });

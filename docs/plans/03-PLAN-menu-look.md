@@ -401,7 +401,8 @@ None.
 - A picker per colour field: a swatch (over a checkerboard, so the opacity shows; not for the theme's colour, which
   the editor does not know), a choice of the theme's, a colour (the web view's colour picker), each palette colour by
   name (its option tinted with its colour), or a gradient or other as JSON; for all but JSON an Intensity slider
-  (0 - 200) and an Opacity slider (0 - 100) behind an Overrule checkbox, written when let go. A palette name the
+  (0 - 200) and an Opacity slider (0 - 100) behind an Overrule checkbox, written when let go; beside each slider
+  its exact value, which can be typed (a whole number, kept within the range). A palette name the
   theme lacks stays in the list. Switching between the theme's, a colour and a palette colour keeps the intensity and
   opacity.
 - Read and written by the layout model (`colorState`, `colorValue`, `colorCss`): `#rgb` and `#rrggbbaa` read (the
