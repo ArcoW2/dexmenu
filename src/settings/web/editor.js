@@ -775,12 +775,20 @@ function placeToggles() {
     mark.style.height = r.height + "px";
     gutter.append(mark);
   }
+  // cards with a menu side by side on a line share one toggle: it collapses them all while one is open, else expands
+  // them all (a double click on a card still folds that card alone)
+  const rows = new Map();
   for (const box of $("cards").querySelectorAll(".card[data-fold]")) {
-    const id = box.dataset.id, folded = box.dataset.fold === "folded";
+    const y = Math.round(box.getBoundingClientRect().top - top);
+    if (!rows.has(y)) rows.set(y, []);
+    rows.get(y).push(box);
+  }
+  for (const [y, boxes] of rows) {
+    const ids = boxes.map(b => b.dataset.id), folded = boxes.every(b => b.dataset.fold === "folded");
     const t = el("button", "toggle fold", folded ? "+" : "-");
-    t.title = (folded ? "Expand " : "Collapse ") + (M.find(linesOf(), id)?.card.card || "");
-    t.style.top = (box.getBoundingClientRect().top - top + 5) + "px";
-    t.addEventListener("click", () => { folded ? collapsed.delete(id) : collapsed.add(id); render(); });
+    t.title = (folded ? "Expand " : "Collapse ") + ids.map(id => M.find(linesOf(), id)?.card.card || "").join(", ");
+    t.style.top = (y + 5) + "px";
+    t.addEventListener("click", () => { for (const id of ids) folded ? collapsed.delete(id) : collapsed.add(id); render(); });
     gutter.append(t);
   }
   // the use counts (plan 02 3.9): how often the items a card got in the preview were chosen; a card with a menu the
