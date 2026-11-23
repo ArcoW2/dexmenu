@@ -492,8 +492,8 @@ function sizeFields(card) {
     changed();
   }, placeholder);
   const fit = el("select");
-  for (const [v, label] of [["", "as its line says (stretched)"], ["stretch", "stretched to the line"], ["top", "at the top"],
-    ["center", "in the middle"], ["bottom", "at the bottom"]]) {
+  for (const [v, label] of [["", "as its row says (by default stretched to its height)"], ["stretch", "stretched to its height"],
+    ["top", "at its top"], ["center", "in its middle"], ["bottom", "at its bottom"]]) {
     const o = el("option", "", label);
     o.value = v;
     fit.append(o);
@@ -501,8 +501,8 @@ function sizeFields(card) {
   fit.value = card.cardFit || "";
   fit.addEventListener("change", () => { if (fit.value) card.cardFit = fit.value; else delete card.cardFit; changed(); });
   const fitRow = el("label", "field");
-  fitRow.title = "Where a card lower than its line stands in it";
-  fitRow.append(el("span", "", "Fit in line"), fit);
+  fitRow.title = "A card lower than the row it stands in: stretched to the row's height, or at its own height at the row's top, middle or bottom (not its width)";
+  fitRow.append(el("span", "", "Height in row"), fit);
   // its title wrapping over more lines: within the height when one is set, else the card as high as it needs
   const wrap = el("input");
   wrap.type = "checkbox";
@@ -512,6 +512,12 @@ function sizeFields(card) {
   wrapRow.title = "The title wraps over more lines: within Height when it is set (the last line cut with ...), else the card is as high as its lines";
   wrapRow.append(el("span", "", "Wrap"), el("span"));
   wrapRow.lastChild.append(wrap, " the title over more lines");
+  // its height in lines; not with Square (its width sets its height then)
+  const heightRow = number("height", "Height", card.square ? "(as wide as it is: square)" : "(its content) in lines of text");
+  if (card.square) {
+    heightRow.querySelector("input").disabled = true;
+    heightRow.title = "Square: its height is its width";
+  }
   // as high as it is wide (plan 11 3.1)
   const square = el("input");
   square.type = "checkbox";
@@ -522,7 +528,7 @@ function sizeFields(card) {
   squareRow.lastChild.append(square, " as high as it is wide");
   return [number("weight", "Weight", "1: its share of the line's width"),
     number("minWidth", "Min width", "(none) the line wraps when it does not fit"),
-    number("height", "Height", "(its content) in lines of text"), wrapRow, squareRow, fitRow];
+    heightRow, wrapRow, squareRow, fitRow];
 }
 
 // One colour's controls (plan 03 3.6): a swatch, where the colour comes from (the theme's own colour, when withTheme;

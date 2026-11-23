@@ -286,3 +286,7 @@ None.
   now show their own titles), the shipped ones, the base layout, and the conversion script's output.
 - Tested: unit tests (the menu card read; its cards in columns of 2, filled column by column; the window drawn in its
   style); the editor's self-test (every layout's menu card); the editor rendered with the menu card selected.
+- A row of found items without `perRow` fills its card's width: each inner card its content's width, the room left
+  shared by their weights (before, they stood at their content's width from the left). In the card panel "Fit in
+  line" is "Height in row" (it is the card's height in a taller row, not its width); Height is greyed out with
+  Square (the width sets the height). Tested: a unit test (the flowing row filled to its card's width).

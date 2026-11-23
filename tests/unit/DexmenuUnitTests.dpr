@@ -1747,6 +1747,21 @@ begin
         P.Free;
       end;
     end;
+    // a row that flows fills its card's width
+    L := Level(Card('Four', '{ "name": { "any": [ "Edit in LexPen", "View in LexPen", "Properties", "Disabled thing" ] } }',
+      ', "show": "row", "templates": [ { "wrap": true } ]'), P);
+    try
+      G := Measure(L);
+      Box := -1;
+      for I := 0 to High(G.Boxes) do
+        if G.Boxes[I].Card = L.Lines[0].Cards[0] then
+          Box := I;
+      Check((Box >= 0) and (Abs(G.Boxes[Box + 4].Rect.right - (G.Boxes[Box].Rect.right - 6)) < 1),
+        'the flowing row filled to its card''s width (less its padding)');
+    finally
+      L.Free;
+      P.Free;
+    end;
     // errors
     Check(Pos('"show"', ErrorOf('{ "format": 2, "menu": { "content": [ { "card": "X", "show": "grid", "rules": [] }, ' + Rest + ' ] } }')) > 0,
       'an unknown show: the layout refused');

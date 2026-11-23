@@ -606,8 +606,8 @@ begin
 end;
 
 // A level's lines laid out from Left, Top at a width (DIP): each row's cards side by side sharing the width by their
-// weights (a card below its minimum gets it); a row that flows (a row without a set number per row) each card as wide
-// as its content, from the left. Collect: the boxes appended to Boxes, a card holding cards its own box then the
+// weights (a card below its minimum gets it); a row that flows (a row without a set number per row) each card its
+// content's width and the room left shared by their weights, so the row fills the width. Collect: the boxes appended to Boxes, a card holding cards its own box then the
 // boxes inside it, recursively. The height used. WrapWidth: where a line wraps (-1: Width).
 function LayLines(Level: TViewLevel; Left, Top, Width: Single; Collect: Boolean; var Boxes: TArray<TBox>;
   WrapWidth: Single; Framed: Boolean): Single;
@@ -646,8 +646,21 @@ begin
       SetLength(Widths, N);
       SetLength(Fixed, N);
       if Line.Flows then
+      begin
+        // a row that flows: each card its content's width, the row then filled to its width (the room left shared by
+        // the cards' weights), so the cards stand over the whole width
+        Avail := Width - CardGap * (N - 1);
+        FreeWeight := 0;
         for J := 0 to N - 1 do
-          Widths[J] := Min(Width, Max(CardNeed(Row[J]), CardMin(Row[J])))
+        begin
+          Widths[J] := Min(Width, Max(CardNeed(Row[J]), CardMin(Row[J])));
+          Avail := Avail - Widths[J];
+          FreeWeight := FreeWeight + CardWeight(Row[J]);
+        end;
+        if Avail > 0 then
+          for J := 0 to N - 1 do
+            Widths[J] := Widths[J] + Avail * CardWeight(Row[J]) / Max(FreeWeight, 0.0001);
+      end
       else
       begin
         // the cards share the width by their weights; one whose share is below its minimum gets its minimum, and the
