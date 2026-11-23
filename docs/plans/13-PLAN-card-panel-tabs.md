@@ -48,17 +48,18 @@ problem in red; the tab chosen in a panel stays when another card is selected.
 
 Every field of the card panel now, in its group (a field still to come in brackets, with its plan):
 
-- **The card (fixed, at the top):** Name (the editor's). Always shown, stuck to the top of the card panel when it
-  scrolls; not a group, not moved.
+- **The card (fixed, at the top):** Name (the editor's), and at its right Hidden as an eye: open, the card shows;
+  struck through (a diagonal line over it), hidden. A click switches it; its tooltip says which and what hidden does
+  (its rules still take their items, so they show nowhere). Always shown, stuck to the top of the card panel when it
+  scrolls; not a group, not moved. Not for the remaining card (it cannot be hidden).
 - **Names:** Title, Rename (regex, replace with), Extra text, Extra text at, Icon (with plan 10's
   picker), Hint, Hint regex (replace with), Comment (the editor's only).
 - **Rules:** + Rule and the card's rules (each with its type, plan 09; [Edit Dexmenu, Windows' menu: plan 12]),
-  Duplicates (skip: one item per name), Hidden.
+  Duplicates (skip: one item per name).
 - **Inside:** Items as buttons, [Several found: on lines, in a submenu, as cards; Per row: plan 11], Submenus open.
 - **Layout:** Weight, Min width, Height, Wrap, Fit in line, [Square: plan 11].
 - **Style:** Background, Text colour, Border, Radius, Hover background, [the pressed look when it gets fields].
 
-Hidden sits with the rules because what it changes is where the found items go (nowhere), not how the card looks.
 Submenus open sits in Inside: it is about what opens from the card.
 
 ### 3.2 Per kind of card
