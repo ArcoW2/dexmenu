@@ -188,9 +188,15 @@ function renderLines(lines, parentId) {
   const box = el("div", "lines");
   lines.forEach((entry, index) => {
     box.append(dropZone("gap", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index) : M.moveCard(linesOf(), id, parentId, index)));
-    if (entry.divider !== undefined || entry.search) { box.append(renderDivider(entry)); return; }
+    if (entry.divider !== undefined || entry.search) {
+      const d = renderDivider(entry);
+      if (!parentId) d.dataset.top = index;   // a top-level line's place, for a card pasted in the gutter
+      box.append(d);
+      return;
+    }
     if (!entry.line) return;
     const row = el("div", "line");
+    if (!parentId) row.dataset.top = index;
     for (const card of entry.line) row.append(renderCard(card));
     row.append(dropZone("line-end", (id, isDiv) => isDiv ? M.moveDivider(linesOf(), id, parentId, index + 1)
       : M.moveCard(linesOf(), id, parentId, index, true)));
@@ -224,15 +230,22 @@ function renderCard(card) {
     el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
   if (card.menu && !folded) box.append(renderLines(card.menu, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
-  // its right-click menu: its style copied, or the copied style pasted onto it (not the remaining card: no style)
-  box.addEventListener("contextmenu", e => {
+  // its right-click menu: the card copied, a copied card pasted inside it (when it can hold one), its style copied, or
+  // a copied style pasted onto it (the remaining card: no copy, no style)
+  box.addEventListener("contextmenu", async e => {
     e.preventDefault();
     e.stopPropagation();
-    if (M.isRemaining(card)) return;
     select(card.id, -1);
-    showContextMenu(e.clientX, e.clientY, [
-      ["Copy style", "Its background, text colour, border, radius, hover look, height, wrap, fit in line, extra text at and submenus open (Ctrl+Shift+C)", copyStyle],
-      ["Paste style", "The copied style onto this card: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle()]]);
+    const x = e.clientX, y = e.clientY;
+    const type = await clipboardType();
+    const remaining = M.isRemaining(card);
+    showContextMenu(x, y, [
+      ["Copy card", "A duplicate of it (with its menu and rules) can be pasted elsewhere, also in another layout (Ctrl+C)", copyCard, remaining],
+      ["Paste card inside", card.menu ? "The copied card added to this card's menu" : "This card becomes a card with a menu: its rules in the first card, the copied card after it",
+        () => pasteCardAt({ into: card.id }), type !== "card" || !M.canHold(card)],
+      null,
+      ["Copy style", "Its background, text colour, border, radius, hover look, height, wrap, fit in line, extra text at and submenus open (Ctrl+Shift+C)", copyStyle, remaining],
+      ["Paste style", "The copied style onto this card: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style" || remaining]]);
   });
   // a double click on a card with a menu (its own space, not a card in it or a button) folds or unfolds it
   box.addEventListener("dblclick", e => {
@@ -964,15 +977,41 @@ async function pasteStyle(text) {
   if (M.paste(layout, linesOf(), text, null, card)) changed();
 }
 
-// A small right-click menu at x, y (page pixels): items [label, title, action]; closed by a choice, a click elsewhere,
-// Esc, or scrolling.
+// What the clipboard holds of Dexmenu's ("card", "style", ...; "" for nothing).
+async function clipboardType() {
+  try { return M.clipType(await navigator.clipboard.readText()); } catch (e) { return ""; }
+}
+
+// The selected card copied (Ctrl+C does the same): a duplicate can be pasted elsewhere, also in another layout.
+async function copyCard() {
+  const at = selectedId ? M.find(linesOf(), selectedId) : null;
+  if (!at || M.isRemaining(at.card)) return;
+  try { await navigator.clipboard.writeText(M.clip("card", at.card)); } catch (e) { /* not copied */ }
+}
+
+// The copied card pasted as a duplicate: inside a card ({ into }) or at the top level at a line's place ({ index }).
+async function pasteCardAt(where) {
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch (e) { return; }
+  const pasted = M.pasteCard(layout, linesOf(), text, where);
+  if (!pasted) return;
+  if (where.into) collapsed.delete(where.into);
+  select(pasted.id, -1);
+  changed();
+}
+
+// A small right-click menu at x, y (page pixels): items [label, title, action, disabled], null a line between them;
+// closed by a choice, a click elsewhere, Esc, or scrolling.
 function showContextMenu(x, y, items) {
   closeContextMenu();
   const menu = el("div", "context-menu");
   menu.id = "contextMenu";
-  for (const [label, title, action] of items) {
+  for (const item of items) {
+    if (!item) { menu.append(el("div", "context-line")); continue; }
+    const [label, title, action, disabled] = item;
     const b = el("button", "", label);
     b.title = title;
+    b.disabled = !!disabled;
     b.addEventListener("click", e => { e.stopPropagation(); closeContextMenu(); action(); });
     menu.append(b);
   }
@@ -981,8 +1020,28 @@ function showContextMenu(x, y, items) {
   const r = menu.getBoundingClientRect();
   menu.style.left = Math.max(0, Math.min(x, innerWidth - r.width - 4)) + "px";
   menu.style.top = Math.max(0, Math.min(y, innerHeight - r.height - 4)) + "px";
-  menu.querySelector("button").focus();
+  const first = menu.querySelector("button:not(:disabled)");
+  if (first) first.focus();
 }
+
+// The cards view's right-click outside a card: "Paste card" at the top level, where clicked: in the header at the
+// top, below the last line at the bottom, in the gutter or between lines at that place.
+document.querySelector("#cardsPane .cards-wrap").addEventListener("contextmenu", async e => {
+  if (!layout || e.target.closest(".card")) return;
+  e.preventDefault();
+  const x = e.clientX, y = e.clientY;
+  let index = 0;
+  if (!e.target.closest(".cards-main > h2")) {
+    // the top-level lines above the click: the card goes after them
+    for (const elem of document.querySelectorAll("#cards > .lines > [data-top]")) {
+      const r = elem.getBoundingClientRect();
+      if (r.top + r.height / 2 < y) index = +elem.dataset.top + 1;
+    }
+  }
+  const type = await clipboardType();
+  showContextMenu(x, y, [["Paste card here", "The copied card, as a line of its own at this place (Ctrl+V pastes after the selected card)",
+    () => pasteCardAt({ index }), type !== "card"]]);
+});
 function closeContextMenu() {
   const m = document.getElementById("contextMenu");
   if (m) m.remove();

@@ -438,7 +438,7 @@ None.
 - Tested: unit tests (a long title without wrap one line; with wrap the card higher; with a height two lines; a
   short title one line). Not yet looked at in the preview or a right-click.
 
-### 6.8 A card's style copied
+### 6.8 A card's style copied; a card copied
 
 - In the editor's cards view a card's right-click menu has Copy style and Paste style (also Ctrl+Shift+C and
   Ctrl+Shift+V; Ctrl+V of a copied style pastes it too). The style: `background`, `foreground`, `border`,
@@ -448,3 +448,10 @@ None.
   remaining card.
 - Tested: the editor's self-test (what the style holds, pasted with the card's own kept, not onto the remaining card);
   the menu rendered in the editor page.
+- The same right-click menu copies the whole card (with its menu and rules) and pastes a copied card inside it as a
+  duplicate: into its menu, or a card with rules becomes a card with a menu as when a card is dropped onto it; not
+  inside a note, Dexmenu's own item or the remaining card (the item disabled then, as is Paste when the clipboard
+  holds no card or style). A right-click outside a card pastes it at the top level: in the cards view's header at the
+  top, in the gutter or between lines at that place, below the last line at the bottom. A duplicate gets new ids and
+  its rules go to the end of the priority list. Tested in the editor's self-test (at the top, at a place, inside a
+  card with a menu, not inside a note or the remaining card, every id once, the priorities 1..n).

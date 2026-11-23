@@ -525,6 +525,34 @@ const LayoutModel = (() => {
     }
   }
 
+  // What the clipboard's text holds: "card", "divider", "rule", "style", or "" (nothing of Dexmenu's).
+  function clipType(text) {
+    try { const d = JSON.parse(text); return d && typeof d.dexmenu === "string" && d.item ? d.dexmenu : ""; } catch (e) { return ""; }
+  }
+
+  // Whether a card can take a pasted card inside it: one with a menu (it joins the menu), or one with rules (it becomes
+  // a card with a menu, its rules in the first card, as when a card is dropped onto it); not a note, Dexmenu's own
+  // item or the remaining card.
+  function canHold(card) {
+    return !!card.menu || (!isNote(card) && !isOwn(card) && !isRemaining(card));
+  }
+
+  // A copied card pasted as a duplicate (new ids, its rules at the end of the priority list): inside the card into
+  // (canHold), or at the top level as a line of its own at index. What was pasted, or null.
+  function pasteCard(layout, lines, text, where) {
+    if (clipType(text) !== "card") return null;
+    if (where.into) {
+      const target = find(lines, where.into);
+      if (!target || !canHold(target.card)) return null;
+    }
+    const item = paste(layout, lines, text, null, null);
+    if (!item) return null;
+    const ok = where.into ? dropOnCard(layout, lines, item.id, where.into) : moveCard(lines, item.id, null, where.index);
+    if (!ok) { deleteCard(lines, item.id); return null; }
+    renumber(lines);
+    return item;
+  }
+
   // What goes on the clipboard: { dexmenu: "card" | "divider" | "rule" | "style", item }, a deep copy.
   function clip(type, item) { return JSON.stringify({ dexmenu: type, item: JSON.parse(JSON.stringify(item)) }); }
 
@@ -618,7 +646,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { styleOf, applyStyle, matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

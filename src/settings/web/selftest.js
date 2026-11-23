@@ -264,6 +264,31 @@
     check(M.paste(L3, L3.lines, M.clip("style", style), null, L3.lines[1].line[0]) === null, "no style onto the remaining card");
   }
 
+  // a card copied and pasted as a duplicate: at the top, at a place, inside a card; not inside a note
+  {
+    const L4 = M.ensureIds({ format: M.formatVersion, lines: [
+      { line: [ { card: "A", rules: [ { name: { equals: "a" } } ] } ] },
+      { line: [ { card: "M", menu: [ { line: [ { card: "In", rules: [ { name: { equals: "in" } } ] } ] } ] } ] },
+      { line: [ { card: "N", note: "n" } ] },
+      { line: [ { card: "Rest", rules: [ "remaining" ] } ] } ] });
+    const names = () => L4.lines.map(e => e.line ? e.line.map(c => c.card).join("|") : "-").join(" / ");
+    const a = L4.lines[0].line[0];
+    const text = M.clip("card", a);
+    check(M.clipType(text) === "card" && M.clipType("hello") === "" && M.clipType(M.clip("style", {})) === "style", "what the clipboard holds");
+    const top = M.pasteCard(L4, L4.lines, text, { index: 0 });
+    check(top && top.id !== a.id && names() === "A / A / M / N / Rest" && L4.lines[0].line[0] === top, "pasted at the top: a duplicate, its own id: " + names());
+    const mid = M.pasteCard(L4, L4.lines, text, { index: 3 });
+    check(mid && names() === "A / A / M / A / N / Rest", "pasted at a place: " + names());
+    const m = L4.lines[2].line[0];
+    const inside = M.pasteCard(L4, L4.lines, text, { into: m.id });
+    check(inside && m.menu.length === 2 && m.menu[1].line[0] === inside, "pasted inside a card with a menu: it joins the menu");
+    check(M.canHold(a) && !M.canHold(L4.lines[4].line[0]) && !M.canHold(L4.lines[5].line[0]) &&
+      M.pasteCard(L4, L4.lines, text, { into: L4.lines[4].line[0].id }) === null, "not inside a note or the remaining card");
+    const ids = [...M.cards(L4.lines)].map(c => c.card.id);
+    check(new Set(ids).size === ids.length && M.ruleList(L4.lines).map(r => r.rule.priority).every((p, i) => p === i + 1),
+      "every id once; the priorities 1..n");
+  }
+
   // a rule's states: its own, else what General sets
   check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
     M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",
