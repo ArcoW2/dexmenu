@@ -75,7 +75,7 @@ the preview is the result.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | Items as buttons in a card | 3.10 |
-| Items as buttons in a card | a card showing its items as buttons inside it (Default B's cards per program) | plan 03 Card | 3.3; 3.10 |
+| Items as buttons in a card | a card showing its items as buttons inside it (Default B's cards per program) | -- | 3.3; 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 Moved out: Explorer's own icons (and an icon picker for cards) to plan 10.
