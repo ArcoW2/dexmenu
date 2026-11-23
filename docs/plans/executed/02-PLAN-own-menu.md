@@ -1,6 +1,6 @@
 # Plan 02: Dexmenu's own menu: drawn by Dexmenu, cards and rows, every item found by rules
 
-Status: partly executed; see Status.
+Status: executed; see Status.
 
 - 2026-11-21: draft.
 - 2026-11-21: partly executed: the item tree and the window's first form (plan 00 steps 2 and 3).
@@ -18,6 +18,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: access keys and shortcuts; the search.
 - 2026-11-23: partly executed: items as buttons in a card.
 - 2026-11-23: partly executed: Default B.
+- 2026-11-23: executed.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -72,13 +73,13 @@ the preview is the result.
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 | Items as buttons in a card | `"buttons": true`: a card showing what it found as buttons inside it, a found submenu unfolded (Default B's cards per program); "Items as buttons" in the editor | 3.3; 6.1 |
+| Tests | 3.12: the rules, layouts, editing, use counts, late changes and a choice's id automated; the rest checked by hand while the editor is used | 3.12; 6.3 |
 | Default B | the shipped layout "Default B": a search box, Cut / Copy / Paste / Rename / Delete, Open / Open with / Properties, cards per program (Archive, Code, Git, SVN) with their items as buttons, the rest | 3.10; 6.2 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 Moved out: Explorer's own icons (and an icon picker for cards) to plan 10.
 
@@ -454,9 +455,6 @@ Windows' texts, so they fit an English Windows until a rule on the verb is possi
   `consume`, one and several found at the card's place,
   none found, the remaining card wherever it stands (root, a submenu), a card with a menu holding cards with rules,
   titles.
-- Templates: items a card found and its found items' subitems drawn with the layout's template; a card's own
-  submenu template used instead, deeper levels included until a card with its own; the remaining card's items in
-  its own look.
 - Editor views: a rule dragged in the rules view changes the order, its number on its card, and the preview; an
   item clicked or hovered in the preview selects the card and rule that placed it; a card selected marks its items
   in the preview.
@@ -514,3 +512,12 @@ None.
 - Tested: the layout files' self-test (the shipped layouts, Default B among them); the unit tests; in the preview,
   from the seen items: 7-Zip unfolded in Archive, Visual Studio and VS Code in Code, TortoiseGit's and Git's items in
   Git. Not tried at a real right-click.
+
+### 6.3 Tests
+
+- Automated: the rules, placement, buttons, search, access keys, use counts, icons and themes in the unit tests; the
+  layout files and the editor's editing in the settings app's self-tests; changes while shown, a choice's id, Send to
+  opened and a broken layout in the test host's cases.
+- Not automated: keys and typing and each way of opening a submenu in the test host, "Edit menu..." starting the
+  settings app, the preview's picture compared with the real menu's. These are checked by hand while the editor is
+  used and enhanced, with the by-hand checks of 3.12.

@@ -1,6 +1,6 @@
 unit Dexmenu.Layout;
 
-// The layout file (docs/plans/02-PLAN-own-menu.md 3.3, 3.5; plan 05 3.1): JSON with comments, one menu: "lines", a
+// The layout file (docs/plans/executed/02-PLAN-own-menu.md 3.3, 3.5; plan 05 3.1): JSON with comments, one menu: "lines", a
 // list of lines, top to bottom; a line holds cards (or is a divider). A card has a title and either rules or a menu
 // (lines again, one level down). The menu has exactly one card with the rule "remaining", which takes every top-level
 // item no other rule took and places each, with its subitems, at its own place. "format" says which form the file

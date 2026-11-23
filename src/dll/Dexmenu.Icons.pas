@@ -1,6 +1,6 @@
 unit Dexmenu.Icons;
 
-// The pixels of an item's icon (docs/plans/02-PLAN-own-menu.md 3.8): an item's own bitmap in Windows' menu, or an icon
+// The pixels of an item's icon (docs/plans/executed/02-PLAN-own-menu.md 3.8): an item's own bitmap in Windows' menu, or an icon
 // from a file a layout card names ("path,index"). As 32-bit BGRA, premultiplied alpha, top-down: what Direct2D draws.
 
 interface

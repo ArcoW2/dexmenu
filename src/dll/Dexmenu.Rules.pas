@@ -1,6 +1,6 @@
 unit Dexmenu.Rules;
 
-// A rule (docs/plans/02-PLAN-own-menu.md 3.3; plan 00 step 5): which items of Windows' menu a card takes.
+// A rule (docs/plans/executed/02-PLAN-own-menu.md 3.3; plan 00 step 5): which items of Windows' menu a card takes.
 //
 //   { "name": { "contains": "LexPen" },            the item's text without &: equals, contains, startsWith,
 //                                                   endsWith, wildcard (* ?), regex; or "any": [ ... ] (equals one)

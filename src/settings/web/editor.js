@@ -1,4 +1,4 @@
-// The layout editor (docs/plans/02-PLAN-own-menu.md 3.3, 3.5; plan 00 step 5). Two views of one layout: the cards
+// The layout editor (docs/plans/executed/02-PLAN-own-menu.md 3.3, 3.5; plan 00 step 5). Two views of one layout: the cards
 // (a tree of lines and submenus, dragged around; a card selected shows its name, title, extra text and rules) and the
 // rules in priority order (dragged to change it). Every change goes to the app at once ({ type: "edit", layout }),
 // which has the DLL draw the preview from it; saving writes the file. The app sends:

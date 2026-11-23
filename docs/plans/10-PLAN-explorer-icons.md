@@ -4,7 +4,7 @@ Status: not started; see Status.
 
 - 2026-11-23: draft.
 
-Builds on plan 02 (`02-PLAN-own-menu.md`): icons in the slot left of the text (3.8), the icons kept as PNG files in
+Builds on plan 02 (`executed/02-PLAN-own-menu.md`): icons in the slot left of the text (3.8), the icons kept as PNG files in
 the seen folder's `icons` by the item's key (3.8, 3.9), and the card's own `icon` (a glyph or `path,index`).
 
 ## 1. What this is about

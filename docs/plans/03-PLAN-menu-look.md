@@ -6,7 +6,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: theme files; the shipped themes; gradients.
 - 2026-11-23: partly executed: lines and cards; the card.
 
-Plan 02 (`02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
+Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
 engine draws the real menu and the settings app's preview alike (plan 02 3.8).
 

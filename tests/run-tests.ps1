@@ -1,4 +1,4 @@
-# The tests (docs/plans/01-PLAN-dexmenu.md 3.11, 02-PLAN-own-menu.md 3.12, 00-PLAN-build-order.md): the unit tests,
+# The tests (docs/plans/01-PLAN-dexmenu.md 3.11, executed/02-PLAN-own-menu.md 3.12, 00-PLAN-build-order.md): the unit tests,
 # then for each selection the test host builds Windows' menu as Explorer does and shows it with Dexmenu off and on.
 # LexPen decides per selection which of its items show and with which title (..\LexPen\src\shell\LexPenShell.cpp
 # GetState, GetTitle); this checks LexPen's items are the ones expected and the same either way, and the host checks

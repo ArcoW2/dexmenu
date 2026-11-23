@@ -30,7 +30,7 @@ implementation
 uses
   System.SysUtils, System.Win.ComServ, Dexmenu.Hook, Dexmenu.Seen;
 
-// The kind of right-click (docs/plans/02-PLAN-own-menu.md 3.5, plan 05 3.2): a folder's empty part (no items; the
+// The kind of right-click (docs/plans/executed/02-PLAN-own-menu.md 3.5, plan 05 3.2): a folder's empty part (no items; the
 // desktop's: ShellInit), several items, a drive, a folder or a file; 'default' when it cannot be told.
 function KindOf(DataObject: IDataObject): string;
 var

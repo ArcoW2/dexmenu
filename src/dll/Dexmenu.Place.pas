@@ -1,6 +1,6 @@
 unit Dexmenu.Place;
 
-// The layout applied to Windows' items (docs/plans/02-PLAN-own-menu.md 3.3; plan 00 steps 3 and 5).
+// The layout applied to Windows' items (docs/plans/executed/02-PLAN-own-menu.md 3.3; plan 00 steps 3 and 5).
 //
 // Cards first: each card's rules take items; where the card stands is where its items show. The rules run in the
 // priority list's order (a rule's "priority", lower first; rules without one after, in the layout's order). An item

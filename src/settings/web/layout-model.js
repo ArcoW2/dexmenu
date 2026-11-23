@@ -1,4 +1,4 @@
-// The layout as the editor changes it (docs/plans/02-PLAN-own-menu.md 3.3, 3.5; plan 00 step 5): pure functions on
+// The layout as the editor changes it (docs/plans/executed/02-PLAN-own-menu.md 3.3, 3.5; plan 00 step 5): pure functions on
 // the parsed layout, no page. A layout: { "<kind>": [ { "line": [ card, ... ] }, ... ], ... }. A card: { id, card
 // (its name), rules: [ ... ] } or { id, card, menu: [ lines ] }, with title, extra, rename where given. The remaining
 // card's rule is the text "remaining"; every kind has exactly one. Every other rule has a priority (the priority

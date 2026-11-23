@@ -1,6 +1,6 @@
 unit Dexmenu.Menu;
 
-// Dexmenu's own menu (docs/plans/02-PLAN-own-menu.md 3.1, 3.6, 3.7; plan 00 step 3): shown in place of Windows' menu
+// Dexmenu's own menu (docs/plans/executed/02-PLAN-own-menu.md 3.1, 3.6, 3.7; plan 00 step 3): shown in place of Windows' menu
 // on the caught show call, as a window per level (the top level, an open submenu next to its card). Windows' items
 // stay in Windows' menu; the chosen item's id is handed back as Windows' menu would (returned with TPM_RETURNCMD,
 // else posted as WM_COMMAND to the owner window), so the program runs it as always.

@@ -1,6 +1,6 @@
 unit Dexmenu.Usage;
 
-// The use counts (docs/plans/02-PLAN-own-menu.md 3.9): every choice in Dexmenu's menu counted per item and kind of
+// The use counts (docs/plans/executed/02-PLAN-own-menu.md 3.9): every choice in Dexmenu's menu counted per item and kind of
 // right-click, in <DataFolder>\usage.json:
 //   { "format": 1, "kinds": { "file": { "Open": 12, "7-Zip > Add to archive...": 3 } } }
 // An item is known by its path in Windows' menu and its text (UsageKey), so a count holds across right-clicks.

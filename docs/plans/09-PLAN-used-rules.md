@@ -4,7 +4,7 @@ Status: not started; see Status.
 
 - 2026-11-23: draft.
 
-Builds on plan 02 (`02-PLAN-own-menu.md`): its rules (3.3), the priority list, and the use counts with the most used
+Builds on plan 02 (`executed/02-PLAN-own-menu.md`): its rules (3.3), the priority list, and the use counts with the most used
 row (3.9).
 
 ## 1. What this is about

@@ -8,7 +8,7 @@ Status: partly executed; see Status.
 - 2026-11-21: partly executed: step 3 (by hand in Explorer, an Open dialog and Foldex still to do).
 - 2026-11-21: partly executed: step 4.
 
-Orders the parts of plan 01 (`01-PLAN-dexmenu.md`: the DLL, the hook, install), plan 02 (`02-PLAN-own-menu.md`:
+Orders the parts of plan 01 (`01-PLAN-dexmenu.md`: the DLL, the hook, install), plan 02 (`executed/02-PLAN-own-menu.md`:
 cards, rules, layouts, the editor) and plan 03 (`03-PLAN-menu-look.md`: themes and the look) into steps. Each step
 works on its own and is tested before the next starts. The details stay in those plans; this one says what comes
 when.

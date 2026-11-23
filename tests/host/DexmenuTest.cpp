@@ -1,4 +1,4 @@
-// DexmenuTest.exe: the test host (docs/plans/01-PLAN-dexmenu.md 3.11, 02-PLAN-own-menu.md 3.12, plan 00 step 3).
+// DexmenuTest.exe: the test host (docs/plans/01-PLAN-dexmenu.md 3.11, executed/02-PLAN-own-menu.md 3.12, plan 00 step 3).
 // Builds Windows' right-click menu for the given files and folders as Explorer does (the parent folder's IContextMenu,
 // QueryContextMenu), reads it, then shows it with TrackPopupMenuEx as Explorer does.
 //

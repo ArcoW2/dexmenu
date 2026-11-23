@@ -1,6 +1,6 @@
 unit Dexmenu.Tree;
 
-// Windows' menu as a tree of items (docs/plans/02-PLAN-own-menu.md 3.2): each item with its text, name, path, id,
+// Windows' menu as a tree of items (docs/plans/executed/02-PLAN-own-menu.md 3.2): each item with its text, name, path, id,
 // state and submenu. A submenu's items are read when it is opened (an extension may fill it only then). Windows'
 // items stay in Windows' menu; the tree only reads them.
 

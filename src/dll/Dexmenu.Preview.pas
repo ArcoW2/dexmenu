@@ -1,6 +1,6 @@
 unit Dexmenu.Preview;
 
-// The settings app's preview (docs/plans/02-PLAN-own-menu.md 3.8; plan 00 step 4): a child window in the settings
+// The settings app's preview (docs/plans/executed/02-PLAN-own-menu.md 3.8; plan 00 step 4): a child window in the settings
 // app that the DLL draws the menu into, from a layout's text and seen items (Dexmenu.Seen), with the same tree,
 // placement and drawing as a right-click, so the preview is the result. Live: hover, submenus opening (next to their
 // card, as at a right-click), Esc; choosing an item does nothing, there being no program to run it. No hook is set

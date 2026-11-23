@@ -4,7 +4,7 @@ Status: not started; see Status.
 
 - 2026-11-22: draft.
 
-Builds on plan 02 (`02-PLAN-own-menu.md`: cards, the window, the editor). The details are to be worked out; this draft
+Builds on plan 02 (`executed/02-PLAN-own-menu.md`: cards, the window, the editor). The details are to be worked out; this draft
 holds the idea and the questions.
 
 ## 1. What this is about

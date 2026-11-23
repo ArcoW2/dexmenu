@@ -4,7 +4,7 @@ Status: not started; see Status.
 
 - 2026-11-22: draft.
 
-Builds on plan 02 (`02-PLAN-own-menu.md`: cards, rules, the priority list, hidden cards, the editor) and plan 03
+Builds on plan 02 (`executed/02-PLAN-own-menu.md`: cards, rules, the priority list, hidden cards, the editor) and plan 03
 (`03-PLAN-menu-look.md`: the look). The build order (plan 00) gets it as a step of its own once agreed.
 
 ## 1. What this is about

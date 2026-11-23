@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Dexmenu.Settings;
 
-/// <summary>Where Dexmenu keeps a user's things (docs/plans/02-PLAN-own-menu.md 3.4, 3.5; plan 05 3.2): %APPDATA%\Dexmenu
+/// <summary>Where Dexmenu keeps a user's things (docs/plans/executed/02-PLAN-own-menu.md 3.4, 3.5; plan 05 3.2): %APPDATA%\Dexmenu
 /// with settings.json ("kinds": which layout each kind of right-click gets, in the order they are tried),
 /// layouts\&lt;name&gt;.json and seen\&lt;kind&gt;.json (the items each kind of right-click showed, written by the DLL).
 /// DEXMENU_DATA (the whole folder), DEXMENU_LAYOUT_FILE and DEXMENU_SEEN_FOLDER override them for the tests, as in the

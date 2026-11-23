@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace Dexmenu.Settings;
 
 /// <summary>
-/// Windows' real menu of a right-click, built in the settings app for the preview (docs/plans/02-PLAN-own-menu.md
+/// Windows' real menu of a right-click, built in the settings app for the preview (docs/plans/executed/02-PLAN-own-menu.md
 /// 3.8): the items in a base folder (a file, a folder, several items), the folder's empty part, or its drive, asked
 /// from the shell as Explorer asks for them (as the test host, tests/host/DexmenuTest.cpp). Every submenu is opened
 /// once (WM_INITMENUPOPUP to the menu's handler), as extensions such as Send to fill theirs only then. So a Git folder

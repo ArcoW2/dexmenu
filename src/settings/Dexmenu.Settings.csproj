@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The settings app (docs/plans/01-PLAN-dexmenu.md 3.7, 02-PLAN-own-menu.md 3.5, 3.8; plan 00 step 4): the layout
+  <!-- The settings app (docs/plans/01-PLAN-dexmenu.md 3.7, executed/02-PLAN-own-menu.md 3.5, 3.8; plan 00 step 4): the layout
        edited on the left (a WebView2 page), the menu previewed on the right, drawn by DexmenuShell.dll itself.
        Built into the repository's bin, next to DexmenuShell.dll, which it loads (64-bit, as the DLL).
        A publish (as Foldex and LexPen): one exe, with only DexmenuShell.dll and WebView2Loader.dll next to it. -->

@@ -1,6 +1,6 @@
 unit Dexmenu.Json;
 
-// JSON with comments (docs/plans/02-PLAN-own-menu.md 3.5): `//` to the end of the line is a comment, except inside a
+// JSON with comments (docs/plans/executed/02-PLAN-own-menu.md 3.5): `//` to the end of the line is a comment, except inside a
 // string, so a regex or a path holding `//` is kept.
 
 interface
