@@ -394,7 +394,7 @@ begin
     if Obj.GetValue('own') is TJSONString then
     begin
       // Dexmenu's own item as a card of its own (earlier layouts): read as a card with one rule finding that item,
-      // titled with the card's name (docs/plans/12-PLAN-own-rules.md 3.3)
+      // titled with the card's name (docs/plans/executed/12-PLAN-own-rules.md 3.3)
       if (Obj.GetValue('own').Value <> 'windowsMenu') and (Obj.GetValue('own').Value <> 'editMenu') then
       begin
         Error := Where + ' "' + Card.Title + '": "own" is "windowsMenu" or "editMenu"';

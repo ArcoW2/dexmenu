@@ -34,8 +34,8 @@ static class ShippedLayouts
             { "id": "d3", "divider": "" },
             { "line": [
               { "id": "about", "note": "Dexmenu - default menu" },
-              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
-              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
+              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
             ] }
           ]
         }
@@ -72,8 +72,8 @@ static class ShippedLayouts
             { "id": "d9", "divider": "" },
             { "line": [
               { "id": "about", "note": "Dexmenu - cards per program" },
-              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
-              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
+              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
             ] }
           ]
         }
@@ -109,8 +109,8 @@ static class ShippedLayouts
             { "id": "d9", "divider": "" },
             { "line": [
               { "id": "about", "note": "Dexmenu - by task" },
-              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
-              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
+              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
             ] }
           ]
         }
@@ -134,8 +134,8 @@ static class ShippedLayouts
             { "id": "d9", "divider": "" },
             { "line": [
               { "id": "about", "note": "Dexmenu - minimal" },
-              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
-              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+              { "id": "edit", "card": "Edit menu...", "rules": [ { "own": "editMenu" } ] },
+              { "id": "windows", "card": "Windows' menu", "rules": [ { "own": "windowsMenu" } ] }
             ] }
           ]
         }

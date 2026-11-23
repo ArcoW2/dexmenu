@@ -17,7 +17,7 @@ unit Dexmenu.Rules;
 // high to low ("3-1") the same items in reverse order. The match kind, caseSensitive, scope and path have no function
 // there. A rank of 0 or lower, or one that is no number or range, makes the rule invalid.
 //
-// Or Dexmenu's own item (docs/plans/12-PLAN-own-rules.md): { "own": "editMenu" | "windowsMenu" } finds that item, once,
+// Or Dexmenu's own item (docs/plans/executed/12-PLAN-own-rules.md): { "own": "editMenu" | "windowsMenu" } finds that item, once,
 // tagged so that, chosen, the DLL starts what the tag names; only its priority has a function there.
 //
 // A rule with both a scope and a path, an unknown match kind or a regex that does not compile is invalid: it finds

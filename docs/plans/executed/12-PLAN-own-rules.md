@@ -1,8 +1,9 @@
 # Plan 12: Dexmenu's own items found by rules, placed in any card
 
-Status: not started; see Status.
+Status: executed; see Status.
 
 - 2026-11-23: draft.
+- 2026-11-23: executed.
 
 Builds on plan 02 (`executed/02-PLAN-own-menu.md`): rules (3.3), Dexmenu's own items "Edit menu..." and "Windows'
 menu" (3.6, 3.11); plan 09 (`executed/09-PLAN-used-rules.md`): a rule's type in the editor (Name, Usage).
@@ -27,16 +28,16 @@ as a card with an own rule, and the editor writes the rule form.
 
 | Part | What | Reference |
 |---|---|---|
+| Own rules | a rule `{ "own": "editMenu" \| "windowsMenu" }` finding Dexmenu's own item, tagged, placed as any found item; chosen, its tag started | 3.1; 3.2; 6.1 |
+| Own cards read as rules | a card with `"own"` read by the DLL as a card with one own rule | 3.3; 6.1 |
+| In the editor | the rule's type: Name, Usage, Edit Dexmenu, Windows' menu; an own card turned into a card with an own rule; "+ Dexmenu" gone | 3.4; 6.1 |
+| Shipped layouts | Default A - D written with own rules | 3.5; 6.1 |
+| Tests | unit tests, the editor's self-test, the preview | 3.6; 6.1 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Own rules | a rule `{ "own": "editMenu" \| "windowsMenu" }` finding Dexmenu's own item, tagged, placed as any found item; chosen, its tag started | -- | 3.1; 3.2 |
-| Own cards read as rules | a card with `"own"` read by the DLL as a card with one own rule | Own rules | 3.3 |
-| In the editor | the rule's type: Name, Usage, Edit Dexmenu, Windows' menu; an own card turned into a card with an own rule; "+ Dexmenu" gone | Own rules | 3.4 |
-| Shipped layouts | Default A - D written with own rules | Own rules | 3.5 |
-| Tests | 3.6 | -- | 3.6 |
 
 ## 3. Details
 
@@ -96,3 +97,24 @@ as a card with an own rule, and the editor writes the rule form.
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 Own rules
+
+- The rule unit parses `own` first: with `name` or `used` too, or an unknown tag, the rule is invalid. Only its
+  priority is read.
+- A found item is `{ Node, Rule, Own }`: an own rule adds one with no node and its tag (`ccEditMenu`,
+  `ccWindowsMenu`) to its card's list, in the priority order with the card's other rules. Placed as a command card
+  (`vkCommand`): the card's only item, one of several (a line of its own), or a button in a card with buttons. Its
+  text is Dexmenu's ("Edit menu...", "Windows' menu"); the card's `title` when it is the card's only item, and the
+  card's rename. Choosing it hands the tag to the show call as the own card did; it is not counted.
+- An own card (`"own"` on a card) is read as a card with one own rule and its name as its `title`; the editor turns
+  it into that when a layout opens (its name the title only when it is not the item's own text), saved with the
+  layout.
+- In the rule panel the two types have no fields of their own: a line saying what the item does; no states, no
+  options. The rules view: "Dexmenu: Edit menu...", "Dexmenu: Windows' menu".
+- Tested: unit tests (alone, the card's title on it, beside a rule by name in both priority orders, twice, an unknown
+  tag, own with a name, as a button tagged editMenu, an own card read as a card with an own rule tagged windowsMenu,
+  not among the remaining items); the editor's self-test (the types switched both ways, outlined red when wrong, own
+  cards converted, also in a menu); the preview of a layout with own cards. Not yet tried at a right-click.

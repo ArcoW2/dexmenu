@@ -330,6 +330,27 @@
       "a panel marked when something of its own is set");
   }
 
+  // Dexmenu's own item found by a rule (plan 12): its types, the switch, an own card of an earlier layout made one
+  {
+    const r = { name: { contains: "x" }, caseSensitive: true, states: ["enabled"], also: true, priority: 4 };
+    M.setRuleType(r, "editMenu");
+    check(M.ruleType(r) === "editMenu" && r.own === "editMenu" && r.name === undefined && r.states === undefined && r.also === undefined &&
+      r.priority === 4 && M.ruleProblem(r) === "", "to Edit Dexmenu: own written, the name and the shared fields gone, valid");
+    M.setRuleType(r, "windowsMenu");
+    check(r.own === "windowsMenu", "to Windows' menu");
+    M.setRuleType(r, "usage");
+    check(r.own === undefined && r.used === "most", "away from it: own taken out");
+    check(M.ruleProblem({ own: "other" }) !== "" && M.ruleProblem({ own: "editMenu", name: { equals: "a" } }) !== "",
+      "an unknown tag, or own with a name: outlined red");
+    const up = M.upToDate({ format: M.formatVersion, lines: [
+      { line: [ { card: "Edit menu...", own: "editMenu" }, { card: "Back to Windows", own: "windowsMenu" } ] },
+      { line: [ { card: "M", menu: [ { line: [ { card: "Windows' menu", own: "windowsMenu" } ] } ] } ] } ] });
+    const [e, w] = up.layout.lines[0].line, inner = up.layout.lines[1].line[0].menu[0].line[0];
+    check(up.changed && e.own === undefined && e.rules[0].own === "editMenu" && e.title === undefined &&
+      w.rules[0].own === "windowsMenu" && w.title === "Back to Windows" && inner.rules[0].own === "windowsMenu",
+      "an own card of an earlier layout: a card with an own rule, its name its title when not the item's own; also in a menu");
+  }
+
   // a rule's states: its own, else what General sets
   check(M.statesOf({}, "enabled").join() === "enabled" && M.statesOf({}, "both").join() === "enabled,disabled" &&
     M.statesOf({ states: ["enabled", "disabled"] }, "enabled").join() === "enabled,disabled",

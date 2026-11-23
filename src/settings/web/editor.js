@@ -652,9 +652,14 @@ function ruleEditor(card, rule, index) {
   priority.title = "Its place in the priority list";
   // the rule's type (plan 09 3.3): Name or Usage, each with its own group of fields; only the chosen one shown
   const typeSel = el("select");
-  for (const [t, label] of [["name", "Name"], ["usage", "Usage"]]) { const o = el("option", "", label); o.value = t; typeSel.append(o); }
+  for (const [t, label] of [["name", "Name"], ["usage", "Usage"], ["editMenu", "Edit Dexmenu"], ["windowsMenu", "Windows' menu"]]) {
+    const o = el("option", "", label);
+    o.value = t;
+    typeSel.append(o);
+  }
   typeSel.value = M.ruleType(rule);
-  typeSel.title = "What the rule finds items by: their name, or their use (the most used or most recently used)";
+  typeSel.title = "What the rule finds: items by their name, or by their use (the most used or most recently used); or " +
+    "Dexmenu's own item, Edit Dexmenu (this editor on the layout in use) or Windows' menu (Windows' own menu shown instead)";
   typeSel.addEventListener("change", () => { M.setRuleType(rule, typeSel.value); changed(); });
   head.append(number, priority, typeSel);
   // a setting's row: its label in the first column, its fields in the second
@@ -665,7 +670,13 @@ function ruleEditor(card, rule, index) {
     body.append(el("span", "rule-label", label), f);
     return f;
   };
-  if (M.ruleType(rule) === "usage") {
+  const ownType = M.ruleType(rule) === "editMenu" || M.ruleType(rule) === "windowsMenu";
+  if (ownType) {
+    // Dexmenu's own item (plan 12): nothing more to set; the card places it as any item it finds
+    body.append(el("span", "rule-label"), el("div", "rule-fields hint", rule.own === "editMenu"
+      ? "Finds \"Edit menu...\": chosen, the menu closes and this editor opens on the layout in use"
+      : "Finds \"Windows' menu\": chosen, Dexmenu's menu closes and Windows' own menu shows in its place"));
+  } else if (M.ruleType(rule) === "usage") {
     const usedSel = el("select");
     for (const [u, label] of [["most", "most used"], ["recent", "most recently used"]]) { const o = el("option", "", label); o.value = u; usedSel.append(o); }
     usedSel.value = rule.used === "recent" ? "recent" : "most";
@@ -738,8 +749,8 @@ function ruleEditor(card, rule, index) {
     l.append(cb, " " + s);
     statesBox.append(l);
   }
-  body.append(el("span", "rule-label"), statesBox);
-  const opts = row("Options");
+  if (!ownType) body.append(el("span", "rule-label"), statesBox);
+  const opts = ownType ? el("div") : row("Options");
   for (const [flag, label] of [["also", "also when taken"],
     ["skipDuplicates", "skip duplicates (one per name)"]]) {
     const cb = el("input");
@@ -1235,7 +1246,9 @@ document.addEventListener("scroll", closeContextMenu, true);
 function summary(rule) {
   const show = m => { const k = Object.keys(m || {})[0]; return k ? k + " " + (k === "any" ? "[" + m.any.join(", ") + "]" : '"' + m[k] + '"') : "?"; };
   let s;
-  if (M.ruleType(rule) === "usage") {
+  if (M.ruleType(rule) === "editMenu" || M.ruleType(rule) === "windowsMenu") {
+    s = "Dexmenu: " + (rule.own === "editMenu" ? "Edit menu..." : "Windows' menu");
+  } else if (M.ruleType(rule) === "usage") {
     s = (rule.used === "recent" ? "most recent" : "most used") + (rule.rank === undefined ? "" : " " + rule.rank);
   } else {
     s = "name " + show(rule.name);
@@ -1440,7 +1453,6 @@ $("close").addEventListener("click", () => post({ type: "close" }));
 withIcon($("addTop"), "+ Card");
 $("addDivider").replaceChildren(dividerIcon(), document.createTextNode(" + Divider"));
 $("addNote").replaceChildren(noteIcon(), document.createTextNode(" + Note"));
-$("addOwn").addEventListener("click", () => { if (layout) addAndFocus(M.addOwn(layout, linesOf())); });
 $("addNote").addEventListener("click", () => { if (layout) addAndFocus(M.addNote(layout, linesOf())); });
 $("addNote").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "newnote"); e.dataTransfer.effectAllowed = "copy"; });
 $("addDivider").addEventListener("click", () => {

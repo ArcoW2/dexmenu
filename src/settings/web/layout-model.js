@@ -201,25 +201,35 @@ const LayoutModel = (() => {
   }
 
   // The rule's type: "usage" (it has "used"), else "name".
-  function ruleType(rule) { return rule && typeof rule === "object" && rule.used !== undefined ? "usage" : "name"; }
+  // The rule's type: "editMenu" or "windowsMenu" (it finds Dexmenu's own item, plan 12), "usage" (it has "used"), else
+  // "name".
+  function ruleType(rule) {
+    if (!rule || typeof rule !== "object") return "name";
+    if (rule.own === "editMenu" || rule.own === "windowsMenu") return rule.own;
+    return rule.used !== undefined ? "usage" : "name";
+  }
 
-  // Switch a rule to the other type: the other type's keys taken out, the new type's start put in.
+  // Switch a rule to another type: the other types' keys taken out, the new type's start put in. Dexmenu's own item
+  // has no other fields: the shared ones go too.
   function setRuleType(rule, type) {
     if (ruleType(rule) === type) return;
-    if (type === "usage") {
-      for (const k of ["name", "caseSensitive", "scope", "path"]) delete rule[k];
-      rule.used = "most";
-    } else {
-      delete rule.used;
-      delete rule.rank;
-      rule.name = { contains: "" };
+    for (const k of ["name", "caseSensitive", "scope", "path", "used", "rank", "own"]) delete rule[k];
+    if (type === "usage") rule.used = "most";
+    else if (type === "editMenu" || type === "windowsMenu") {
+      for (const k of ["states", "also", "consume", "skipDuplicates"]) delete rule[k];
+      rule.own = type;
     }
+    else rule.name = { contains: "" };
   }
 
   function ruleProblem(rule) {
     if (rule === "remaining") return "";
     if (typeof rule !== "object" || rule === null) return "a rule is an object";
     if (rule.verb !== undefined) return "a rule on the verb is not yet possible";
+    if (rule.own !== undefined) {
+      if (rule.name !== undefined || rule.used !== undefined) return "a rule finds Dexmenu's item, by a name or by use: one of them";
+      return rule.own === "editMenu" || rule.own === "windowsMenu" ? "" : "own is editMenu or windowsMenu";
+    }
     if (rule.used !== undefined) {
       if (rule.name !== undefined) return "a rule has a name or a use, not both";
       if (rule.used !== "most" && rule.used !== "recent") return "used is most or recent";
@@ -471,12 +481,6 @@ const LayoutModel = (() => {
 
   // Dexmenu's own item as a card ({ id, card: its title, own: "editMenu" | "windowsMenu" }; plan 02 3.6, 3.11): no rules.
   function isOwn(card) { return typeof card.own === "string"; }
-  function addOwn(layout, lines) {
-    const card = { id: newId(layout), card: "Edit menu...", own: "editMenu" };
-    lines.push({ line: [card] });
-    return card;
-  }
-
   function addNote(layout, lines) {
     const card = { id: newId(layout), note: "" };
     lines.push({ line: [card] });
@@ -704,6 +708,22 @@ const LayoutModel = (() => {
       }
     };
     convert(layout.lines);
+    // Dexmenu's own item as a card of its own ({ own }, plan 12): a card with one rule finding it, its name its title
+    // when it is not the item's own text
+    const ownText = { editMenu: "Edit menu...", windowsMenu: "Windows' menu" };
+    const ownCards = lines => {
+      for (const entry of lines) if (entry && entry.line) for (const card of entry.line) {
+        if (card && typeof card.own === "string") {
+          const own = card.own;
+          delete card.own;
+          card.rules = [{ own }];
+          if (card.card && card.card !== ownText[own] && card.title === undefined) card.title = card.card;
+          changed = true;
+        }
+        if (card && Array.isArray(card.menu)) ownCards(card.menu);
+      }
+    };
+    ownCards(layout.lines);
     return { layout, changed };
   }
 
@@ -729,7 +749,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
