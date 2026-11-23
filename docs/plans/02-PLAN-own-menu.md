@@ -63,7 +63,7 @@ the preview is the result.
 | Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else none (an empty slot: a letter there would look like a key to type); set in the editor's card panel | 3.8 |
 | Shipped layouts | "Default A", "Default C" (by task) and "Default D" (minimal, without its search box yet), each written once into the layouts folder (settings.json `shipped`); every other kind on Default A at a first start; each ends with a note, "Edit menu..." and "Windows' menu" | 3.10 |
 | Icons in the preview | the items' own bitmaps kept as PNG files in the seen folder's `icons` (by a hash of the item's path and text), by every right-click and by the settings app's real menu of a folder; the preview draws them; an icon this process kept with the same pixels is not encoded again | 3.8 |
-| Icon probe | opt-in (HKCU Software Dexmenu, ProbeIcons = 1): at a right-click every owner-drawn item without a bitmap drawn by its owner window into Dexmenu's memory on black and on white, the icon cut from its left part; the drawings written to %LOCALAPPDATA%\Dexmenu\probe, the icon kept for the preview, the result logged; not yet run in Explorer | 3.8 |
+| Icon probe | opt-in (HKCU Software Dexmenu, ProbeIcons = 1): at a right-click every owner-drawn item without a bitmap drawn by its owner window into Dexmenu's memory on black and on white, the icon cut from its left part; the drawings written to %LOCALAPPDATA%\Dexmenu\probe, the icon kept for the preview, the result logged; run in Explorer it gives nothing (removed in plan 10) | 3.8 |
 | Access keys and shortcuts | the `&` letter underlined in an item's own title, its key picks the item; the shortcut after a tab in Windows' text shown dim at the right, the card wide enough for it | 3.6 |
 | Search | a letter that is no access key in the open level starts a search: the top level shows "Search: ..." and every item at any depth whose name holds the text (case ignored; a leading `/`: a regex), titled with its path, the first selected; Enter runs it, Backspace edits, Esc ends the search; kept when Explorer changes the menu; in the settings app's preview every letter searches (nothing is chosen there) | 3.6 |
 | Search box | `{ "search": true }` in a layout: a "Search..." line where it stands ("+ Search" in the editor, moved and deleted as a divider); Default D has one at the top | 3.6; 3.10 |
@@ -74,10 +74,11 @@ the preview is the result.
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Explorer's own icons | Explorer's owner-drawn items' icons read at a right-click and used in the menu and the preview | the probe's result | 3.8 |
 | Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | Items as buttons in a card | 3.10 |
 | Items as buttons in a card | a card showing its items as buttons inside it (Default B's cards per program) | plan 03 Card | 3.3; 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
+
+Moved out: Explorer's own icons (and an icon picker for cards) to plan 10.
 
 ## 3. Details
 
@@ -333,14 +334,13 @@ The settings app shows them on a tab of their own; they are in `%APPDATA%\Dexmen
     card with a menu and on every item a card places, not on the remaining card's items;
   - the item's own bitmap where Windows' menu has one (most extensions' items outside Explorer);
   - in Explorer's full menu, where Explorer draws every item itself (plan 01 6.2) and there is no bitmap to read:
-    Explorer asked to draw the item into Dexmenu's memory (`WM_MEASUREITEM` / `WM_DRAWITEM` to the owner window) and
-    the icon cut out of it: [not yet checked] whether it works;
+    plan 10 (`10-PLAN-explorer-icons.md`);
   - otherwise none: the slot stays empty (a letter there would look like a key to type).
   A checked item shows its check mark in the slot instead.
 - The preview draws the items' own icons too: every right-click, and the settings app's real menu of a folder, keep
   the items' bitmaps as PNG files in the seen folder's `icons`, named by a hash of the item's path and text (its key,
   as the use counts', 3.9); the preview reads them. Items Explorer draws itself have no bitmap to keep: they show
-  no icon until Explorer's own icons are read (below).
+  no icon until plan 10.
 - One drawing engine for the menu and its preview. The settings app (plan 01 3.7, .NET 10 and WebView2) loads the same
   DLL and gives it a window of its own next to the editor; the DLL draws the menu there from the seen items (plan 01
   3.6) and the layout being edited, and draws it again on every change. The preview is the real window, live: hover,
