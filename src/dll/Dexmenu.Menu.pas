@@ -55,6 +55,7 @@ type
     FDeep: Boolean;          // the layout's rules look inside submenus (RulesLookDeeper)
     FHints: TDictionary<string, string>;   // the items' own hints, from the seen items (Dexmenu.Seen.HintsOf)
     FUsage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage), for the most used row
+    FLastUse: TDictionary<string, string>; // this kind's times of last use, for used rules (plan 09)
     FChosenKey: string;                    // the chosen item's use count key; '' when none was chosen
     FTextSize: Single;                     // the menu's size (Ctrl+scroll; settings.json menu.textSize)
     FTextSizeChanged: Boolean;             // Ctrl+scroll changed it: kept once the menu closed (Dexmenu.Hook)
@@ -212,6 +213,7 @@ begin
   FTip.Free;
   FHints.Free;
   FUsage.Free;
+  FLastUse.Free;
   inherited;
 end;
 
@@ -331,13 +333,14 @@ begin
   SetMenuLook(FSettings);
   FHints := HintsOf(ReadSeenText(FKind));
   FUsage := ReadUsage(FKind);
-  // the rules look inside submenus, or the most used row may hold an item of one: those filled only when opened are
-  // opened now
-  FDeep := RulesLookDeeper(FLayout, FKind) or (HasMostUsed(FLayout, FKind) and UsageGoesDeeper(FUsage));
+  FLastUse := ReadLastUse(FKind);
+  // the rules look inside submenus, or the most used row or a used rule may hold an item of one: those filled only
+  // when opened are opened now
+  FDeep := RulesLookDeeper(FLayout, FKind) or (UsesUsage(FLayout, FKind) and UsageGoesDeeper(FUsage));
   FindEmpty(FTop);
   if Notify and ProbingIcons then
     ProbeOwnerDrawn(FOwner, FTop);   // Explorer's own icons: the probe (plan 02 3.8), off unless switched on
-  FPlacement := TPlacement.Create(FLayout, FKind, FTop);
+  FPlacement := TPlacement.Create(FLayout, FKind, FTop, FUsage, FLastUse);
   FPlacement.Empty := FEmpty;
   FPlacement.AtRightClick := True;
   FPlacement.Usage := FUsage;
@@ -895,7 +898,7 @@ begin
     Exit;
   NewTop := ReadLevel(FOriginal, '');
   FindEmpty(NewTop);
-  NewPlacement := TPlacement.Create(FLayout, FKind, NewTop);
+  NewPlacement := TPlacement.Create(FLayout, FKind, NewTop, FUsage, FLastUse);
   NewPlacement.Empty := FEmpty;
   NewPlacement.AtRightClick := True;
   NewPlacement.Usage := FUsage;

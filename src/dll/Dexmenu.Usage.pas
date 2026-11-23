@@ -4,6 +4,10 @@ unit Dexmenu.Usage;
 // right-click, in <DataFolder>\usage.json:
 //   { "format": 1, "kinds": { "file": { "Open": 12, "7-Zip > Add to archive...": 3 } } }
 // An item is known by its path in Windows' menu and its text (UsageKey), so a count holds across right-clicks.
+// Beside "kinds", "last" holds the time of each item's last use by the same kind and key, in UTC, as a text that
+// sorts as the time does (docs/plans/09-PLAN-used-rules.md 3.2):
+//   "last": { "file": { "Open": "2026-11-23T14:05:09.120Z" } }
+// An older DLL reads "kinds" only and keeps "last" when it writes a count.
 
 interface
 
@@ -14,6 +18,11 @@ uses
 function UsageKey(Node: TNode): string;
 // The counts of one kind of right-click (the caller frees it; empty when there are none).
 function ReadUsage(const Kind: string): TDictionary<string, Integer>;
+// The times of last use of one kind, by key (the caller frees it; empty when there are none; an item counted before
+// times were kept has none).
+function ReadLastUse(const Kind: string): TDictionary<string, string>;
+// The time now as kept in "last".
+function UsageTimeNow: string;
 // One choice counted. Several Explorer processes may count at once: a named mutex keeps them in turn.
 procedure CountChoice(const Kind, Key: string);
 function UsageFile: string;
@@ -98,10 +107,61 @@ begin
   end;
 end;
 
+function ReadLastUse(const Kind: string): TDictionary<string, string>;
+var
+  Root: TJSONObject;
+  Last, Times: TJSONValue;
+  P: TJSONPair;
+begin
+  Result := TDictionary<string, string>.Create;
+  try
+    Root := ReadRoot;
+    try
+      if Root = nil then
+        Exit;
+      Last := Root.GetValue('last');
+      if not (Last is TJSONObject) then
+        Exit;
+      Times := TJSONObject(Last).GetValue(Kind);
+      if Times is TJSONObject then
+        for P in TJSONObject(Times) do
+          if P.JsonValue is TJSONString then
+            Result.AddOrSetValue(P.JsonString.Value, P.JsonValue.Value);
+    finally
+      Root.Free;
+    end;
+  except
+    on E: Exception do
+      Log('usage not read: ' + E.Message);
+  end;
+end;
+
+function UsageTimeNow: string;
+var
+  T: TSystemTime;
+begin
+  GetSystemTime(T);
+  Result := Format('%.4d-%.2d-%.2dT%.2d:%.2d:%.2d.%.3dZ', [T.wYear, T.wMonth, T.wDay, T.wHour, T.wMinute, T.wSecond,
+    T.wMilliseconds]);
+end;
+
+// The object Name in Parent, made when it is missing or not an object.
+function ObjectIn(Parent: TJSONObject; const Name: string): TJSONObject;
+var
+  V: TJSONValue;
+begin
+  V := Parent.GetValue(Name);
+  if V is TJSONObject then
+    Exit(TJSONObject(V));
+  Parent.RemovePair(Name).Free;
+  Result := TJSONObject.Create;
+  Parent.AddPair(Name, Result);
+end;
+
 procedure CountChoice(const Kind, Key: string);
 var
   Mutex: THandle;
-  Root, Kinds, Counts: TJSONObject;
+  Root, Kinds, Counts, Times: TJSONObject;
   V: TJSONValue;
   Count: Integer;
   Lines: TStringList;
@@ -147,6 +207,9 @@ begin
           Count := TJSONNumber(V).AsInt;
         Counts.RemovePair(Key).Free;
         Counts.AddPair(Key, TJSONNumber.Create(Count + 1));
+        Times := ObjectIn(ObjectIn(Root, 'last'), Kind);
+        Times.RemovePair(Key).Free;
+        Times.AddPair(Key, UsageTimeNow);
         ForceDirectories(ExtractFilePath(UsageFile));
         Lines := TStringList.Create;
         try

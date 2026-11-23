@@ -112,8 +112,14 @@ type
     // The use counts of this kind (Dexmenu.Usage; not owned, may be nil) and how many the most used row shows.
     Usage: TDictionary<string, Integer>;
     MostUsedCount: Integer;
+    // The times of last use of this kind (Dexmenu.Usage; not owned, may be nil), for used rules.
+    LastUse: TDictionary<string, string>;
     function Hides(Node: TNode): Boolean;
-    constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes);
+    constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes); overload;
+    // With the use counts and times known before the rules are evaluated: used rules rank by them
+    // (docs/plans/09-PLAN-used-rules.md).
+    constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes; AUsage: TDictionary<string, Integer>;
+      ALastUse: TDictionary<string, string>); overload;
     destructor Destroy; override;
     function TopLevel: TViewLevel;
     function MenuLevel(Card: TCard): TViewLevel;
@@ -133,6 +139,8 @@ function KeyOf(Node: TNode): string;
 function RulesLookDeeper(const Layout: ILayout; const Kind: string): Boolean;
 // Whether a kind's layout has a most used row (plan 02 3.9), at any level.
 function HasMostUsed(const Layout: ILayout; const Kind: string): Boolean;
+// Whether a kind's layout uses the use counts: a most used row, or a used rule (docs/plans/09-PLAN-used-rules.md).
+function UsesUsage(const Layout: ILayout; const Kind: string): Boolean;
 // The hint shown on hover over a card: its layout card's hint (a text, or a regex on the item's own hint), else the
 // item's own hint (Regular: from the seen items, Dexmenu.Seen.HintsOf); '' for none.
 function ShownHint(V: TViewCard; const Regular: string): string;
@@ -439,7 +447,15 @@ end;
 
 constructor TPlacement.Create(const ALayout: ILayout; const AKind: string; ATop: TNodes);
 begin
+  Create(ALayout, AKind, ATop, nil, nil);
+end;
+
+constructor TPlacement.Create(const ALayout: ILayout; const AKind: string; ATop: TNodes;
+  AUsage: TDictionary<string, Integer>; ALastUse: TDictionary<string, string>);
+begin
   inherited Create;
+  Usage := AUsage;
+  LastUse := ALastUse;
   Layout := ALayout;
   Kind := AKind;
   Top := ATop;
@@ -549,6 +565,25 @@ begin
   Result := Look(Layout.Lines(Kind));
 end;
 
+function UsesUsage(const Layout: ILayout; const Kind: string): Boolean;
+var
+  Rules: TList<TRule>;
+  R: TRule;
+begin
+  Result := HasMostUsed(Layout, Kind);
+  if Result then
+    Exit;
+  Rules := TList<TRule>.Create;
+  try
+    CollectRules(Layout.Lines(Kind), Rules);
+    for R in Rules do
+      if R.Spec.Used <> ukNone then
+        Exit(True);
+  finally
+    Rules.Free;
+  end;
+end;
+
 // Every submenu's items read (as far as Windows' menu has them before it opens), for rules that look deeper.
 procedure ReadAllChildren(Nodes: TNodes);
 var
@@ -562,6 +597,14 @@ begin
       ReadAllChildren(N.Children);
     end;
 end;
+
+type
+  // An item a used rule ranks: its count and time of last use ('' none) read once
+  TUsedItem = record
+    Node: TNode;
+    Count: Integer;
+    Time: string;
+  end;
 
 function Accepts(R: TRule; Node: TNode): Boolean;
 begin
@@ -601,42 +644,137 @@ var
       end;
   end;
 
-  procedure Visit(Nodes: TNodes; R: TRule; Names: TDictionary<string, Boolean>);
+  // N found by R: shown in R's card (unless a duplicate), taken with its subitems when R consumes
+  procedure Take(N: TNode; R: TRule; Names: TDictionary<string, Boolean>);
   var
-    N: TNode;
     List: TList<TFound>;
     F: TFound;
     Twice: Boolean;
   begin
+    if not FFound.TryGetValue(R.Card, List) then
+    begin
+      List := TList<TFound>.Create;
+      FFound.Add(R.Card, List);
+    end;
+    // a second item of a name this rule (skipDuplicates) or its card (skipDuplicates) already has: taken, not shown
+    Twice := R.Spec.SkipDuplicates and Names.ContainsKey(AnsiLowerCase(N.Name));
+    if not Twice and R.Card.SkipDuplicates then
+      for F in List do
+        if SameText(F.Node.Name, N.Name) then
+          Twice := True;
+    Names.AddOrSetValue(AnsiLowerCase(N.Name), True);
+    Found.Node := N;
+    Found.Rule := R;
+    if not Twice then
+      List.Add(Found);
+    if R.Spec.Consume and not FTaken.ContainsKey(KeyOf(N)) then
+    begin
+      FTaken.AddOrSetValue(KeyOf(N), True);
+      FDirect.AddOrSetValue(KeyOf(N), True);
+      TakeBelow(N);   // its subitems follow it, except those taken already
+    end;
+  end;
+
+  procedure Visit(Nodes: TNodes; R: TRule; Names: TDictionary<string, Boolean>);
+  var
+    N: TNode;
+  begin
     for N in Nodes do
     begin
       if Accepts(R, N) and (not FTaken.ContainsKey(KeyOf(N)) or R.Spec.Also) then
-      begin
-        if not FFound.TryGetValue(R.Card, List) then
-        begin
-          List := TList<TFound>.Create;
-          FFound.Add(R.Card, List);
-        end;
-        // a second item of a name this rule (skipDuplicates) or its card (skipDuplicates) already has: taken, not shown
-        Twice := R.Spec.SkipDuplicates and Names.ContainsKey(AnsiLowerCase(N.Name));
-        if not Twice and R.Card.SkipDuplicates then
-          for F in List do
-            if SameText(F.Node.Name, N.Name) then
-              Twice := True;
-        Names.AddOrSetValue(AnsiLowerCase(N.Name), True);
-        Found.Node := N;
-        Found.Rule := R;
-        if not Twice then
-          List.Add(Found);
-        if R.Spec.Consume and not FTaken.ContainsKey(KeyOf(N)) then
-        begin
-          FTaken.AddOrSetValue(KeyOf(N), True);
-          FDirect.AddOrSetValue(KeyOf(N), True);
-          TakeBelow(N);   // its subitems follow it, except those taken already
-        end;
-      end;
+        Take(N, R, Names);
       if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
         Visit(N.Children, R, Names);
+    end;
+  end;
+
+  // A used rule (docs/plans/09-PLAN-used-rules.md 3.1): the items of this menu with a use, at any depth, in its states,
+  // ranked (most: by count, a tie by the last use; recent: by the last use, those without one after, by count); the
+  // ranks counted whether or not another rule took the item, then the ranks asked for taken in their order.
+  procedure TakeUsed(R: TRule; Names: TDictionary<string, Boolean>);
+  var
+    Used: TList<TUsedItem>;
+    Keys: TDictionary<string, Boolean>;
+    I, First, Last: Integer;
+    Recent: Boolean;
+
+    procedure Walk(Nodes: TNodes);
+    var
+      N: TNode;
+      Item: TUsedItem;
+    begin
+      for N in Nodes do
+      begin
+        if N.IsSeparator or Hides(N) then
+          Continue;
+        if N.Children <> nil then
+          Walk(N.Children);
+        if (N.Name = '') or Keys.ContainsKey(UsageKey(N)) or (N.Enabled and not (stEnabled in R.Spec.States)) or
+          (not N.Enabled and not (stDisabled in R.Spec.States)) then
+          Continue;
+        Item.Node := N;
+        if not Usage.TryGetValue(UsageKey(N), Item.Count) or (Item.Count <= 0) then
+          Continue;
+        if (LastUse = nil) or not LastUse.TryGetValue(UsageKey(N), Item.Time) then
+          Item.Time := '';
+        Keys.Add(UsageKey(N), True);
+        Used.Add(Item);
+      end;
+    end;
+
+    procedure TakeRank(Rank: Integer);
+    var
+      N: TNode;
+    begin
+      N := Used[Rank - 1].Node;
+      if not FTaken.ContainsKey(KeyOf(N)) or R.Spec.Also then
+        Take(N, R, Names);
+    end;
+
+  begin
+    if (Usage = nil) or (Usage.Count = 0) then
+      Exit;   // nothing used yet: the rule finds nothing
+    Recent := R.Spec.Used = ukRecent;
+    Used := TList<TUsedItem>.Create;
+    Keys := TDictionary<string, Boolean>.Create;
+    try
+      Walk(Top);
+      Used.Sort(TComparer<TUsedItem>.Construct(
+        function(const A, B: TUsedItem): Integer
+        begin
+          if Recent then
+          begin
+            Result := -CompareStr(A.Time, B.Time);
+            if Result = 0 then
+              Result := B.Count - A.Count;
+          end
+          else
+          begin
+            Result := B.Count - A.Count;
+            if Result = 0 then
+              Result := -CompareStr(A.Time, B.Time);
+          end;
+          if Result = 0 then
+            Result := CompareText(UsageKey(A.Node), UsageKey(B.Node));
+        end));
+      First := R.Spec.RankFrom;
+      Last := R.Spec.RankTo;
+      if First = 0 then
+      begin
+        First := 1;
+        Last := Used.Count;
+      end;
+      if First <= Last then
+      begin
+        for I := First to Min(Last, Used.Count) do
+          TakeRank(I);
+      end
+      else
+        for I := Min(First, Used.Count) downto Last do
+          TakeRank(I);
+    finally
+      Keys.Free;
+      Used.Free;
     end;
   end;
 
@@ -668,10 +806,19 @@ begin
         Break;
       end;
     for R in Rules do
+      if (R.Spec.Used <> ukNone) and UsageGoesDeeper(Usage) then
+      begin
+        ReadAllChildren(Top);   // an item used in a submenu: its submenu read
+        Break;
+      end;
+    for R in Rules do
     begin
       Names := TDictionary<string, Boolean>.Create;
       try
-        Visit(Top, R, Names);
+        if R.Spec.Used <> ukNone then
+          TakeUsed(R, Names)
+        else
+          Visit(Top, R, Names);
       finally
         Names.Free;
       end;

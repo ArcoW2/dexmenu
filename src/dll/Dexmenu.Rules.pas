@@ -12,6 +12,11 @@ unit Dexmenu.Rules;
 //     "skipDuplicates": false,                      true: of items of one name it finds, only the first shows
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
+// Or by use instead of by name (docs/plans/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
+// the most used or most recently used items of this menu, at any depth; no rank: all of them, in order; a range from
+// high to low ("3-1") the same items in reverse order. The match kind, caseSensitive, scope and path have no function
+// there. A rank of 0 or lower, or one that is no number or range, makes the rule invalid.
+//
 // A rule with both a scope and a path, an unknown match kind or a regex that does not compile is invalid: it finds
 // nothing (the editor outlines its card red).
 
@@ -34,6 +39,7 @@ type
 
   TScope = (scTop, scAnywhere, scPath);
   TStates = set of (stEnabled, stDisabled);
+  TUsedKind = (ukNone, ukMost, ukRecent);   // a rule by name; by the most used; by the most recently used
 
   TRuleSpec = record
     Valid: Boolean;
@@ -46,6 +52,8 @@ type
     Consume: Boolean;    // default True
     SkipDuplicates: Boolean;
     Priority: Integer;   // -1: none given
+    Used: TUsedKind;     // ukNone: a rule by name
+    RankFrom, RankTo: Integer;   // the ranks a used rule finds, from 1; RankFrom > RankTo: in reverse; 0: all
   end;
 
 function ParseRule(Obj: TJSONObject): TRuleSpec;
@@ -152,6 +160,42 @@ begin
   end;
 end;
 
+// "rank": a number from 1, or a text with one ("3") or a range ("1-3", "3-1").
+function ParseRank(V: TJSONValue; out RankFrom, RankTo: Integer; var Problem: string): Boolean;
+var
+  M: System.RegularExpressions.TMatch;
+  D: Double;
+begin
+  Result := False;
+  RankFrom := 0;
+  RankTo := 0;
+  if V is TJSONNumber then
+  begin
+    D := TJSONNumber(V).AsDouble;
+    if (Frac(D) = 0) and (D >= 1) and (D <= MaxInt) then
+    begin
+      RankFrom := Trunc(D);
+      RankTo := RankFrom;
+    end;
+  end
+  else if V is TJSONString then
+  begin
+    M := TRegEx.Match(V.Value, '^\s*(\d{1,9})\s*(?:-\s*(\d{1,9})\s*)?$');
+    if M.Success then
+    begin
+      RankFrom := StrToInt(M.Groups[1].Value);
+      RankTo := RankFrom;
+      if (M.Groups.Count > 2) and (M.Groups[2].Value <> '') then
+        RankTo := StrToInt(M.Groups[2].Value);
+    end;
+  end;
+  if (RankFrom >= 1) and (RankTo >= 1) then
+    Exit(True);
+  RankFrom := 0;
+  RankTo := 0;
+  Problem := 'rank: a number from 1, or a range as "1-3"';
+end;
+
 function ParseRule(Obj: TJSONObject): TRuleSpec;
 var
   V, S: TJSONValue;
@@ -166,36 +210,64 @@ begin
     Result.Problem := 'a rule on the verb: not yet possible (the verb cannot be read from the menu yet)';
     Exit;
   end;
-  V := Obj.GetValue('name');
-  if V = nil then
-  begin
-    Result.Problem := 'a rule needs "name"';
-    Exit;
-  end;
-  if not ParseMatch(V, 'name', Result.Name, Result.Problem) then
-    Exit;
-  if (Obj.GetValue('scope') <> nil) and (Obj.GetValue('path') <> nil) then
-  begin
-    Result.Problem := 'a rule has either a scope or a path, not both';
-    Exit;
-  end;
-  V := Obj.GetValue('scope');
+  V := Obj.GetValue('used');
   if V <> nil then
-    if V.Value = 'top' then
-      Result.Scope := scTop
-    else if V.Value = 'anywhere' then
-      Result.Scope := scAnywhere
-    else
+  begin
+    if Obj.GetValue('name') <> nil then
     begin
-      Result.Problem := 'scope is "top" or "anywhere"';
+      Result.Problem := 'a rule has either "name" or "used", not both';
       Exit;
     end;
-  V := Obj.GetValue('path');
-  if V <> nil then
-  begin
-    if not ParseMatch(V, 'path', Result.Path, Result.Problem) then
+    if V.Value = 'most' then
+      Result.Used := ukMost
+    else if V.Value = 'recent' then
+      Result.Used := ukRecent
+    else
+    begin
+      Result.Problem := '"used" is "most" or "recent"';
       Exit;
-    Result.Scope := scPath;
+    end;
+    if (Obj.GetValue('rank') <> nil) and not ParseRank(Obj.GetValue('rank'), Result.RankFrom, Result.RankTo,
+      Result.Problem) then
+      Exit;
+  end
+  else
+  begin
+    V := Obj.GetValue('name');
+    if V = nil then
+    begin
+      Result.Problem := 'a rule needs "name" or "used"';
+      Exit;
+    end;
+    if not ParseMatch(V, 'name', Result.Name, Result.Problem) then
+      Exit;
+  end;
+  // a used rule: the match kind, caseSensitive, scope and path have no function (a used item is found at any depth)
+  if Result.Used = ukNone then
+  begin
+    if (Obj.GetValue('scope') <> nil) and (Obj.GetValue('path') <> nil) then
+    begin
+      Result.Problem := 'a rule has either a scope or a path, not both';
+      Exit;
+    end;
+    V := Obj.GetValue('scope');
+    if V <> nil then
+      if V.Value = 'top' then
+        Result.Scope := scTop
+      else if V.Value = 'anywhere' then
+        Result.Scope := scAnywhere
+      else
+      begin
+        Result.Problem := 'scope is "top" or "anywhere"';
+        Exit;
+      end;
+    V := Obj.GetValue('path');
+    if V <> nil then
+    begin
+      if not ParseMatch(V, 'path', Result.Path, Result.Problem) then
+        Exit;
+      Result.Scope := scPath;
+    end;
   end;
   V := Obj.GetValue('states');
   if V <> nil then

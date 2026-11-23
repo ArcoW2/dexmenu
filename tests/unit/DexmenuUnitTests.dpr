@@ -560,6 +560,187 @@ begin
   end;
 end;
 
+// Used rules (docs/plans/09-PLAN-used-rules.md): a rule finding the most used or most recently used items by rank; the
+// time of last use kept with each choice.
+procedure TestUsedRules;
+var
+  Data, Error: string;
+  U: TDictionary<string, Integer>;
+  T: TDictionary<string, string>;
+  Menu: HMENU;
+  Top: TNodes;
+
+  function RuleValid(const Text: string): Boolean;
+  var
+    V: TJSONValue;
+  begin
+    V := TJSONObject.ParseJSONValue(Text);
+    try
+      Result := ParseRule(TJSONObject(V)).Valid;
+    finally
+      V.Free;
+    end;
+  end;
+
+  // The top level of a layout of the given lines followed by the remaining card, with the counts and times above.
+  function Placed(const Lines: string; WithUsage: Boolean = True): string;
+  var
+    Layout: ILayout;
+    P: TPlacement;
+    Level: TViewLevel;
+  begin
+    Layout := ParseLayout('{ "default": [ ' + Lines + ', { "divider": "rest" }, ' +
+      '{ "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+    if Layout = nil then
+      Exit('layout: ' + Error);
+    if WithUsage then
+      P := TPlacement.Create(Layout, 'default', Top, U, T)
+    else
+      P := TPlacement.Create(Layout, 'default', Top);
+    try
+      Level := P.TopLevel;
+      try
+        Result := Describe(Level);
+        if Pos(' / D:rest', Result) > 0 then
+          Result := Copy(Result, 1, Pos(' / D:rest', Result) - 1)
+        else
+          Result := '';
+      finally
+        Level.Free;
+      end;
+    finally
+      P.Free;
+    end;
+  end;
+
+  function Card(const Name, Rule: string): string;
+  begin
+    Result := '{ "card": "' + Name + '", "rules": [ ' + Rule + ' ] }';
+  end;
+
+  function Line(const Cards: string): string;
+  begin
+    Result := '{ "line": [ ' + Cards + ' ] }';
+  end;
+
+const
+  Enabled = '"states": [ "enabled" ]';
+begin
+  Check(RuleValid('{ "used": "most" }') and RuleValid('{ "used": "recent", "rank": 2 }') and
+    RuleValid('{ "used": "most", "rank": "2" }') and RuleValid('{ "used": "most", "rank": "1-3" }') and
+    RuleValid('{ "used": "most", "rank": "3-1" }') and RuleValid('{ "used": "most", "rank": " 2 - 5 " }'),
+    'a used rule: no rank, a number, a text with one, a range, a range from high to low');
+  Check(not RuleValid('{ "used": "most", "rank": 0 }') and not RuleValid('{ "used": "most", "rank": -1 }') and
+    not RuleValid('{ "used": "most", "rank": "0-3" }') and not RuleValid('{ "used": "most", "rank": "3-0" }') and
+    not RuleValid('{ "used": "most", "rank": "x" }') and not RuleValid('{ "used": "most", "rank": 1.5 }') and
+    not RuleValid('{ "used": "often" }') and not RuleValid('{ "used": "most", "name": { "equals": "Cut" } }'),
+    'a wrong used rule: a rank of 0 or lower, text, a fraction; an unknown kind; both name and used');
+  Check(RuleValid('{ "used": "most", "scope": "anywhere", "path": { "contains": "x" }, "caseSensitive": true }'),
+    'a used rule: scope, path and caseSensitive have no function (not an error)');
+
+  // enabled: Copy 5, Cut 3 (23rd), Delete 3 (22nd), 7-Zip > Add to archive... 2 (23rd, the latest), Properties 1 (no
+  // time); Disabled thing 9 (disabled); Gone 4 (not in this menu)
+  U := TDictionary<string, Integer>.Create;
+  T := TDictionary<string, string>.Create;
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  try
+    U.Add('Copy', 5);
+    U.Add('Cut', 3);
+    U.Add('Delete', 3);
+    U.Add('7-Zip > Add to archive...', 2);
+    U.Add('Properties', 1);
+    U.Add('Disabled thing', 9);
+    U.Add('Gone', 4);
+    T.Add('Copy', '2026-11-20T08:00:00.000Z');
+    T.Add('Cut', '2026-11-23T10:00:00.000Z');
+    T.Add('Delete', '2026-11-22T10:00:00.000Z');
+    T.Add('7-Zip > Add to archive...', '2026-11-23T12:00:00.000Z');
+    T.Add('Disabled thing', '2026-11-24T10:00:00.000Z');
+    T.Add('Gone', '2026-11-25T10:00:00.000Z');
+    Check(Placed(Line(Card('A', '{ "used": "most", ' + Enabled + ' }'))) =
+      'I:Copy / I:Cut / I:Delete / I:Add to archive... / I:Properties',
+      'most used, no rank: all, by count, a tie by the last use, an item in a submenu too, one not in the menu left out');
+    Check(Placed(Line(Card('A', '{ "used": "most" }'))) =
+      'I:Disabled thing / I:Copy / I:Cut / I:Delete / I:Add to archive... / I:Properties',
+      'most used in the default states: the disabled item too');
+    Check(Placed(Line(Card('A', '{ "used": "recent", "rank": "1-3", ' + Enabled + ' }'))) =
+      'I:Add to archive... / I:Cut / I:Delete', 'most recent 1-3');
+    Check(Placed(Line(Card('A', '{ "used": "recent", ' + Enabled + ' }'))) =
+      'I:Add to archive... / I:Cut / I:Delete / I:Copy / I:Properties', 'most recent: an item without a time last');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": 3, ' + Enabled + ' }'))) = 'I:Delete', 'most used 3: the third');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "2-1", ' + Enabled + ' }'))) = 'I:Cut / I:Copy',
+      'a range from high to low: the same items in reverse order');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "7-2", ' + Enabled + ' }'))) =
+      'I:Properties / I:Add to archive... / I:Delete / I:Cut', 'a reversed range partly past the items');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "4-9", ' + Enabled + ' }'))) =
+      'I:Add to archive... / I:Properties', 'a range partly past the items');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": 6, ' + Enabled + ' }'))) = '',
+      'a rank past the items: nothing found, the card not shown');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": 0 }'))) = '', 'a wrong rank: nothing found');
+    Check(Placed(Line(Card('A', '{ "used": "most", "rank": "1-2", ' + Enabled + ' }') + ', ' +
+      Card('B', '{ "used": "most", "rank": "1-3", ' + Enabled + ' }'))) = 'I:Copy / I:Cut / I:Delete',
+      'ranks do not shift when an earlier rule took an item: 1-3 after 1-2 adds only the third');
+    Check(Placed(Line(Card('X', '{ "name": { "equals": "Copy" } }')) + ', ' +
+      Line(Card('A', '{ "used": "most", "rank": 1, ' + Enabled + ' }'))) = 'I:Copy',
+      'the first ranked taken by an earlier rule: not shown again');
+    Check(Placed(Line(Card('X', '{ "name": { "equals": "Copy" } }')) + ', ' +
+      Line(Card('A', '{ "used": "most", "rank": 1, "also": true, ' + Enabled + ' }'))) = 'I:Copy / I:Copy',
+      '... with also: shown again');
+    Check(Pos('I:Copy', Copy(Placed(Line(Card('A', '{ "used": "most", "rank": 1, "consume": false, ' + Enabled +
+      ' }')) + ', { "line": [ ' + Card('X', '{ "name": { "equals": "Copy" } }') + ' ] }'), 8, MaxInt)) > 0,
+      'consume false: a later rule finds the item too');
+    Check(Placed(Line(Card('A', '{ "used": "most" }')), False) = '', 'no use counts: a used rule finds nothing');
+    Check(UsesUsage(ParseLayout('{ "default": [ ' + Line(Card('A', '{ "used": "recent" }')) + ', ' +
+      Line(Card('Rest', '"remaining"')) + ' ] }', 'test', Error), 'default') and
+      not UsesUsage(ParseLayout('{ "default": [ ' + Line(Card('A', '{ "name": { "equals": "Cut" } }')) + ', ' +
+      Line(Card('Rest', '"remaining"')) + ' ] }', 'test', Error), 'default'),
+      'a layout with a used rule uses the counts; one without does not');
+  finally
+    Top.Free;
+    DestroyMenu(Menu);
+    T.Free;
+    U.Free;
+  end;
+
+  // the time of last use, written with each choice
+  Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-used');
+  if TDirectory.Exists(Data) then
+    TDirectory.Delete(Data, True);
+  TDirectory.CreateDirectory(Data);
+  SetEnvironmentVariable('DEXMENU_DATA', PChar(Data));
+  try
+    TFile.WriteAllText(TPath.Combine(Data, 'usage.json'), '{ "format": 1, "kinds": { "file": { "Copy": 2 } } }');
+    T := ReadLastUse('file');
+    U := ReadUsage('file');
+    try
+      Check((T.Count = 0) and (U['Copy'] = 2), 'an older usage.json without times: the counts read, no times');
+    finally
+      T.Free;
+      U.Free;
+    end;
+    CountChoice('file', 'Copy');
+    T := ReadLastUse('file');
+    U := ReadUsage('file');
+    try
+      Check((U['Copy'] = 3) and T.ContainsKey('Copy') and (Length(T['Copy']) = 24) and T['Copy'].EndsWith('Z') and
+        (T['Copy'] <= UsageTimeNow), 'a choice: counted, and its time of last use kept (UTC)');
+    finally
+      T.Free;
+      U.Free;
+    end;
+    T := ReadLastUse('folder');
+    try
+      Check(T.Count = 0, 'times per kind of right-click');
+    finally
+      T.Free;
+    end;
+  finally
+    TDirectory.Delete(Data, True);
+    SetEnvironmentVariable('DEXMENU_DATA', nil);
+  end;
+end;
+
 // Icons (plan 02 3.8): a glyph by its code point, an icon in a file, a menu item's bitmap.
 procedure TestIcons;
 var
@@ -1387,6 +1568,7 @@ begin
   TestHints;
   TestDuplicates;
   TestUsage;
+  TestUsedRules;
   TestIcons;
   TestKeptIcons;
   TestAccessAndShortcut;

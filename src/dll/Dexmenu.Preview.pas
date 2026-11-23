@@ -84,6 +84,7 @@ type
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
     Search: string;                       // typed into the preview's search (plan 02 3.6); '' : none
     Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): the most used row
+    LastUse: TDictionary<string, string>; // this kind's times of last use: used rules (plan 09)
     Tip: TTip;
     TipLevel, TipBox: Integer;
     HoverLevel: Integer;   // the level whose submenu change waits for the hover timer; -1: none
@@ -135,6 +136,7 @@ begin
   Tip.Free;
   Hints.Free;
   Usage.Free;
+  LastUse.Free;
   Levels.Free;
   inherited;
 end;
@@ -173,10 +175,11 @@ begin
   if (Menu = 0) or (Layout = nil) then
     Exit;
   Top := ReadLevel(Menu, '');
-  Placement := TPlacement.Create(Layout, Kind, Top);
   FreeAndNil(Usage);
+  FreeAndNil(LastUse);
   Usage := ReadUsage(Kind);
-  Placement.Usage := Usage;
+  LastUse := ReadLastUse(Kind);
+  Placement := TPlacement.Create(Layout, Kind, Top, Usage, LastUse);
   Placement.MostUsedCount := Settings.MostUsed;
   L := TPreviewLevel.Create;
   L.View := Placement.TopLevel;
