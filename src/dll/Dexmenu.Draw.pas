@@ -343,6 +343,53 @@ begin
     Result := MarkWidth;
 end;
 
+// A card whose title wraps (its layout card's "wrap", plan 03 3.5): an item, a card with a menu or Dexmenu's own item;
+// not a button in a card with buttons.
+function Wraps(V: TViewCard): Boolean;
+begin
+  Result := (V.Card <> nil) and V.Card.Wrap and (V.Kind in [vkItem, vkMenu, vkCommand]) and not V.InGroup;
+end;
+
+// The title laid out wrapping within Width (DIP) and Height (0: as high as it needs); nil when it has none.
+function WrappedTitle(const Title: string; Fmt: IDWriteTextFormat; Width, Height: Single): IDWriteTextLayout;
+var
+  Trimming: TDwriteTrimming;
+  Sign: IDWriteInlineObject;
+begin
+  Result := nil;
+  if Height <= 0 then
+    Height := 10000;
+  if (Title = '') or Failed(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt, Max(1, Width), Height,
+    Result)) then
+    Exit(nil);
+  Result.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+  // a title longer than its lines: its last line cut at a word with "..."
+  FillChar(Trimming, SizeOf(Trimming), 0);
+  Trimming.granularity := DWRITE_TRIMMING_GRANULARITY_WORD;
+  DWrite.CreateEllipsisTrimmingSign(Result, Sign);
+  Result.SetTrimming(Trimming, Sign);
+end;
+
+// One line of the items' text, high (DIP).
+function LineHeight: Single;
+var
+  Layout: IDWriteTextLayout;
+  M: TDWriteTextMetrics;
+begin
+  Result := 16;
+  if Succeeded(DWrite.CreateTextLayout('Ag', 2, NormalFormat, 1000, 1000, Layout)) and
+    Succeeded(Layout.GetMetrics(M)) then
+    Result := M.height;
+end;
+
+function TitleFormat(V: TViewCard): IDWriteTextFormat;
+begin
+  if V.IsDefault then
+    Result := BoldFormat
+  else
+    Result := NormalFormat;
+end;
+
 function GroupNeed(V: TViewCard): Single; forward;
 
 // What a card's content needs across (DIP): the icon slot, its title, a shortcut, the mark; a divider's label; a note;
@@ -350,6 +397,7 @@ function GroupNeed(V: TViewCard): Single; forward;
 function CardNeed(V: TViewCard): Single;
 var
   Fmt: IDWriteTextFormat;
+  Word: string;
 begin
   Result := 0;
   if V.Kind = vkGroup then
@@ -364,7 +412,15 @@ begin
       Fmt := BoldFormat
     else
       Fmt := NormalFormat;
-    Result := TextWidth(V.Title, Fmt);
+    if Wraps(V) then
+    begin
+      // a title that wraps needs its longest word across, not its whole text
+      Result := 0;
+      for Word in V.Title.Split([' ']) do
+        Result := Max(Result, TextWidth(Word, Fmt));
+    end
+    else
+      Result := TextWidth(V.Title, Fmt);
     if V.LookCard <> nil then
       Result := Max(Result, TextWidth(V.LookCard.Extra, ExtraFormat));
     Result := TextLeft + Result + MarkSpace(V) + 8;
@@ -433,6 +489,8 @@ end;
 function CardHeight(V: TViewCard; Width: Single): Single;
 var
   Rects: TArray<TD2D1RectF>;
+  Layout: IDWriteTextLayout;
+  M: TDWriteTextMetrics;
 begin
   Result := ItemHeight;
   if V.Kind = vkGroup then
@@ -441,6 +499,13 @@ begin
     Result := NoteHeight(V, Width)
   else if (V.LookCard <> nil) and (V.LookCard.Extra <> '') then
     Result := ItemHeight + ExtraHeight;   // the title and its extra text
+  if Wraps(V) and (V.Card.Height <= 0) then
+  begin
+    // as high as its wrapped title's lines, with a single line's room around them
+    Layout := WrappedTitle(V.Title, TitleFormat(V), Width - TextLeft - MarkSpace(V), 0);
+    if (Layout <> nil) and Succeeded(Layout.GetMetrics(M)) then
+      Result := Result + Max(0, M.height - LineHeight);
+  end;
   if (V.Card <> nil) and (V.Kind <> vkSeparator) and (V.Card.Height > 0) then
     Result := V.Card.Height * ItemHeight;
 end;
@@ -744,7 +809,8 @@ var
   NoteText: IDWriteTextLayout;
   Fmt: IDWriteTextFormat;
   Brush: ID2D1SolidColorBrush;
-  Y, TitleRight, TitleTop, TitleBottom: Single;
+  Y, H, TitleRight, TitleTop, TitleBottom: Single;
+  Metrics: TDWriteTextMetrics;
   Shortcut: string;
   Access: Integer;
   TitleLayout: IDWriteTextLayout;
@@ -896,7 +962,20 @@ begin
           Y + ExtraHeight), ExtraBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
         Y := Y + ExtraHeight;
       end;
-      if Title <> '' then
+      if (Title <> '') and Wraps(V) then
+      begin
+        // the title's lines under the icon, as many as fit above the extra text below it
+        H := R.bottom - 4 - Y - Ord(not ExtraAbove and (ExtraText <> '')) * ExtraHeight;
+        TitleLayout := WrappedTitle(Title, CenterFormat, R.right - R.left - 8, Max(TitleHeight, H));
+        if TitleLayout <> nil then
+        begin
+          TitleLayout.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+          T.DrawTextLayout(D2D1PointF(R.left + 4, Y), TitleLayout, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+          if Succeeded(TitleLayout.GetMetrics(Metrics)) then
+            Y := Y + Min(Max(TitleHeight, H), Max(TitleHeight, Metrics.height)) - TitleHeight;
+        end;
+      end
+      else if Title <> '' then
         T.DrawText(PWideChar(Title), Length(Title), CenterFormat, D2D1RectF(R.left + 4, Y, R.right - 4,
           Y + TitleHeight), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       Y := Y + TitleHeight;
@@ -924,10 +1003,31 @@ begin
     else if (ActionMark <> '') and (V.Kind in [vkItem, vkCommand]) then
       T.DrawText(PWideChar(ActionMark), Length(ActionMark), NormalFormat, D2D1RectF(R.right - MarkWidth + 6, R.top,
         R.right - 4, R.bottom), MarkBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
-    // the title's line, and the extra text's above or below it, the two centred in the card together
+    // the title's line, and the extra text's above or below it, the two centred in the card together; a title that
+    // wraps: its lines within the card, the extra text's line above or below them
     TitleTop := R.top;
     TitleBottom := R.bottom;
-    if ExtraText <> '' then
+    if Wraps(V) then
+    begin
+      TitleTop := R.top + (ItemHeight - LineHeight) / 2;
+      TitleBottom := Max(TitleTop + LineHeight, R.bottom - (ItemHeight - LineHeight) / 2);
+      if ExtraText <> '' then
+      begin
+        if ExtraAbove then
+        begin
+          T.DrawText(PWideChar(ExtraText), Length(ExtraText), ExtraFormat, D2D1RectF(R.left + TextLeft, TitleTop,
+            R.right - MarkWidth, TitleTop + ExtraHeight), ExtraBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+          TitleTop := TitleTop + ExtraHeight;
+        end
+        else
+        begin
+          TitleBottom := Max(TitleTop + LineHeight, TitleBottom - ExtraHeight);
+          T.DrawText(PWideChar(ExtraText), Length(ExtraText), ExtraFormat, D2D1RectF(R.left + TextLeft, TitleBottom,
+            R.right - MarkWidth, TitleBottom + ExtraHeight), ExtraBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        end;
+      end;
+    end
+    else if ExtraText <> '' then
     begin
       TitleTop := R.top + (R.bottom - R.top - TitleHeight - ExtraHeight) / 2;
       if ExtraAbove then
@@ -953,7 +1053,24 @@ begin
     end;
     // the access key (the letter Windows' text marks with "&") underlined: that key picks the item
     Access := V.AccessIndex;
-    if (Title <> '') and (Access >= 0) and Succeeded(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt,
+    if Wraps(V) then
+    begin
+      TitleLayout := WrappedTitle(Title, Fmt, TitleRight - R.left - TextLeft, TitleBottom - TitleTop);
+      if TitleLayout <> nil then
+      begin
+        // lines centred in their room; more lines than fit: from the top, the last one cut
+        if Succeeded(TitleLayout.GetMetrics(Metrics)) and (Metrics.height > TitleBottom - TitleTop + 0.5) then
+          TitleLayout.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+        if Access >= 0 then
+        begin
+          Range.startPosition := Access;
+          Range.length := 1;
+          TitleLayout.SetUnderline(True, Range);
+        end;
+        T.DrawTextLayout(D2D1PointF(R.left + TextLeft, TitleTop), TitleLayout, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      end;
+    end
+    else if (Title <> '') and (Access >= 0) and Succeeded(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt,
       Max(1, TitleRight - R.left - TextLeft), TitleBottom - TitleTop, TitleLayout)) then
     begin
       Range.startPosition := Access;

@@ -94,6 +94,9 @@ type
     MinWidth: Single;
     Height: Single;
     CardFit: TCardFit;
+    // "wrap": its title wraps over more lines: within its "height" when set (the last line cut with "..."), else the
+    // card as high as the lines it needs (plan 03 3.5)
+    Wrap: Boolean;
     // "extra": a smaller text with the title, above it ("extraAt": "above") or below it (plan 03 3.6); '' none
     Extra: string;
     ExtraAbove: Boolean;
@@ -288,6 +291,8 @@ begin
   if (Obj.GetValue('height') is TJSONNumber) and (TJSONNumber(Obj.GetValue('height')).AsDouble > 0) then
     Card.Height := TJSONNumber(Obj.GetValue('height')).AsDouble;
   Card.CardFit := ParseCardFit(Obj.GetValue('cardFit'));
+  if Obj.GetValue('wrap') is TJSONBool then
+    Card.Wrap := TJSONBool(Obj.GetValue('wrap')).AsBoolean;
 end;
 
 // A card's extra text and its own look (plan 03 3.6).

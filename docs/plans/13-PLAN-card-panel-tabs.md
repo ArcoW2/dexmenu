@@ -49,7 +49,7 @@ Every field of the card panel now, in its tab (a field still to come in brackets
 - **Rules:** + Rule and the card's rules (each with its type, plan 09; [Edit Dexmenu, Windows' menu: plan 12]),
   Duplicates (skip: one item per name), Hidden.
 - **Inside:** Items as buttons, [Several found: on lines, in a submenu, as cards; Per row: plan 11], Submenus open.
-- **Layout:** Weight, Min width, Height, Fit in line, [Square: plan 11].
+- **Layout:** Weight, Min width, Height, Wrap, Fit in line, [Square: plan 11].
 - **Look:** Background, Text colour, Border, Radius, Hover background, [the pressed look when it gets fields].
 
 Hidden sits with the rules because what it changes is where the found items go (nowhere), not how the card looks.

@@ -361,9 +361,18 @@ function sizeFields(card) {
   const fitRow = el("label", "field");
   fitRow.title = "Where a card lower than its line stands in it";
   fitRow.append(el("span", "", "Fit in line"), fit);
+  // its title wrapping over more lines: within the height when one is set, else the card as high as it needs
+  const wrap = el("input");
+  wrap.type = "checkbox";
+  wrap.checked = !!card.wrap;
+  wrap.addEventListener("change", () => { if (wrap.checked) card.wrap = true; else delete card.wrap; changed(); });
+  const wrapRow = el("label", "field");
+  wrapRow.title = "The title wraps over more lines: within Height when it is set (the last line cut with ...), else the card is as high as its lines";
+  wrapRow.append(el("span", "", "Wrap"), el("span"));
+  wrapRow.lastChild.append(wrap, " the title over more lines");
   return [number("weight", "Weight", "1: its share of the line's width"),
     number("minWidth", "Min width", "(none) the line wraps when it does not fit"),
-    number("height", "Height", "(its content) in lines of text"), fitRow];
+    number("height", "Height", "(its content) in lines of text"), wrapRow, fitRow];
 }
 
 // One colour's controls (plan 03 3.6): a swatch, where the colour comes from (the theme's own colour, when withTheme;

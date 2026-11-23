@@ -1490,6 +1490,19 @@ begin
     '{ "note": "a" } ] } ]', W);
   Check((Length(R) = 1) and Near(R[0].bottom - R[0].top, ItemHeight + 14),
     'a card with an extra text: its line one extra line higher');
+  // a title that wraps (plan 03 3.5): a narrow card beside a wide note, the note stretched to the line's height
+  R := NoteBoxes('[ { "line": [ { "card": "Copy", "title": "A rather long title that needs several lines here", ' +
+    '"rules": [ { "name": { "equals": "Copy" } } ] }, { "note": "a", "weight": 4 } ] } ]', W);
+  Check((Length(R) = 1) and (R[0].bottom - R[0].top < ItemHeight + 4), 'a long title without wrap: one line, cut');
+  R := NoteBoxes('[ { "line": [ { "card": "Copy", "title": "A rather long title that needs several lines here", ' +
+    '"wrap": true, "rules": [ { "name": { "equals": "Copy" } } ] }, { "note": "a", "weight": 4 } ] } ]', W);
+  Check((Length(R) = 1) and (R[0].bottom - R[0].top > ItemHeight + 20), 'a long title that wraps: the card as high as its lines');
+  R := NoteBoxes('[ { "line": [ { "card": "Copy", "title": "A rather long title that needs several lines here", ' +
+    '"wrap": true, "height": 2, "rules": [ { "name": { "equals": "Copy" } } ] }, { "note": "a", "weight": 4 } ] } ]', W);
+  Check((Length(R) = 1) and Near(R[0].bottom - R[0].top, 2 * ItemHeight), '... with a height: within its lines');
+  R := NoteBoxes('[ { "line": [ { "card": "Copy", "title": "Short", "wrap": true, ' +
+    '"rules": [ { "name": { "equals": "Copy" } } ] }, { "note": "a", "weight": 4 } ] } ]', W);
+  Check((Length(R) = 1) and (R[0].bottom - R[0].top < ItemHeight + 4), 'a short title that wraps: one line, as any');
 end;
 
 // Items as buttons in a card (plan 02 3.3): a found submenu unfolded, its title the item's; found items without one

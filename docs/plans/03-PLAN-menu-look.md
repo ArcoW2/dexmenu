@@ -6,6 +6,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: theme files; the shipped themes; gradients.
 - 2026-11-23: partly executed: lines and cards; the card.
 - 2026-11-23: partly executed: the colour fields.
+- 2026-11-23: partly executed: a title that wraps.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -43,7 +44,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
-| Lines and cards | a card's `weight`, `minWidth`, `height` (in lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
+| Lines and cards | a card's `weight`, `minWidth`, `height` (in lines), `wrap` (its title over more lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
 ### Not yet built
@@ -202,6 +203,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
 - **Heights:** a card's `height` is `auto` (from its content: the titles, the icon) or a fixed height in lines of
   text (`2`, `3`) or in units. The line is as tall as its tallest card. The others, by the line's `cardFit`, which a
   card can overrule: `stretch` (as tall as the line) or aligned at their own height, `top`, `center` or `bottom`.
+- **A title that wraps:** with `"wrap": true` a card's title wraps over more lines at word breaks: within its
+  `height` when one is set (the lines that fit, the last one cut with "..."), else the card as high as the lines it
+  needs. Its width need is then its longest word, so it does not widen the menu. A tall card (its icon on top) wraps
+  its title the same, under the icon. Not for buttons in a card with buttons.
 - **A single card on a line** is drawn as a menu item: full width, no card border, the hover as a menu's, the icon
   left and the mark right. Several cards on a line are drawn as cards: their own background and border, the icon
   above or left of the titles depending on the card's shape (3.6).
@@ -422,3 +427,13 @@ None.
   alpha, an opacity); unit tests (the theme's colour, background and gradient adjusted by a card's own look); the
   palette export called for light and dark. The
   pickers themselves not yet looked at by hand.
+
+### 6.7 A title that wraps
+
+- `"wrap": true` (`TCard.Wrap`); in the card panel "Wrap" with the size fields. The title is laid out with word
+  wrapping and word trimming ("..."); its lines centred in the card, from the top when more lines than fit. The
+  extra text keeps its own line above or below the title's lines.
+- The card's height without a `height`: one line's height plus the lines beyond the first; its need across: its
+  longest word (with the icon slot and the mark).
+- Tested: unit tests (a long title without wrap one line; with wrap the card higher; with a height two lines; a
+  short title one line). Not yet looked at in the preview or a right-click.
