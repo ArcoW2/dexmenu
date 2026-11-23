@@ -63,6 +63,7 @@ const
 var
   NoteLayout: ILayout;
   NoteError: string;
+  When: TDateTime;
 begin
   Check(Valid(BaseLayout), 'the built-in base layout is valid');
   Check(Valid('{ "default": [ { "line": [ ' + Remaining + ' ] } ] }'), 'one remaining card at the root');
@@ -106,6 +107,15 @@ begin
   Check((NoteLayout <> nil) and (NoteLayout.Lines('')[0].Cards[3].Look <> nil) and
     (NoteLayout.Lines('')[0].Cards[3].Look.GetValue('border3d') <> nil) and (NoteLayout.Lines('')[0].Cards[3].Look.GetValue('shadow') <> nil),
     'a card''s 3D border and shadow kept in its look');
+  // a note's date and time placeholders (plan 03 3.6), at a fixed moment
+  When := EncodeDate(2026, 11, 23) + EncodeTime(14, 5, 9, 0);
+  Check(FillNote('{date:yyyy-MM-dd} {time:HH:mm}', When) = '2026-11-23 14:05', 'a note: {date:...} and {time:...} in Windows'' pictures');
+  Check(FillNote('{time:HH:mm:ss}', When) = '14:05:09', '... with seconds');
+  Check((FillNote('{date}', When) <> '') and (Pos('{', FillNote('{date}', When)) = 0) and (FillNote('{time}', When) <> '') and
+    (Pos('{', FillNote('{time}', When)) = 0), '{date} and {time}: the short formats');
+  Check(FillNote('a {{b}} c', When) = 'a {b} c', '{{ and }}: a brace');
+  Check(FillNote('{other} and {date', When) = '{other} and {date', 'an unknown placeholder, a brace not closed: as typed');
+  Check(FillNote('no braces', When) = 'no braces', 'a note without placeholders: as it is');
 end;
 
 procedure TestCurrent;

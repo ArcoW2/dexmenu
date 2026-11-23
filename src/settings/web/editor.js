@@ -1114,8 +1114,14 @@ function renderCardPane() {
     area.value = card.note || "";
     area.placeholder = "(empty: a space in the menu)";
     area.addEventListener("change", () => { card.note = area.value; changed(); });
+    area.title = "{date} and {time}: today's date and the time the menu opens, in Windows' short formats; " +
+      "{date:dddd d MMMM} or {time:HH:mm}: in a format of your own; {{ and }}: a brace";
     const row = el("label", "field");
-    row.append(el("span", "", "Text"), area);
+    const text = el("span");
+    text.append(area, el("div", "hint", "{date}, {time}, {date:dddd d MMMM}, {time:HH:mm}: filled in when the menu opens"));
+    const label = el("span", "", "Text");
+    label.style.alignSelf = "start";
+    row.append(label, text);
     // where its text goes: the card's left edge, in line with the items' text, the middle, the right
     const place = el("select");
     for (const [v, label] of [["left", "left"], ["text", "aligned with the menu's text"], ["center", "centered"], ["right", "right"]]) {

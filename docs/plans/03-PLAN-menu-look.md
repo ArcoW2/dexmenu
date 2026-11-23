@@ -8,6 +8,7 @@ Status: partly executed; see Status.
 - 2026-11-23: partly executed: the colour fields.
 - 2026-11-23: partly executed: a title that wraps.
 - 2026-11-23: partly executed: none; a note's style and font; the 3D border; the shadow.
+- 2026-11-23: partly executed: a note's date and time.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -46,6 +47,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
 | None | "none" for Background, Hover background and Border: nothing drawn (a framed card's border "none": no frame line, where not set gives the dividers' colour) | 3.6; 6.9 |
 | Note style | a note's own style (background, text colour, border, radius, 3D border, shadow) and its font: the items' text, the smaller extra text, or its own (family, size, bold, italic) | 3.6; 6.10 |
+| Note date and time | `{date}` and `{time}` in a note's text (Windows' short formats), or `{date:<picture>}` and `{time:<picture>}`; `{{` and `}}` a brace; filled when the menu opens | 3.6; 6.11 |
 | 3D border | a card's border raised (outset) or sunk (inset) as Windows' classic buttons, lit from an angle, its width and light and dark edge colours; in the card panel's Style | 3.6; 6.10 |
 | Shadow | a card's shadow in a colour at a distance away from the light, its edge blurred, under the card and inside the menu only; in the card panel's Style | 3.6; 6.10 |
 | Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
@@ -256,7 +258,11 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   what is not given). Plain text only: no markdown, so a note stays as fast and crisp as the rest of the menu. In the
   card panel a note gets the Style panel and a Font field beside its text; its style is copied and pasted as a
   card's.
-- A note showing what a file holds, or the time and date, is plan 14.
+- **A note's date and time:** a note's text may hold `{date}` and `{time}`: the date and the time the menu opens, in
+  Windows' short date and time formats (the user's regional settings), or `{date:<picture>}` and `{time:<picture>}` in
+  Windows' date and time pictures (`dddd d MMMM`, `HH:mm`). `{{` and `}}` are a brace; anything else in braces, or a
+  brace that is not closed, shows as typed. The menu does not change while it is open.
+- A note showing what a file holds is plan 14.
 - **A 3D border:** besides a flat border, a card's border can look raised (`outset`) or sunk (`inset`), as
   Windows' classic buttons: a bevel of a width, its edges on the light side drawn in a light colour, those on the
   other side in a shadow colour, the light coming from an angle (degrees, 135 when not given: from the top left).
@@ -507,3 +513,14 @@ None.
 - Tested: unit tests (a note's font read; the 3D border and shadow kept in a card's look), the editor's self-test
   (the style takes them), the preview captured as a picture (outset, inset, rounded outset lit from above, sharp and
   blurred shadows, a note in its own font and colours), and the editor's fields in the headless harness.
+
+### 6.11 A note's date and time
+
+- `FillNote` (Dexmenu.Layout) fills a note's text: `GetDateFormatEx` and `GetTimeFormatEx` for the user's locale,
+  `DATE_SHORTDATE` and `TIME_NOSECONDS` without a picture, the picture as given with one. A note view fills its text
+  once, the first time it is asked for (the menu or the preview opening), and keeps it, so measuring and drawing see
+  the same minute. The editor's note Text field has a hint and a tooltip listing the placeholders; the cards view
+  shows the text as typed, the preview filled in.
+- Tested: unit tests at a fixed moment (pictures for date, time and seconds; the short formats without braces left;
+  `{{` and `}}`; an unknown placeholder and an unclosed brace as typed; a note without braces as it is), and the
+  preview captured as a picture (the long date in the user's language, the time, the short date).

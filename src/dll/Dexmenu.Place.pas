@@ -62,6 +62,8 @@ type
     IsMore: Boolean;
     MoreFrom: Integer;
     ShownText: string;  // vkItem: a title in place of its own (a search hit: with its path); '' none
+    NoteFilled: Boolean;   // vkNote: its text filled (FillNote) once, into NoteShown, so measure and draw agree
+    NoteShown: string;
     Command: TCommand;  // vkCommand: which
     function Title: string;
     // The layout card's own icon ("icon") where it is this card's: a card with a menu, or the items a card places
@@ -332,7 +334,16 @@ begin
             // a rename that does not compile: the item's own text
           end;
       end;
-    vkNote: Result := Card.NoteText;
+    vkNote:
+      begin
+        // its placeholders filled once, when first shown (the menu opening)
+        if not NoteFilled then
+        begin
+          NoteShown := FillNote(Card.NoteText, Now);
+          NoteFilled := True;
+        end;
+        Result := NoteShown;
+      end;
     vkCommand:
       begin
         // Dexmenu's own item: the card's title for it alone, else its own; the card's rename on it (plan 12 3.1)

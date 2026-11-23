@@ -195,6 +195,10 @@ function ClampTextSize(Size: Double): Single;
 procedure SaveTextSize(Size: Single);
 // The file CurrentLayout reads for a kind, or '' for the built-in base layout or Windows' menu (ToWindows).
 function LayoutFile(const Kind: string; out ToWindows: Boolean): string;
+// A note's text with its placeholders filled for the moment When (plan 03 3.6): {date} and {time} in Windows' short
+// date and time (the user's regional settings), {date:<picture>} and {time:<picture>} in Windows' date and time
+// pictures ("dddd d MMMM", "HH:mm"); {{ and }} a brace; anything else in braces, or a brace not closed, as typed.
+function FillNote(const Text: string; When: TDateTime): string;
 
 const
   MinTextSize = 0.6;   // the menu's text size (TMenuSettings.TextSize) from 60% to 250%
@@ -209,6 +213,79 @@ implementation
 
 uses
   Winapi.Windows, System.SysUtils, System.Classes, System.SyncObjs, System.Math, Dexmenu.Json, Dexmenu.Log;
+
+function FillNote(const Text: string; When: TDateTime): string;
+var
+  I, Close, Colon, Chars: Integer;
+  Inside, Name, Picture, Part: string;
+  Time: TSystemTime;
+  Buffer: array[0..255] of Char;
+  Format: PChar;
+begin
+  if Pos('{', Text) + Pos('}', Text) = 0 then
+    Exit(Text);
+  DateTimeToSystemTime(When, Time);
+  Result := '';
+  I := 1;
+  while I <= Length(Text) do
+  begin
+    if (Text[I] = '{') and (I < Length(Text)) and (Text[I + 1] = '{') then
+    begin
+      Result := Result + '{';
+      Inc(I, 2);
+      Continue;
+    end;
+    if (Text[I] = '}') and (I < Length(Text)) and (Text[I + 1] = '}') then
+    begin
+      Result := Result + '}';
+      Inc(I, 2);
+      Continue;
+    end;
+    if Text[I] = '{' then
+    begin
+      Close := Pos('}', Text, I + 1);
+      if Close > 0 then
+      begin
+        Inside := Copy(Text, I + 1, Close - I - 1);
+        Colon := Pos(':', Inside);
+        if Colon > 0 then
+        begin
+          Name := Trim(Copy(Inside, 1, Colon - 1));
+          Picture := Copy(Inside, Colon + 1, MaxInt);
+        end
+        else
+        begin
+          Name := Trim(Inside);
+          Picture := '';
+        end;
+        Format := nil;
+        if Picture <> '' then
+          Format := PChar(Picture);
+        Chars := 0;
+        if SameText(Name, 'date') then
+          if Format = nil then
+            Chars := GetDateFormatEx(nil, DATE_SHORTDATE, @Time, nil, Buffer, Length(Buffer), nil)
+          else
+            Chars := GetDateFormatEx(nil, 0, @Time, Format, Buffer, Length(Buffer), nil)
+        else if SameText(Name, 'time') then
+          if Format = nil then
+            Chars := GetTimeFormatEx(nil, TIME_NOSECONDS, @Time, nil, Buffer, Length(Buffer))
+          else
+            Chars := GetTimeFormatEx(nil, 0, @Time, Format, Buffer, Length(Buffer));
+        if Chars > 0 then
+        begin
+          SetString(Part, Buffer, Chars - 1);
+          Result := Result + Part;
+          I := Close + 1;
+          Continue;
+        end;
+      end;
+    end;
+    // not a placeholder: as typed
+    Result := Result + Text[I];
+    Inc(I);
+  end;
+end;
 
 type
   TLayout = class(TInterfacedObject, ILayout)
