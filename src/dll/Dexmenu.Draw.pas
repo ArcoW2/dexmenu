@@ -314,6 +314,16 @@ begin
   LevelWidths := Settings.Widths;
 end;
 
+// The room kept at a card's right for its mark; a button in a card with buttons that shows no mark keeps none, so
+// more buttons fit side by side.
+function MarkSpace(V: TViewCard): Single;
+begin
+  if V.InGroup and not V.HasSubmenu and ((ActionMark = '') or not (V.Kind in [vkItem, vkCommand])) then
+    Result := 8
+  else
+    Result := MarkWidth;
+end;
+
 function GroupNeed(V: TViewCard): Single; forward;
 
 // What a card's content needs across (DIP): the icon slot, its title, a shortcut, the mark; a divider's label; a note;
@@ -338,7 +348,7 @@ begin
     Result := TextWidth(V.Title, Fmt);
     if V.LookCard <> nil then
       Result := Max(Result, TextWidth(V.LookCard.Extra, ExtraFormat));
-    Result := TextLeft + Result + MarkWidth + 8;
+    Result := TextLeft + Result + MarkSpace(V) + 8;
     if V.Shortcut <> '' then
       Result := Result + TextWidth(V.Shortcut, ShortcutFormat) + ShortcutGap;
   end;
@@ -914,12 +924,12 @@ begin
       TitleBottom := TitleTop + TitleHeight;
     end;
     // the shortcut Windows' text gives ("Ctrl+X"), dim, at the right before the mark; the title stops short of it
-    TitleRight := R.right - MarkWidth;
+    TitleRight := R.right - MarkSpace(V);
     Shortcut := V.Shortcut;
     if Shortcut <> '' then
     begin
       T.DrawText(PWideChar(Shortcut), Length(Shortcut), ShortcutFormat, D2D1RectF(R.left + TextLeft, TitleTop,
-        R.right - MarkWidth, TitleBottom), Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        R.right - MarkSpace(V), TitleBottom), Extra, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       TitleRight := Max(R.left + TextLeft, TitleRight - TextWidth(Shortcut, ShortcutFormat) - ShortcutGap);
     end;
     // the access key (the letter Windows' text marks with "&") underlined: that key picks the item

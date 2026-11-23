@@ -40,6 +40,44 @@ static class ShippedLayouts
           ]
         }
         """),
+        ("Default B", """
+        {
+          "format": 1,
+          "lines": [
+            { "id": "search", "search": true },
+            { "line": [
+              { "id": "cut", "card": "Cut", "icon": "E8C6", "rules": [ { "name": { "equals": "Cut" } } ] },
+              { "id": "copy", "card": "Copy", "icon": "E8C8", "rules": [ { "name": { "equals": "Copy" } } ] },
+              { "id": "paste", "card": "Paste", "icon": "E77F", "rules": [ { "name": { "equals": "Paste" } } ] },
+              { "id": "rename", "card": "Rename", "icon": "E8AC", "rules": [ { "name": { "equals": "Rename" } } ] },
+              { "id": "delete", "card": "Delete", "icon": "E74D", "rules": [ { "name": { "equals": "Delete" } } ] }
+            ] },
+            { "id": "d1", "divider": "" },
+            { "line": [
+              { "id": "open", "card": "Open", "icon": "E8E5", "rules": [ { "name": { "equals": "Open" } } ] },
+              { "id": "openwith", "card": "Open with", "icon": "E7AC", "rules": [ { "name": { "regex": "^Open with(\\.\\.\\.)?$" } } ] },
+              { "id": "properties", "card": "Properties", "icon": "E946", "rules": [ { "name": { "equals": "Properties" } } ] }
+            ] },
+            { "id": "d2", "divider": "" },
+            { "line": [
+              { "id": "archive", "card": "Archive", "buttons": true, "rules": [ { "name": { "regex": "^(7-Zip|WinRAR|Extract All\\.\\.\\.)$" } } ] },
+              { "id": "code", "card": "Code", "buttons": true, "rules": [ { "name": { "regex": "^Open (with|in) (Code|Visual Studio)" } } ] }
+            ] },
+            { "line": [
+              { "id": "git", "card": "Git", "buttons": true, "rules": [ { "name": { "regex": "^(TortoiseGit$|Git |Open Git )" } } ] },
+              { "id": "svn", "card": "SVN", "buttons": true, "rules": [ { "name": { "regex": "^(TortoiseSVN$|SVN )" } } ] }
+            ] },
+            { "id": "d3", "divider": "" },
+            { "line": [ { "id": "rest", "card": "Rest", "rules": [ "remaining" ] } ] },
+            { "id": "d9", "divider": "" },
+            { "line": [
+              { "id": "about", "note": "Dexmenu - cards per program" },
+              { "id": "edit", "card": "Edit menu...", "own": "editMenu" },
+              { "id": "windows", "card": "Windows' menu", "own": "windowsMenu" }
+            ] }
+          ]
+        }
+        """),
         ("Default C", """
         {
           "format": 1,

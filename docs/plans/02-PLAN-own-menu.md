@@ -17,6 +17,7 @@ Status: partly executed; see Status.
 - 2026-11-22: partly executed: the items' icons in the preview.
 - 2026-11-22: partly executed: access keys and shortcuts; the search.
 - 2026-11-23: partly executed: items as buttons in a card.
+- 2026-11-23: partly executed: Default B.
 
 Builds on plan 01 (`01-PLAN-dexmenu.md`): its Delphi DLL, the hook on the show call, following the changes a program
 makes while the menu is shown, and handing back the chosen id. Plan 01's layout engine and its arranged Windows menu
@@ -62,7 +63,7 @@ the preview is the result.
 | Use counts | every choice counted per item (its path in Windows' menu and its text) and kind of right-click, in usage.json, after the menu closed; `{ "mostUsed": true }` in a layout: the items chosen most, side by side, most first, also items in submenus, disabled ones left out; how many: the main window (1 - 10, 3 when unset); "+ Most used" in the editor, moved and deleted as a divider; in the editor every card's count in the cards view's gutter (a card with a menu: the sum of what is in it); none on the preview | 3.9 |
 | Text size | Ctrl+scroll in the open menu: its text, cards and widths 10% larger or smaller (60% - 250%), its submenus closed, drawn again where it is; kept in settings.json (menu.textSize) once the menu closed; also set in the main window; the preview follows it | 3.4 |
 | Icons | left of the text, the first there is: the layout card's `icon` (a glyph of Segoe Fluent Icons by its code point, `E8C8`, or an icon in a file, `path,index`; on a card with a menu and on the items a card places, not the remaining card's), the item's own bitmap in Windows' menu, else none (an empty slot: a letter there would look like a key to type); set in the editor's card panel | 3.8 |
-| Shipped layouts | "Default A", "Default C" (by task) and "Default D" (minimal, without its search box yet), each written once into the layouts folder (settings.json `shipped`); every other kind on Default A at a first start; each ends with a note, "Edit menu..." and "Windows' menu" | 3.10 |
+| Shipped layouts | "Default A", "Default B" (cards per program), "Default C" (by task) and "Default D" (minimal), each written once into the layouts folder (settings.json `shipped`); every other kind on Default A at a first start; each ends with a note, "Edit menu..." and "Windows' menu" | 3.10 |
 | Icons in the preview | the items' own bitmaps kept as PNG files in the seen folder's `icons` (by a hash of the item's path and text), by every right-click and by the settings app's real menu of a folder; the preview draws them; an icon this process kept with the same pixels is not encoded again | 3.8 |
 | Icon probe | opt-in (HKCU Software Dexmenu, ProbeIcons = 1): at a right-click every owner-drawn item without a bitmap drawn by its owner window into Dexmenu's memory on black and on white, the icon cut from its left part; the drawings written to %LOCALAPPDATA%\Dexmenu\probe, the icon kept for the preview, the result logged; run in Explorer it gives nothing (removed in plan 10) | 3.8 |
 | Access keys and shortcuts | the `&` letter underlined in an item's own title, its key picks the item; the shortcut after a tab in Windows' text shown dim at the right, the card wide enough for it | 3.6 |
@@ -71,12 +72,12 @@ the preview is the result.
 | Note card | `{ "note": "<text>", "align": ... }` (left, with the items' text, centered, right): no button (no hover, skipped by keys and clicks), its text wrapped in the dim colour, as high as its text; "+ Note" in the editor, its text edited in the panel | 3.3 |
 | Preview | the same window drawn by the DLL inside the editor, from the seen items or Windows' live menu of a right-click in a chosen folder, and the layout being edited; items not always there striped | 3.8; plan 00 6.4, 6.5 |
 | Items as buttons in a card | `"buttons": true`: a card showing what it found as buttons inside it, a found submenu unfolded (Default B's cards per program); "Items as buttons" in the editor | 3.3; 6.1 |
+| Default B | the shipped layout "Default B": a search box, Cut / Copy / Paste / Rename / Delete, Open / Open with / Properties, cards per program (Archive, Code, Git, SVN) with their items as buttons, the rest | 3.10; 6.2 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Default B | the shipped layout "Default B" (cards per program, their items as buttons in the card) | -- | 3.10 |
 | Tests | 3.12: the rules, placement and editor parts tested (plan 00 6.5); the rest with their parts | -- | 3.12 |
 
 Moved out: Explorer's own icons (and an icon picker for cards) to plan 10.
@@ -410,17 +411,23 @@ Windows' texts, so they fit an English Windows until a rule on the verb is possi
   Dexmenu - default menu  [Edit menu...] [Windows' menu]
   ```
 
-- **B. Default B, cards per program** (not yet shipped: it needs items as buttons in a card). Each program's card shows its items as buttons in it (not a submenu); the icon row on
-  top; a search box.
+- **B. Default B, cards per program.** A search box; the icon row; Open, Open with and Properties; a card per program
+  (Archive: 7-Zip, WinRAR, Extract All; Code: Visual Studio, VS Code; Git; SVN) showing its items as buttons in it (not
+  a submenu), a program's own submenu unfolded; the rest; the note and Dexmenu's own items.
 
   ```
   [search............................]
   [Cut] [Copy] [Paste] [Rename] [Delete]
+  [Open]   [Open with  >]   [Properties]
   +----------------+ +----------------+
-  | LexPen         | | 7-Zip          |
-  | Edit  View     | | Add  Zip  7z   |
-  | Compare left   | | Extract here   |
+  | 7-Zip          | | Code           |
+  | Add  Zip  7z   | | Open with Code |
+  | Extract here   | |                |
   +----------------+ +----------------+
+  | Git            | | SVN            |
+  | Commit  Pull   | | Update  Commit |
+  +----------------+ +----------------+
+  (every other item, each a card)
   ```
 
 - **C. Default C, by task.** Places named after what is done, filled by rules across programs: Open (Open, Open with, Edit in
@@ -495,3 +502,15 @@ None.
 - Tested: unit tests (TestButtons: unfolding, titles, a button's submenu, the look, the boxes inside the card, the hit
   tests, a buttons card opening lazily filled submenus); the editor's self-test; in the preview, LexPen's and 7-Zip's
   cards side by side, 7-Zip unfolded and with its own border. Not tried at a real right-click.
+
+### 6.2 Default B
+
+- The program cards are found by Windows' texts: Archive (`7-Zip`, `WinRAR`, `Extract All...`), Code (`Open with`
+  or `Open in` Code or Visual Studio), Git (`TortoiseGit`, items starting with `Git ` or `Open Git `), SVN
+  (`TortoiseSVN`, items starting with `SVN `). A card that finds nothing is left out, so a missing program leaves no
+  empty card.
+- Properties sits beside Open and Open with: six cards in the icon row did not fit the menu's maximum width.
+- A button in a card with buttons keeps no room for a mark when it shows none, so more buttons fit side by side.
+- Tested: the layout files' self-test (the shipped layouts, Default B among them); the unit tests; in the preview,
+  from the seen items: 7-Zip unfolded in Archive, Visual Studio and VS Code in Code, TortoiseGit's and Git's items in
+  Git. Not tried at a real right-click.
