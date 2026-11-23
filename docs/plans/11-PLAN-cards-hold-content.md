@@ -1,8 +1,9 @@
 # Plan 11: Cards hold content: one item, a submenu, or cards arranged inside them; lines and groups become cards
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-23: draft.
+- 2026-11-23: partly executed: step 1, the DLL and format 2; the conversion script.
 
 Builds on plan 02 (`executed/02-PLAN-own-menu.md`): lines of cards, a card with a menu, a card placing what it
 found (3.3), items as buttons in a card (3.3, 6.1), the editor's cards view (3.5); plan 03 (`03-PLAN-menu-look.md`):
@@ -33,9 +34,10 @@ the next column, the columns sharing the width). A card that only arranges other
 nothing itself: that is what a line was, and what a group was, also in being left out when nothing in it shows. The
 menu is then one tree of cards, so rows of cards (a mosaic) and aligned columns are both a matter of what holds what.
 A card holding cards can have every style a card has (background, border, a title, which may look like a divider),
-and its hover style lights it up while the mouse is over anything inside it. The cards made for found items are made from a
-template the card holds: a card of its own, edited as any card, which every inner card follows; how they are
-aligned stays the holding card's. It is built in two steps: the DLL and the layout
+and its hover style lights it up while the mouse is over anything inside it. The cards made for found items follow templates the
+card holds: cards of their own, edited as any card, each with its states' looks; with several, the card says how
+its inner cards pick one, by their place (cycling) or by the rule that found them; how they are aligned stays the
+holding card's. It is built in two steps: the DLL and the layout
 format first, then the editor. The user's layouts (their "First" among them) are converted once to the new form; the
 shipped layouts are written in it.
 
@@ -45,19 +47,20 @@ shipped layouts are written in it.
 
 | Part | What | Reference |
 |---|---|---|
+| Format | format 2 read by the DLL (format 1 too, onto the same cards) | 3.1; 6.1 |
+| Placement | holders, found items inside a card or in a submenu, limits, "More", rest, shownWhen, templates by place or rule | 3.2; 3.3; 6.1 |
+| Measure and draw | measuring recursive through holders; holders' frames, titles (also as a divider), hover inside; square | 3.4; 6.1 |
+| Keys and hit tests | through the boxes in their order at any depth; a holder no stop | 3.4; 6.1 |
+| Conversion script | written and checked on the user's layouts (the same menus); not yet run on them | 3.7; 6.1 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Format | format 2: the menu a card; a card's rules or its `content` (cards, dividers, notes, the search box), and `show` (`item`, `submenu`, `row`, `column`) with `perRow`, `rows`, `perColumn`, `columns`, `rest`, `shownWhen`, `titleAs`, `template` | -- | 3.1 |
-| Placement | the tree placed: found items and placed cards in a card's content, shown as it says; a holder left out by `shownWhen` | Format | 3.2; 3.3 |
-| Measure and draw | a card's content measured and drawn inside it as its `show` says, recursively; a holder's style, title (or title as a divider) and hover while the mouse is inside it; found items made from the `template`; square cards | Placement | 3.4 |
-| Keys and hit tests | the arrows, a click and the hover through the tree of cards | Measure and draw | 3.4 |
 | Shipped layouts | Default A - D in format 2 | Format | 3.6 |
-| Conversion once | the user's layouts converted once to format 2 (a backup kept); nothing reads format 1 afterwards | Format | 3.7 |
+| Conversion run | the user's layouts converted once to format 2 (a backup kept), after both steps are published | Editor: panel | 3.7 |
 | Editor: tree | the cards view shows the tree: a card's content inside it; dragging into a card, beside a card, above or below it | Format | 3.5 |
-| Editor: panel | the card panel's Inside: Shows, per row, rows, per column, columns, the rest, shown when; Names: Title shown as; the template a card in the cards view, edited as a card | Editor: tree | 3.5 |
+| Editor: panel | the card panel's Inside: Shows, per row, rows, per column, columns, the rest, shown when; Names: Title shown as; Templates picked by; the templates cards in the cards view, edited as cards; a rule's template | Editor: tree | 3.5 |
 | Tests | 3.8 | -- | 3.8 |
 
 Moved in: all of plan 07 (groups), as holders without a style and their `shownWhen`.
@@ -93,14 +96,18 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
     anything inside it. Its title, when it has one (`title`), stands above its content: as a card's title, or with
     `"titleAs": "divider"` drawn as a divider with that text (its line and text in the dividers' look). With no style
     and no title it draws nothing itself (what a line or a group was).
-  - `template`: a card every inner card made for its found items follows when it shows them in a `row`, a `column` or
-    a `submenu`: its own and apart from the card's (the card's own layout and style are its box around them). A
+  - `templates`: the cards the inner cards made for its found items follow when it shows them in a `row`, a `column`
+    or a `submenu`: their own and apart from the card's (the card's own layout and style are its box around them). A
     template is a card without rules or content: its texts that apply to every item (`rename`, `extra`, `extraAt`,
     `icon`, `hint`), its layout (`height`, `square`, `minWidth`, `wrap`, `cardFit`) and its style (`background`,
-    `foreground`, `border`, `borderWidth`, `radius`, `hover`, `pressed`). Each inner card's title is its item's text
-    (with the template's rename). How the inner cards are aligned (`perRow`, `rows`, `perColumn`, `columns`, the
-    holder's `cardFit`) stays the holding card's. No template: the theme's card look, each as high as its content (as
-    buttons are now).
+    `foreground`, `border`, `borderWidth`, `radius`, and its states' looks `hover`, `pressed`, `disabled`). Each inner
+    card's title is its item's text (with its template's rename). How the inner cards are aligned (`perRow`, `rows`,
+    `perColumn`, `columns`, the holder's `cardFit`) stays the holding card's. No template: the theme's card look,
+    each as high as its content (as buttons are now).
+  - `templatesBy`, with more than one template: `"position"` (the default: the inner cards take them in turn, the
+    first card the first template, the second the second, and round again: two templates, every other card) or
+    `"rule"` (each inner card the template its rule names, `"template": 2` on the rule; a rule naming none the
+    first).
   - `square`: a card as high as it is wide.
   - `cardFit` (on a holder: how its cards fit a taller row, as a line's now) and `weight`, `minWidth`, `height`,
     `wrap`, `cardFit` on a card as now, within its holder.
@@ -116,7 +123,9 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
   show is the only change.
 - Used rules (plan 09) and own rules (plan 12) find items as any rule; ranks are as before.
 - The remaining card: its items in its own way as now (`item`: each a card of its own under each other).
-- An item found with a submenu of its own keeps it, in any `show`.
+- An item found with a submenu of its own keeps it as its submenu, except inside a card showing it in a `row` or
+  `column`: there it is unfolded, its submenu's items the inner cards (as buttons did, so a program's card shows that
+  program's items).
 
 ### 3.3 Holders and being shown
 
@@ -133,9 +142,11 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
 - A holder with a style or a title: its box (background, border, radius), its title on top (as a title, or as a
   divider), its content inside with a padding (as a card with buttons now). The mouse anywhere inside it: its `hover`
   look on its box, besides the hover of the card under the mouse.
-- Keys: the arrows move by position through what shows, at any depth (left and right within a row, up and down
-  between rows and columns); a holder is no stop of its own. The hover and a click hit the innermost
-  card.
+- Keys: up and down move through the cards in their order, at any depth, as through the cards of lines now; a holder
+  is no stop of its own. The hover and a click hit the innermost card.
+- A row of held cards shares its width as a line's cards do (wrapping where their minimum widths do not fit); a row
+  of found items without `perRow` flows, each as wide as its content, wrapping where they do not fit (as buttons).
+- A holder with nothing in it but dividers (its cards found nothing) is left out, also in the preview.
 - The preview draws the same; a holder left out by `shownWhen` shows striped there (as plan 02 3.8 does for cards
   that show nothing at a right-click).
 
@@ -143,6 +154,8 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
 
 - The cards view shows the tree: a card's content inside it, drawn as now for a card with a menu; a holder without a
   style or title as a light outline (as a line now). Its `show` named on it ("row", "column 3 per column", "submenu").
+- With more than one template: "Templates picked by" (place, rule) in the card's Inside panel, disabled with one or
+  none; by rule, each rule's panel names its template.
 - Dragging: onto a card's top or bottom edge, a card above or below it in the same holder; onto its left or right
   edge, beside it (into a row holder made there when the holder is a column); onto its middle, into it (its content
   at the end). The gutter's line selection becomes a holder's selection: a click beside a holder selects it.
@@ -153,7 +166,8 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
   own inside it, marked as the template (dashed, "Template"), first in it; "+ Template" adds one, "x" removes it.
   Selected, it is edited in the card panel as any card: its Names (rename, extra text, icon, hint), Layout and Style
   panels; no Rules or Inside. Its style is copied and pasted as any card's.
-- No conversion in the editor: it reads and writes format 2 only.
+- No conversion in the editor: it reads and writes format 2 only. (The DLL still reads format 1 as well: its unit
+  tests are written in it, and it is read onto the same cards.)
 
 ### 3.6 Shipped layouts
 
@@ -164,11 +178,14 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
 
 - A script run once (not part of the settings app or the DLL) converts every layout in the user's layouts folder to
   format 2 and keeps the old files in a backup folder beside it. How: the lines as the menu's `column`; a line of one
-  card: that card; of more: a `row` holder without a style holding them, the line's `cardFit` on it; a card with a
-  menu: `show: "submenu"` with its menu as `content`; a card with buttons: `show: "row"` with the theme's card
-  border; everything else as it is.
-- Run when step 1 (the DLL and the format) is published, so the menu reads the converted layouts at once; the user's
-  "First" checked by hand after it. The settings' `shipped` list is left as it is (the shipped layouts already
+  card: that card; of more: a `row` holder without a style holding them, shown whenever anything in it shows
+  (`"shownWhen": "always"`, as a line), the line's `cardFit` on it; a card with a menu: `show: "submenu"` with its
+  menu as `content`; a card with buttons: `show: "row"`; Dexmenu's own card a card with an own rule; everything else
+  as it is. `tools/convert-layouts-to-format-2.py`; `--to <folder>` writes the converted files elsewhere to look first.
+- Checked before it runs: `DexmenuUnitTests --compare <old> <new> <kinds>` places each kind's seen menu with the old
+  and the converted layout, in the preview and at a right-click, and compares every box (kind, title, place, size).
+- Run when both steps are published (the editor reads format 2 only, so not before), so the menu and the editor read
+  the converted layouts at once; the user's "First" checked by hand after it. The settings' `shipped` list is left as it is (the shipped layouts already
   written are converted with the others).
 
 ### 3.8 Tests
@@ -187,3 +204,22 @@ Moved in: all of plan 07 (groups), as holders without a style and their `shownWh
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 Step 1: the DLL and format 2
+
+- Read onto the cards the DLL had: a format 2 card's `content` is its lines, one card (or divider, or search box) to
+  a line; `show` and the rest on the card (`TCard.Shows`, `PerRow`, ..., `Templates`, `TemplatesBy`); a rule's
+  `template`. Format 1 is read as before onto the same cards (`menu`: show submenu; `buttons`: show row).
+- Placed (`Dexmenu.Place`): a card holding cards, or a card showing its found items in a row or column, becomes a
+  holder view (`vkGroup`) with its inner lines (`Inner`), arranged by `Arrange` (a row `perRow` to a line, a column
+  filled column by column, beyond the capacity "More" or nothing); "More" and a card's found items in a submenu open
+  with `TPlacement.LevelOf`. Each inner card has its template (`Template`), picked by its place or its rule.
+- Measured (`Dexmenu.Draw`): `LayLines` lays out lines at a width and recurses into holders; a level is its lines at
+  the level's width. Drawn: a holder without a frame draws nothing; a framed one its box, its title (bold, or as a
+  divider), and its own `hover` look while the selected card is inside it.
+- Tested: the unit tests (format 1 as before, and format 2: a row holder and its boxes, a framed holder, templates by
+  place and by rule, More and its submenu, rest none, a column per column, found items in a submenu, shownWhen at a
+  right-click and in the preview, square, errors); `--compare` on the user's five layouts: the same boxes in every
+  kind, in the preview and at a right-click.
