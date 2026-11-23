@@ -118,6 +118,16 @@ h2 button { white-space: nowrap; }
 /* the selected card */
 .field { display: grid; grid-template-columns: 110px 1fr; gap: 4px 8px; align-items: center; margin: 3px 0; }
 .field input[type=text], .field textarea { width: 100%; box-sizing: border-box; }
+/* a colour picker (plan 03 3.6): the swatch over a checkerboard, so an opacity shows */
+.color-controls { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
+.color-controls input[type=text] { flex: 1 1 160px; width: auto; }
+.color-controls input[type=color] { width: 32px; height: 22px; padding: 0; border: 1px solid var(--line); background: none; }
+.swatch { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 4px; flex: none;
+  background: linear-gradient(var(--swatch), var(--swatch)), repeating-conic-gradient(#999 0 25%, #fff 0 50%) 0 0 / 10px 10px; }
+.slider { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.slider input[type=range] { width: 90px; }
+.slider-value { min-width: 2.4em; text-align: right; color: var(--dim); }
+[hidden] { display: none !important; }
 textarea { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; resize: vertical; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .rule { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }

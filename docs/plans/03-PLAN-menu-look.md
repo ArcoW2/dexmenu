@@ -5,6 +5,7 @@ Status: partly executed; see Status.
 - 2026-11-21: draft.
 - 2026-11-22: partly executed: theme files; the shipped themes; gradients.
 - 2026-11-23: partly executed: lines and cards; the card.
+- 2026-11-23: partly executed: the colour fields.
 
 Plan 02 (`executed/02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -41,6 +42,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
+| Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: the theme's, a colour, a colour of the theme's palette, or JSON for a gradient; an intensity and an opacity; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
@@ -56,7 +58,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Submenu panels | next, under, replace: where they appear and how they look | -- | 3.9 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
 | Preview marks | striped unavailable items, new | -- | 3.10 |
-| Colour fields | the card panel's colours each a picker: a colour or a palette colour, an intensity and an opacity | -- | 3.6 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -387,3 +388,19 @@ None.
   own background only, `none`, the extra text's line height); the editor's self-test; by hand in the editor's
   preview: tall cards with their icons on top, extra text below and above, a card with its own background, border
   and radius, a pressed card in `dark-forest`.
+
+### 6.6 Colour fields
+
+- The DLL gives the palette of the theme the preview draws with (`DexmenuThemePalette`: `{ "<name>": "#rrggbbaa" }`,
+  each palette colour resolved, `basecolor` among them); the settings app posts it to the editor with every reload,
+  so a theme switched in the main window or the editor shows in the pickers.
+- A picker per colour field: a swatch (over a checkerboard, so the opacity shows), a choice of the theme's, a colour
+  (Windows' colour picker of the web view), each palette colour by name (its option tinted with its colour), or a
+  gradient or other as JSON; with a colour or a palette colour an Intensity slider (0 - 200) and an Opacity slider
+  (0 - 100), written when let go. A palette name the theme lacks stays in the list.
+- Read and written by the layout model (`colorState`, `colorValue`, `colorCss`): `#rgb` and `#rrggbbaa` read (the
+  alpha as the opacity), written as `#rrggbb` or the name alone at 100 / 100, else `{ color, intensity, opacity }`
+  with only what differs from 100; JSON that does not parse leaves the value as it was.
+- Tested: the editor's self-test (reading, the shortest form, a gradient and `none` kept, the swatch's colour with an
+  intensity below and above 100, the palette's alpha, an opacity); the palette export called for light and dark. The
+  pickers themselves not yet looked at by hand.

@@ -22,6 +22,7 @@ let selectedId = null;
 let selectedRule = -1;   // index on the selected card
 let hoverId = null;
 const collapsed = new Set();   // cards with a menu shown folded (this session only)
+let palette = {};  // the theme's palette, { name: "#rrggbbaa" } (the app, DexmenuThemePalette): the colour pickers
 let counts = {};   // the stored use counts per card id of what the preview shows (the app, DexmenuPreviewCounts)
 let dirty = false;
 let lastSent = "";
@@ -365,21 +366,98 @@ function sizeFields(card) {
     number("height", "Height", "(its content) in lines of text"), fitRow];
 }
 
-// A card's own look over the theme's (plan 03 3.6): a colour as "#rrggbb", a theme palette name ("accent"), or empty
-// for the theme's; the hover background the same. A background or colour given as an object in the file (a gradient,
-// an intensity) shows as JSON and is kept as it is unless changed here.
-function lookFields(card) {
-  const colorField = (label, get, set, placeholder) => {
-    const v = get();
-    return textField(label, v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v), text => {
-      const t = text.trim();
-      let value;
-      if (t.startsWith("{")) { try { value = JSON.parse(t); } catch { value = undefined; } }
-      else if (t) value = t;
-      set(value);
-      changed();
-    }, placeholder);
+// A colour picker (plan 03 3.6): the theme's (nothing given), a colour picked, a colour of the theme's palette by
+// name, or a gradient or anything else as JSON; for a colour or a palette colour an intensity (0 - 200, 100 the colour
+// itself) and an opacity (0 - 100). Written in its shortest form (LayoutModel.colorValue).
+function colorField(label, get, set) {
+  let state = M.colorState(get());
+  const row = el("div", "field color-field");
+  const controls = el("span", "color-controls");
+  const swatch = el("span", "swatch");
+  const source = el("select");
+  const option = (value, text, color) => {
+    const o = el("option", "", text);
+    o.value = value;
+    if (color) { o.style.background = color; o.style.color = "inherit"; }
+    source.append(o);
   };
+  option("theme", "(the theme's)");
+  option("pick", "a colour");
+  const names = Object.keys(palette);
+  if (state.mode === "pick" && !state.base.startsWith("#") && !names.includes(state.base)) names.push(state.base);
+  for (const n of names) option("name:" + n, n, M.colorCss({ mode: "pick", base: n, intensity: 100, opacity: 100 }, palette));
+  option("json", "a gradient or other (JSON)");
+  source.value = state.mode === "pick" ? (state.base.startsWith("#") ? "pick" : "name:" + state.base) : state.mode;
+  const picker = el("input");
+  picker.type = "color";
+  picker.value = state.mode === "pick" && state.base.startsWith("#") ? state.base : "#808080";
+  const slider = (min, max, value, title) => {
+    const r = el("input");
+    r.type = "range";
+    r.min = min;
+    r.max = max;
+    r.value = value;
+    const shown = el("span", "slider-value", String(value));
+    const box = el("label", "slider");
+    box.title = title;
+    box.append(r, shown);
+    return [box, r, shown];
+  };
+  const [intensityBox, intensity, intensityShown] = slider(0, 200, state.intensity ?? 100,
+    "Intensity: 0 the theme's base colour, 100 the colour itself, 200 towards the base colour inverted");
+  const [opacityBox, opacity, opacityShown] = slider(0, 100, state.opacity ?? 100, "Opacity: 0 invisible, 100 solid");
+  intensityBox.prepend("Intensity ");
+  opacityBox.prepend("Opacity ");
+  const json = el("input");
+  json.type = "text";
+  json.value = state.mode === "json" ? state.text : "";
+  json.placeholder = '{ "gradient": [ "accent", "surface" ] } or "none"';
+  const show = () => {
+    picker.hidden = source.value !== "pick";
+    intensityBox.hidden = opacityBox.hidden = state.mode !== "pick";
+    json.hidden = state.mode !== "json";
+    swatch.hidden = state.mode !== "pick";
+    swatch.style.setProperty("--swatch", M.colorCss(state, palette) || "transparent");
+  };
+  const write = () => {
+    const r = M.colorValue(state);
+    if (!r.ok) return;
+    set(r.value);
+    changed();
+  };
+  // the sliders' values follow while dragging; written when let go
+  const live = () => {
+    state.intensity = +intensity.value;
+    state.opacity = +opacity.value;
+    intensityShown.textContent = intensity.value;
+    opacityShown.textContent = opacity.value;
+    show();
+  };
+  intensity.addEventListener("input", live);
+  opacity.addEventListener("input", live);
+  intensity.addEventListener("change", write);
+  opacity.addEventListener("change", write);
+  picker.addEventListener("change", () => { state.base = picker.value; write(); });
+  json.addEventListener("change", () => { state.text = json.value.trim(); write(); });
+  source.addEventListener("change", () => {
+    const v = source.value;
+    if (v === "theme") state = { mode: "theme" };
+    else if (v === "json") state = { mode: "json", text: state.mode === "pick" ? JSON.stringify(M.colorValue(state).value) : "" };
+    else {
+      const keep = state.mode === "pick" ? state : { intensity: 100, opacity: 100 };
+      state = { mode: "pick", base: v === "pick" ? picker.value : v.slice(5), intensity: keep.intensity, opacity: keep.opacity };
+    }
+    if (state.mode !== "json" || state.text) write(); else show();
+  });
+  controls.append(swatch, source, picker, intensityBox, opacityBox, json);
+  row.append(el("span", "", label), controls);
+  show();
+  return row;
+}
+
+// A card's own look over the theme's (plan 03 3.6): its colours as pickers (colorField), the hover background the
+// same; the radius a number.
+function lookFields(card) {
   const own = name => ({ get: () => card[name], set: v => { if (v === undefined) delete card[name]; else card[name] = v; } });
   const hover = {
     get: () => card.hover && card.hover.background,
@@ -399,15 +477,15 @@ function lookFields(card) {
   const extraRow = el("label", "field");
   extraRow.append(el("span", "", "Extra text at"), extraAt);
   return [extraRow,
-    colorField("Background", own("background").get, own("background").set, "(the theme's) e.g. #d03030 or accent"),
-    colorField("Text colour", own("foreground").get, own("foreground").set, "(the theme's)"),
-    colorField("Border", own("border").get, own("border").set, "(the theme's: none)"),
+    colorField("Background", own("background").get, own("background").set),
+    colorField("Text colour", own("foreground").get, own("foreground").set),
+    colorField("Border", own("border").get, own("border").set),
     textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
       const n = Number(v.trim());
       if (v.trim() && n >= 0) card.radius = n; else delete card.radius;
       changed();
     }, "(the theme's) corners, in DIP"),
-    colorField("Hover background", hover.get, hover.set, "(the theme's)")];
+    colorField("Hover background", hover.get, hover.set)];
 }
 
 function matchEditor(match, onChange) {
@@ -1148,5 +1226,9 @@ chrome.webview.addEventListener("message", e => {
     else if (hoverId !== m.cardId) { hoverId = m.cardId; render(); }
   }
   else if (m.type === "counts") { counts = m.counts || {}; placeToggles(); }
+  else if (m.type === "palette") {
+    const next = m.palette || {};
+    if (JSON.stringify(next) !== JSON.stringify(palette)) { palette = next; renderCardPane(); }
+  }
   else if (m.type === "saved") { dirty = false; $("dirty").hidden = true; }
 });

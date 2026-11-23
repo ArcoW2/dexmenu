@@ -52,6 +52,9 @@ function Render(const G: TGeometry; Selected: Integer; ScrollY, Scale, VisibleHe
 // The look light or dark as told (the settings app's theme switch, plan 05 3.3): 0 as Windows' apps are, 1 light,
 // 2 dark. Only the settings app calls it; a right-click follows Windows.
 procedure DexmenuSetTheme(Mode: Integer); stdcall;
+// The palette of the theme the preview draws with (DexmenuSetTheme's mode), as TTheme.PaletteText, into Buffer; the
+// number of characters it needs (with the #0).
+function DexmenuThemePalette(Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 // The box at a point (DIP within the level, scroll applied), or -1.
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
 
@@ -108,6 +111,22 @@ var
 procedure DexmenuSetTheme(Mode: Integer); stdcall;
 begin
   ThemeMode := Mode;
+end;
+
+function DexmenuThemePalette(Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+var
+  Text: string;
+begin
+  Text := '{}';
+  try
+    Text := CurrentTheme(TLook.Current.Dark).PaletteText;
+  except
+    on E: Exception do
+      Log('theme palette: ' + E.Message);
+  end;
+  Result := Length(Text) + 1;
+  if (Buffer <> nil) and (Chars > 0) then
+    StrPLCopy(Buffer, Text, Chars - 1);
 end;
 
 class function TLook.Current: TLook;

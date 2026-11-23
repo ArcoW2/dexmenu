@@ -252,6 +252,7 @@ sealed class EditorForm : Form, IThemed
         if (!pageReady) return;
         PostPreviewBar();
         PostCounts();
+        PostPalette();
         if (editedText is not null)
         {
             Post(new { type = "preview", error });
@@ -267,6 +268,13 @@ sealed class EditorForm : Form, IThemed
     {
         if (preview == IntPtr.Zero) return;
         Post(new { type = "counts", counts = System.Text.Json.Nodes.JsonNode.Parse(Native.PreviewCounts(preview)) });
+    }
+
+    // the theme's palette for the card panel's colour pickers (plan 03 3.6), with every reload: the theme may have changed
+    void PostPalette()
+    {
+        try { Post(new { type = "palette", palette = System.Text.Json.Nodes.JsonNode.Parse(Native.ThemePalette()) }); }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or System.Text.Json.JsonException) { }
     }
 
     void Placed(int previewEvent, string cardId, int rule) =>

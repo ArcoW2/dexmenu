@@ -41,6 +41,9 @@ type
       Own: TJSONObject = nil; StateOnly: Boolean = False): Boolean;
     // A property's number (a radius, a width): as Color, a number.
     function Number(const Element, State, Prop: string; Default: Single; Own: TJSONObject = nil): Single;
+    // The palette's colours resolved, as JSON { "<name>": "#rrggbbaa" } in the palette's order, basecolor among them
+    // (the editor's colour pickers, plan 03 3.6); a name that does not resolve left out.
+    function PaletteText: string;
   end;
 
 // A colour from its text: "#rgb", "#rrggbb", "#rrggbbaa", "rgba(r, g, b, a)", "rgb(r, g, b)".
@@ -323,6 +326,30 @@ begin
     if TJSONObject(V).GetValue('opacity') is TJSONNumber then
       Color.A := Max(0, Min(100, TJSONNumber(TJSONObject(V).GetValue('opacity')).AsDouble)) / 100;
     Exit(True);
+  end;
+end;
+
+function TTheme.PaletteText: string;
+var
+  Json: TJSONObject;
+  P: TJSONPair;
+  C: TRGBA;
+
+  function Hex(V: Single): string;
+  begin
+    Result := IntToHex(Round(Max(0, Min(1, V)) * 255), 2);
+  end;
+
+begin
+  Json := TJSONObject.Create;
+  try
+    if FPalette <> nil then
+      for P in FPalette do
+        if Resolve(P.JsonValue, C) then
+          Json.AddPair(P.JsonString.Value, LowerCase('#' + Hex(C.R) + Hex(C.G) + Hex(C.B) + Hex(C.A)));
+    Result := Json.ToJSON;
+  finally
+    Json.Free;
   end;
 end;
 

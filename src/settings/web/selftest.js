@@ -248,6 +248,27 @@
       "a card with a wrong rank outlined red, with a reversed range not");
   }
 
+  // the colour pickers (plan 03 3.6): read, written in the shortest form, shown
+  {
+    const back = v => JSON.stringify(M.colorValue(M.colorState(v)).value);
+    check(M.colorState(undefined).mode === "theme" && M.colorValue({ mode: "theme" }).value === undefined, "nothing given: the theme's");
+    check(back("#D03030") === '"#d03030"' && back("#abc") === '"#aabbcc"' && back("accent") === '"accent"',
+      "a colour and a palette name: written alone");
+    check(back({ color: "accent", intensity: 100, opacity: 100 }) === '"accent"', "intensity and opacity 100: the name alone");
+    check(back({ color: "surface", intensity: 80 }) === '{"color":"surface","intensity":80}' &&
+      back("#11223380") === '{"color":"#112233","opacity":50}', "an intensity, an opacity (also from #rrggbbaa): only what differs");
+    check(M.colorState({ gradient: ["a", "b"] }).mode === "json" && M.colorState("none").mode === "json" &&
+      back({ gradient: ["a", "b"] }) === '{"gradient":["a","b"]}', "a gradient and none: JSON, kept");
+    check(!M.colorValue({ mode: "json", text: "{ bad" }).ok, "JSON that does not parse: not written");
+    const pal = { basecolor: "#000000ff", accent: "#ff0000ff", glass: "#ffffff80" };
+    check(M.colorCss(M.colorState("accent"), pal) === "rgba(255, 0, 0, 1)" &&
+      M.colorCss(M.colorState({ color: "accent", intensity: 50 }), pal) === "rgba(128, 0, 0, 1)" &&
+      M.colorCss(M.colorState({ color: "accent", intensity: 200 }), pal) === "rgba(255, 255, 255, 1)" &&
+      M.colorCss(M.colorState("glass"), pal) === "rgba(255, 255, 255, 0.5019607843137255)" &&
+      M.colorCss(M.colorState({ color: "glass", opacity: 20 }), pal) === "rgba(255, 255, 255, 0.2)",
+      "the swatch: a palette colour, an intensity towards the base and past it, the palette's alpha, an opacity");
+  }
+
   // comments
   check(M.withoutComments('{ "r": "a//b" } // c') === '{ "r": "a//b" } \n', "// inside a string kept, after it a comment");
 

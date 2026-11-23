@@ -83,6 +83,70 @@ const LayoutModel = (() => {
 
   // ---- rules ----------------------------------------------------------------------------------------------------
 
+  // ---- colours (plan 03 3.2, 3.6) ---------------------------------------------------------------------------------
+
+  const hexColor = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+  const paletteName = /^[A-Za-z][\w-]*$/;
+
+  // A colour value of a card's look as the picker shows it: mode "theme" (none given), "pick" (a colour or a palette
+  // name, with an intensity and an opacity) or "json" (a gradient, "none", anything else, as text).
+  function colorState(value) {
+    if (value === undefined) return { mode: "theme" };
+    let base = value, intensity = 100, opacity = 100;
+    if (value && typeof value === "object" && !Array.isArray(value) && typeof value.color === "string" &&
+      Object.keys(value).every(k => ["color", "intensity", "opacity"].includes(k)) &&
+      (value.intensity === undefined || typeof value.intensity === "number") &&
+      (value.opacity === undefined || typeof value.opacity === "number")) {
+      base = value.color;
+      if (value.intensity !== undefined) intensity = value.intensity;
+      if (value.opacity !== undefined) opacity = value.opacity;
+    }
+    if (typeof base === "string" && hexColor.test(base)) {
+      let h = base.slice(1).toLowerCase();
+      if (h.length === 3) h = [...h].map(c => c + c).join("");
+      if (h.length === 8) { if (base === value) opacity = Math.round(parseInt(h.slice(6), 16) / 255 * 100); h = h.slice(0, 6); }
+      return { mode: "pick", base: "#" + h, intensity, opacity };
+    }
+    if (typeof base === "string" && base !== "none" && paletteName.test(base)) return { mode: "pick", base, intensity, opacity };
+    return { mode: "json", text: JSON.stringify(value) };
+  }
+
+  // The value written for a picker's state, in its shortest form: nothing for the theme's; "#rrggbb" or the palette name
+  // alone at intensity and opacity 100, else { color, intensity, opacity } with only what differs from 100. JSON
+  // text that does not parse: undefined with ok false (left as it was).
+  function colorValue(state) {
+    if (state.mode === "theme") return { ok: true, value: undefined };
+    if (state.mode === "json") {
+      try { return { ok: true, value: JSON.parse(state.text) }; } catch { return { ok: false }; }
+    }
+    const intensity = Math.max(0, Math.min(200, Math.round(state.intensity)));
+    const opacity = Math.max(0, Math.min(100, Math.round(state.opacity)));
+    if (intensity === 100 && opacity === 100) return { ok: true, value: state.base };
+    const v = { color: state.base };
+    if (intensity !== 100) v.intensity = intensity;
+    if (opacity !== 100) v.opacity = opacity;
+    return { ok: true, value: v };
+  }
+
+  // A picker's colour as CSS (the swatch), with the theme's palette ({ name: "#rrggbbaa" }, basecolor among them) for
+  // a palette name and the intensity: 0 the base colour, 100 the colour, 200 the base colour inverted. "" unknown.
+  function colorCss(state, palette) {
+    if (state.mode !== "pick") return "";
+    const rgba = text => {
+      const h = (text || "").slice(1);
+      if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(h)) return null;
+      return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).concat(h.length === 8 ? parseInt(h.slice(6), 16) / 255 : 1);
+    };
+    const c = rgba(hexColor.test(state.base) ? state.base : palette && palette[state.base]);
+    if (!c) return "";
+    const base = rgba(palette && palette.basecolor) || [0, 0, 0, 1];
+    const t = state.intensity;
+    const mixed = [0, 1, 2].map(i => Math.round(t <= 100 ? base[i] + (c[i] - base[i]) * t / 100
+      : c[i] + (255 - base[i] - c[i]) * (t - 100) / 100));
+    const alpha = state.opacity !== 100 || hexColor.test(state.base) ? state.opacity / 100 : c[3];
+    return "rgba(" + mixed.join(", ") + ", " + alpha + ")";
+  }
+
   // A used rule's rank (plan 09 3.1): none, a number from 1, or a text with one ("3") or a range ("1-3", "3-1").
   function rankProblem(rank) {
     if (rank === undefined) return "";
@@ -478,7 +542,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem,
+  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, colorState, colorValue, colorCss,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addMostUsed, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

@@ -48,6 +48,18 @@ static class Native
     }
 
     [DllImport(Dll, CharSet = CharSet.Unicode)]
+    static extern int DexmenuThemePalette(StringBuilder? buffer, int chars);
+
+    /// <summary>The palette of the theme the preview draws with, as JSON { "name": "#rrggbbaa" } (plan 03 3.6).</summary>
+    public static string ThemePalette()
+    {
+        var chars = DexmenuThemePalette(null, 0);
+        var buffer = new StringBuilder(chars);
+        DexmenuThemePalette(buffer, chars);
+        return buffer.ToString();
+    }
+
+    [DllImport(Dll, CharSet = CharSet.Unicode)]
     static extern int DexmenuPreviewCounts(IntPtr wnd, StringBuilder? buffer, int chars);
 
     /// <summary>The stored use counts per card of what the preview shows, as JSON { "card id": count }.</summary>
