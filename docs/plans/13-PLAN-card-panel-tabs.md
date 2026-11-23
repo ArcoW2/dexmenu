@@ -19,10 +19,10 @@ picker), 11 (several found as cards, per row, square) and 12 (own rules) add mor
 At the top of the card panel, always shown and fixed, the card's name. Under it the card's fields are grouped by
 subject: Names (what the card and its items show as text, the icon, the hint, the comment), Rules (what the card
 finds), Inside (how what it found is shown and opens), Layout (its size and place on its line) and Look (its colours
-and corners). Each group is a panel the user drags where they want it: onto another panel, the two become tabs; at
-the top or bottom of another, they stand under each other, also inside a tab, which is then named for its groups
-("Layout/Look"). So all as tabs, all under each other, or any mix is the user's choice, and the arrangement is
-remembered. A card shows only the groups that apply to its kind. A group with anything set in it is marked, and the Rules group shows a
+and corners). Each group is a panel the user drags where they want it: above or below another, they stand under each
+other; onto another panel, the two become tabs; onto a tab, a new tab; into a tab, under each other in that tab,
+which is then named for its panels ("Layout/Look"). A panel holds only its fields, never tabs. So all as tabs, all
+under each other, or any mix is the user's choice, and the arrangement is remembered. A card shows only the groups that apply to its kind. A group with anything set in it is marked, and the Rules group shows a
 problem in red; the tab chosen in a panel stays when another card is selected.
 
 ## Status
@@ -37,7 +37,7 @@ problem in red; the tab chosen in a panel stays when another card is selected.
 | Part | What | Waits for | Reference |
 |---|---|---|---|
 | Groups | the card's name fixed at the top; the other fields in the groups Names, Rules, Inside, Layout, Look; per kind of card the groups that apply | -- | 3.1; 3.2 |
-| Panels arranged | each group a panel, dragged onto another (tabs) or to the top or bottom of another (under each other, also inside a tab, the tab named for its groups); the arrangement remembered | Groups | 3.3 |
+| Panels arranged | each group a panel, dragged above or below another (under each other), onto another (both tabs), onto a tab (a new tab) or into a tab (under each other in it, the tab named for its panels); the arrangement remembered | Groups | 3.3 |
 | Group marks | a group with anything set marked; the Rules group red with an invalid rule; its count of rules | Groups | 3.4 |
 | Tab kept | the chosen tab of each panel kept across selections; the Rules group shown when a rule is selected in the rules view or the preview | Panels arranged | 3.4 |
 | Tests | 3.5 | Groups | 3.5 |
@@ -75,23 +75,25 @@ Submenus open sits in Inside: it is about what opens from the card.
 
 ### 3.3 Panels the user arranges
 
-- Under the fixed name, panels stand under each other. A panel holds one or more tabs; a tab holds one or more groups
-  under each other. A panel with one tab shows no tab line: just its box with the tab's name on the border line (as
-  a rule's box). A tab's name is its groups' names joined ("Layout/Look"); each group in it keeps its own title above
-  its fields when there are several.
-- A group's title (on its panel's border line, on its tab, or above its fields inside a tab) is its handle:
-  - dropped onto another panel (its middle, or its tab line): a new tab of that panel;
-  - dropped at the top or bottom edge of another panel: a panel of its own above or below it;
-  - dropped at the top or bottom of a group inside a tab: under each other with that group, in that tab.
-  A tab left without groups goes, a panel left without tabs goes. While dragging, the place it would go is shown;
-  Esc cancels.
-- So every arrangement is the user's: all groups as tabs of one panel, all under each other, or any mix (Names and
-  Rules as tabs, a third tab Layout/Look, Inside under them).
+- Each group is a panel: a box with its name on the border line (as a rule's box), its fields in two columns. A panel
+  holds only its fields, never tabs.
+- Under the fixed name stand, under each other, panels and sets of tabs. A set of tabs shows one tab at a time; a tab
+  holds one or more panels under each other, and its name is its panels' names joined ("Layout/Look").
+- A panel's name (on its border line) is its handle. Where it is dropped:
+  - at the top or bottom edge of a panel or a set of tabs standing on its own: a panel on its own above or below it;
+  - onto a panel standing on its own (its middle): the two become a set of tabs, a tab each;
+  - onto a tab (its name in the tab line): a new tab of that set, after it;
+  - inside a tab (its content): into that tab at that place, at the top, the bottom or between its panels; the
+    panels there make room for it.
+  A tab left without panels goes; a set of tabs left with one tab becomes the panels of that tab standing on their
+  own. While dragging, the place it would go is shown; Esc cancels.
+- So every arrangement is the user's: all as tabs of one set, all under each other, or any mix (Names on its own,
+  then a set of tabs Rules, Inside and Layout/Look).
 - The arrangement is remembered by the editor (its own storage, the same in every editor window) until changed; not
   in the layout. The first arrangement: every group a panel of its own, under each other, in the order Names, Rules,
   Inside, Layout, Look.
-- A card whose kind lacks a group (3.2) shows the panels without it: a tab holding only groups it lacks is not shown,
-  nor a panel left with no tab to show, and a tab's name lists only the groups shown. The arrangement itself stays as
+- A card whose kind lacks a group (3.2) shows the arrangement without that panel: a tab holding only panels it lacks
+  is not shown, nor a set of tabs left with none, and a tab's name lists only the panels shown. The arrangement itself stays as
   the user made it.
 
 ### 3.4 Marks and the tab kept
@@ -100,8 +102,8 @@ Submenus open sits in Inside: it is about what opens from the card.
   border, so it is seen where a card has something of its own.
 - The Rules group shows the number of the card's rules ("Rules 3") and is red when one of them is invalid, as the card
   is outlined red in the cards view.
-- In a panel of tabs, the tab chosen stays chosen when another card is selected; when that card's kind has no such
-  group, the panel's first tab that applies shows. Selecting a rule (in the rules view, or by clicking an item in the
+- In a set of tabs, the tab chosen stays chosen when another card is selected; when that card's kind has none of its
+  panels, the set's first tab that applies shows. Selecting a rule (in the rules view, or by clicking an item in the
   preview) shows the Rules group (its tab chosen when it is one) and scrolls to the rule.
 - The tabs chosen last the editor window's session; the arrangement is what is remembered.
 
@@ -109,13 +111,13 @@ Submenus open sits in Inside: it is about what opens from the card.
 
 - The editor's self-test: per kind of card the groups shown; every field of the card panel in exactly one group (a
   list in the model checked against the fields the panel builds); a group's dot with a field set; the Rules group's
-  count and red with an invalid rule; an arrangement changed in the model (a group onto another panel as a tab, above
-  and below a panel, at the top and bottom of a group inside a tab, the tab's name; the last group taken out of a tab
-  and of a panel) and read back after a restart; the name always at the top.
-- By hand: dragging groups into tabs and under each other, Esc while dragging; the tab kept across selections; the
+  count and red with an invalid rule; an arrangement changed in the model (a panel above and below another, onto
+  another as a set of tabs, onto a tab, into a tab at its top, bottom and between its panels, the tab's name; the last
+  panel taken out of a tab, a set left with one tab) and read back after a restart; the name always at the top.
+- By hand: dragging panels into tabs and under each other, Esc while dragging; the tab kept across selections; the
   Rules group shown and scrolled to from the rules view and from the preview.
 
 ## 4. Open questions
 
-1. In a panel of tabs, which tab first, for a card selected for the first time in a session: the panel's first tab
-   in the arrangement, or Rules whenever the panel holds it (what is edited most)?
+1. In a set of tabs, which tab first, for a card selected for the first time in a session: the set's first tab in the
+   arrangement, or the tab holding Rules whenever the set has it (what is edited most)?
