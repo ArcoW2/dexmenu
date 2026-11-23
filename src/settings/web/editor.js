@@ -340,6 +340,31 @@ function textField(label, value, onChange, placeholder = "") {
   return row;
 }
 
+// A card's size on its line (plan 03 3.5): its share of the width, a minimum width, a height in lines, and how it fits
+// a taller line. Empty: the default (weight 1, no minimum, its content's height, as the line says).
+function sizeFields(card) {
+  const number = (name, label, placeholder) => textField(label, card[name] === undefined ? "" : String(card[name]), v => {
+    const n = Number(v.trim());
+    if (v.trim() && n > 0) card[name] = n; else delete card[name];
+    changed();
+  }, placeholder);
+  const fit = el("select");
+  for (const [v, label] of [["", "as its line says (stretched)"], ["stretch", "stretched to the line"], ["top", "at the top"],
+    ["center", "in the middle"], ["bottom", "at the bottom"]]) {
+    const o = el("option", "", label);
+    o.value = v;
+    fit.append(o);
+  }
+  fit.value = card.cardFit || "";
+  fit.addEventListener("change", () => { if (fit.value) card.cardFit = fit.value; else delete card.cardFit; changed(); });
+  const fitRow = el("label", "field");
+  fitRow.title = "Where a card lower than its line stands in it";
+  fitRow.append(el("span", "", "Fit in line"), fit);
+  return [number("weight", "Weight", "1: its share of the line's width"),
+    number("minWidth", "Min width", "(none) the line wraps when it does not fit"),
+    number("height", "Height", "(its content) in lines of text"), fitRow];
+}
+
 function matchEditor(match, onChange) {
   const kindSel = el("select");
   for (const k of M.matchKinds) { const o = el("option", "", k); o.value = k; kindSel.append(o); }
@@ -509,7 +534,8 @@ function renderCardPane() {
     place.addEventListener("change", () => { if (place.value === "left") delete card.align; else card.align = place.value; changed(); });
     const placeRow = el("label", "field");
     placeRow.append(el("span", "", "Text placed"), place);
-    $("card").replaceChildren(row, placeRow, el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
+    $("card").replaceChildren(row, placeRow, ...sizeFields(card),
+      el("div", "hint", "A note is no button: it is shown as text, with nothing to click."));
     return;
   }
   if (M.isOwn(card)) {
@@ -527,7 +553,8 @@ function renderCardPane() {
     row.append(el("span", "", "Item"), which);
     $("card").replaceChildren(row,
       textField("Title", card.card, v => { card.card = v || (card.own === "windowsMenu" ? "Windows' menu" : "Edit menu..."); changed(); }),
-      textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); }, "(the first letter) e.g. E70F"),
+      textField("Icon", card.icon, v => { if (v.trim()) card.icon = v.trim(); else delete card.icon; changed(); }, "(none) e.g. E70F"),
+      ...sizeFields(card),
       el("div", "hint", "Shown where it stands in the layout; a layout without it does not show it."));
     return;
   }
@@ -591,6 +618,8 @@ function renderCardPane() {
     row.append(el("span", "", "Submenus open"), way);
     box.append(row);
   }
+  // its size on its line; the remaining card's items each take a line of their own
+  if (!M.isRemaining(card)) box.append(...sizeFields(card));
   if (!card.menu && !M.isRemaining(card)) {
     // one item per name over all its rules (Windows 11 shows some items twice: a newer and an older copy)
     const cb = el("input");

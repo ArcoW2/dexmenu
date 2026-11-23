@@ -7,7 +7,7 @@ program DexmenuUnitTests;
 {$APPTYPE CONSOLE}
 
 uses
-  Winapi.Windows, System.SysUtils, System.IOUtils, System.Generics.Collections,
+  Winapi.Windows, System.SysUtils, System.IOUtils, System.Generics.Collections, System.Math,
   Dexmenu.Json in '..\..\src\dll\Dexmenu.Json.pas',
   Dexmenu.Log in '..\..\src\dll\Dexmenu.Log.pas',
   Dexmenu.Rules in '..\..\src\dll\Dexmenu.Rules.pas',
@@ -19,7 +19,8 @@ uses
   Dexmenu.Usage in '..\..\src\dll\Dexmenu.Usage.pas',
   Dexmenu.Icons in '..\..\src\dll\Dexmenu.Icons.pas',
   Dexmenu.Theme in '..\..\src\dll\Dexmenu.Theme.pas',
-  System.JSON;
+  Dexmenu.Draw in '..\..\src\dll\Dexmenu.Draw.pas',
+  Winapi.D2D1, System.JSON;
 
 var
   Failures: Integer = 0;
@@ -1192,6 +1193,77 @@ begin
   end;
 end;
 
+// The boxes of the note cards a layout's first lines place (plan 03 3.5), measured as the menu measures them; the
+// remaining card is added at the end and its items left out. The menu's width: Width.
+function NoteBoxes(const Lines: string; out Width: Single): TArray<TD2D1RectF>;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+  G: TGeometry;
+  B: TBox;
+begin
+  Result := nil;
+  Width := 0;
+  Layout := ParseLayout('{ "format": 1, "lines": ' + Copy(Lines, 1, LastDelimiter(']', Lines) - 1) +
+    ', { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  if Layout = nil then
+    Exit;
+  Menu := TestMenu;
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      G := Measure(Level);
+      Width := G.Width;
+      for B in G.Boxes do
+        if B.Card.Kind = vkNote then
+          Result := Result + [B.Rect];
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+function Near(A, B: Single): Boolean;
+begin
+  Result := Abs(A - B) < 0.01;
+end;
+
+procedure TestLinesAndCards;
+var
+  R: TArray<TD2D1RectF>;
+  W: Single;
+begin
+  R := NoteBoxes('[ { "line": [ { "note": "a" }, { "note": "b", "weight": 3 } ] } ]', W);
+  Check((Length(R) = 2) and Near((R[1].right - R[1].left), 3 * (R[0].right - R[0].left)) and
+    Near(R[1].right - R[0].left, W - 2 * OuterPad), 'weights: the line''s width shared 1 : 3');
+  R := NoteBoxes('[ { "line": [ { "note": "a", "minWidth": 150 }, { "note": "b" } ] } ]', W);
+  Check((Length(R) = 2) and Near(R[0].right - R[0].left, Max(150, (W - 2 * OuterPad) / 2)) and
+    Near(R[1].right - R[0].left, W - 2 * OuterPad), 'a minimum width kept, the other card takes the rest');
+  R := NoteBoxes('[ { "line": [ { "note": "a", "minWidth": 200 }, { "note": "b", "minWidth": 200 }, ' +
+    '{ "note": "c", "minWidth": 200 } ] } ]', W);
+  Check((Length(R) = 3) and Near(R[0].top, R[1].top) and (R[2].top >= R[0].bottom) and Near(R[2].left, OuterPad) and
+    (W >= 400 + 2 * OuterPad) and (W <= MaxWidth), 'a line too wide at its minimum widths: the level grows, the last card wraps');
+  R := NoteBoxes('[ { "line": [ { "note": "a", "height": 2 }, { "note": "b", "cardFit": "center" }, { "note": "c" } ] } ]', W);
+  Check((Length(R) = 3) and Near(R[0].bottom - R[0].top, 2 * ItemHeight) and
+    Near(R[1].top - R[0].top, (R[0].bottom - R[0].top - (R[1].bottom - R[1].top)) / 2) and
+    (R[1].bottom - R[1].top < 2 * ItemHeight) and Near(R[2].bottom - R[2].top, 2 * ItemHeight),
+    'a fixed height of two lines; a card centred at its own height; another stretched to the line');
+  R := NoteBoxes('[ { "line": [ { "note": "a", "height": 3 }, { "note": "b" }, { "note": "c", "cardFit": "top" } ], ' +
+    '"cardFit": "bottom" } ]', W);
+  Check((Length(R) = 3) and Near(R[1].bottom, R[0].bottom) and (R[1].top > R[0].top) and Near(R[2].top, R[0].top) and
+    (R[2].bottom < R[0].bottom), 'the line''s fit (bottom), a card overruling it (top)');
+end;
+
 begin
   TestComments;
   TestLayouts;
@@ -1210,6 +1282,7 @@ begin
   TestThemes;
   TestSubmenuModes;
   TestSeen;
+  TestLinesAndCards;
   if Failures = 0 then
     Writeln('OK')
   else

@@ -71,6 +71,7 @@ type
   TViewLine = class
   public
     Cards: TObjectList<TViewCard>;
+    CardFit: TCardFit;   // the layout line's: how its lower cards fit it (plan 03 3.5)
     constructor Create;
     destructor Destroy; override;
   end;
@@ -748,7 +749,10 @@ begin
         if V = nil then
           Continue;   // found nothing: not shown
         if Out = nil then
+        begin
           Out := NewLine(Result);
+          Out.CardFit := Line.CardFit;
+        end;
         Out.Cards.Add(V);
       end;
   end;

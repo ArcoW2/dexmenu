@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-21: draft.
 - 2026-11-22: partly executed: theme files; the shipped themes; gradients.
+- 2026-11-23: partly executed: lines and cards.
 
 Plan 02 (`02-PLAN-own-menu.md`) decides what goes where: lines of cards found by rules, submenus, the preview. This
 plan decides how it looks and what the drawing engine in the Delphi DLL (plan 01 3.2) must be able to draw. The
@@ -39,6 +40,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Engine | Direct2D and DirectWrite in the DLL (`Dexmenu.Draw`): solid and gradient brushes, rounded boxes, text and text layouts, bitmaps (icons), stripes; drawing into a layered window (the menu) or an image in memory (the preview, the screenshots); image files come with Menu window | 3.1 |
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
+| Lines and cards | a card's `weight`, `minWidth`, `height` (in lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
 ### Not yet built
@@ -47,7 +49,6 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 |---|---|---|---|
 | Animation | none, slide (direction), fade, crossfade, with a time; for submenus and `replace` | Submenu panels | 3.9 |
 | Menu window | popup, corners, shadow, border, background image, placement, scrolling | Engine | 3.4 |
-| Lines and cards | widths per level, minimum widths, weights, heights, gaps; a single card as a menu item | Engine | 3.5 |
 | Card | icon, title, extra text above or below it, mark, own background and colours, every state | Lines and cards | 3.6; 3.7 |
 | Dividers | a line between lines, with an optional label (left, middle, right), own height, background and colours | Engine | 3.8 |
 | Other elements | icon row, search box, most used row, `<<` | Card | 3.8 |
@@ -331,3 +332,24 @@ None.
   long enough to reach the corners. Drawn for the menu, a card and a hovered card; images (3.4) are still to come.
 - Tested: a gradient's colours resolved through the palette and its angle; a colour background; none given. By
   hand: a menu from blue to purple in the editor's preview.
+
+### 6.4 Lines and cards
+
+- A card in the layout: `"weight"` (its share of the line's width, 1 when not set), `"minWidth"` (DIP), `"height"`
+  (in lines of text; not set: its content's height, one line or a note's wrapped text) and `"cardFit"` (`stretch`,
+  `top`, `center`, `bottom`); a line: `"cardFit"` for its cards, stretched when not set. A height in units is not
+  made: lines of text only.
+- The width: the widest line's need, each card at least its minimum width, between the level's minimum and maximum
+  (plan 02 3.4). A line whose minimum widths do not fit within the maximum has its last cards wrapped onto a line of
+  their own. The screen's work area is not a limit of its own here: the level's maximum is.
+- Shared by weight; a card whose share is below its minimum gets its minimum and the others share the rest.
+- Gaps: the theme's `card.normal.gap` between cards on a line and `line.normal.gap` between lines, none when not
+  given (the built-in themes give none, so nothing moved).
+- A single card on a line was already drawn as a menu item; several cards on a line drawn as cards of their own
+  come with the Card part.
+- In the editor: Weight, Min width, Height and "Fit in line" in the card panel (cards with rules or a menu, notes,
+  Dexmenu's own items; not the remaining card, whose items each take a line). A line's own `cardFit` has no field;
+  it is kept when written in the file.
+- Tested: unit tests on the measured boxes (weights 1 : 3, a minimum width with the other card taking the rest, a
+  line wrapped with the level grown, a height of two lines with a card centred and one stretched, a line's fit and a
+  card overruling it); the editor's self-test.

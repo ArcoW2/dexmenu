@@ -70,7 +70,8 @@ const
 implementation
 
 uses
-  System.SysUtils, System.Math, System.SyncObjs, Winapi.DxgiFormat, Dexmenu.Log, Dexmenu.Icons, Dexmenu.Usage, Dexmenu.Theme;
+  System.SysUtils, System.Math, System.SyncObjs, System.Generics.Collections, Winapi.DxgiFormat, Dexmenu.Log,
+  Dexmenu.Icons, Dexmenu.Usage, Dexmenu.Theme;
 
 const
   RRF_RT_REG_DWORD = $00000010;
@@ -304,18 +305,83 @@ begin
   LevelWidths := Settings.Widths;
 end;
 
-function Measure(Level: TViewLevel; Depth: Integer): TGeometry;
+// What a card's content needs across (DIP): the icon slot, its title, a shortcut, the mark; a divider's label; a note.
+function CardNeed(V: TViewCard): Single;
 var
-  LevelMin, LevelMax: Single;
-  Line: TViewLine;
-  V: TViewCard;
-  W, Y, H, X, CardW, Need: Single;
-  N, I: Integer;
-  Box: TBox;
   Fmt: IDWriteTextFormat;
 begin
+  Result := 0;
+  if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
+    Result := TextWidth(V.Divider.DividerText, NormalFormat) + 48
+  else if V.Kind = vkNote then
+    Result := NoteWidth(V.Title) + NoteLeft(V) - NotePad
+  else if V.Kind <> vkSeparator then
+  begin
+    if V.IsDefault then
+      Fmt := BoldFormat
+    else
+      Fmt := NormalFormat;
+    Result := TextLeft + TextWidth(V.Title, Fmt) + MarkWidth + 8;
+    if V.Shortcut <> '' then
+      Result := Result + TextWidth(V.Shortcut, ShortcutFormat) + ShortcutGap;
+  end;
+end;
+
+// The layout card's size settings (plan 03 3.5); a view card without one (Windows' items in a submenu, the most used
+// row) has the defaults.
+function CardMin(V: TViewCard): Single;
+begin
+  Result := 0;
+  if (V.Card <> nil) and (V.Kind <> vkSeparator) then
+    Result := V.Card.MinWidth;
+end;
+
+function CardWeight(V: TViewCard): Single;
+begin
+  Result := 1;
+  if (V.Card <> nil) and (V.Kind <> vkSeparator) then
+    Result := V.Card.Weight;
+end;
+
+// A card's own height at a width: a note's wrapped text, a fixed height in lines, else one line.
+function CardHeight(V: TViewCard; Width: Single): Single;
+begin
+  Result := ItemHeight;
+  if V.Kind = vkNote then
+    Result := NoteHeight(V, Width);
+  if (V.Card <> nil) and (V.Kind <> vkSeparator) and (V.Card.Height > 0) then
+    Result := V.Card.Height * ItemHeight;
+end;
+
+function CardFitOf(V: TViewCard; Line: TViewLine): TCardFit;
+begin
+  Result := cfDefault;
+  if (V.Card <> nil) and (V.Kind <> vkSeparator) then
+    Result := V.Card.CardFit;
+  if Result = cfDefault then
+    Result := Line.CardFit;
+  if Result = cfDefault then
+    Result := cfStretch;
+end;
+
+function Measure(Level: TViewLevel; Depth: Integer): TGeometry;
+var
+  LevelMin, LevelMax, CardGap, LineGap: Single;
+  Theme: TTheme;
+  Line: TViewLine;
+  Rows: TList<TArray<TViewCard>>;
+  Row: TArray<TViewCard>;
+  Widths: TArray<Single>;
+  Fixed: TArray<Boolean>;
+  V: TViewCard;
+  W, Y, H, X, Need, SumMin, Avail, FreeWeight, OwnH, Top: Single;
+  N, I, J: Integer;
+  Changed, First: Boolean;
+  Box: TBox;
+  Fit: TCardFit;
+  RowLines: TList<TViewLine>;
+begin
   EnsureFactories;
-  // The width: the widest line's need, between the minimum and the maximum.
   LevelMin := MinWidth;
   LevelMax := MaxWidth;
   if Length(LevelWidths) > 0 then
@@ -323,57 +389,133 @@ begin
     LevelMin := LevelWidths[Min(Depth, High(LevelWidths))].MinW;
     LevelMax := LevelWidths[Min(Depth, High(LevelWidths))].MaxW;
   end;
-  W := LevelMin;
-  for Line in Level.Lines do
-  begin
-    Need := 0;
-    for V in Line.Cards do
-      if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
-        Need := Need + TextWidth(V.Divider.DividerText, NormalFormat) + 48
-      else if V.Kind = vkNote then
-        Need := Need + NoteWidth(V.Title) + NoteLeft(V) - NotePad
-      else if V.Kind <> vkSeparator then
-      begin
-        if V.IsDefault then
-          Fmt := BoldFormat
-        else
-          Fmt := NormalFormat;
-        Need := Need + TextLeft + TextWidth(V.Title, Fmt) + MarkWidth + 8;
-        if V.Shortcut <> '' then
-          Need := Need + TextWidth(V.Shortcut, ShortcutFormat) + ShortcutGap;
-      end;
-    W := Max(W, Need + 2 * OuterPad);
-  end;
-  W := Min(W, LevelMax);
+  // the gaps between cards on a line and between lines (plan 03 3.5): the theme's, none unless it gives them
+  Theme := CurrentTheme(TLook.Current.Dark);
+  CardGap := Max(0, Theme.Number('card', 'normal', 'gap', 0));
+  LineGap := Max(0, Theme.Number('line', 'normal', 'gap', 0));
 
-  Result.Boxes := nil;
-  Y := OuterPad;
-  for Line in Level.Lines do
-  begin
-    N := Line.Cards.Count;
-    if N = 0 then
-      Continue;
-    if (N = 1) and (Line.Cards[0].Kind = vkSeparator) then
+  Rows := TList<TArray<TViewCard>>.Create;
+  RowLines := TList<TViewLine>.Create;
+  try
+    // A line whose cards do not fit side by side at their minimum widths within the level's maximum: its last cards
+    // wrap onto a line of their own below it, in their order.
+    for Line in Level.Lines do
     begin
-      H := SeparatorHeight;
-      if (Line.Cards[0].Divider <> nil) and (Line.Cards[0].Divider.DividerText <> '') then
-        H := DividerTextHeight;
-    end
-    else
-      H := ItemHeight;
-    CardW := (W - 2 * OuterPad) / N;
-    for I := 0 to N - 1 do   // a line as high as its highest card (a note may wrap to several lines)
-      if Line.Cards[I].Kind = vkNote then
-        H := Max(H, NoteHeight(Line.Cards[I], CardW));
-    X := OuterPad;
-    for I := 0 to N - 1 do
-    begin
-      Box.Card := Line.Cards[I];
-      Box.Rect := D2D1RectF(X, Y, X + CardW, Y + H);
-      Result.Boxes := Result.Boxes + [Box];
-      X := X + CardW;
+      Row := nil;
+      SumMin := 0;
+      for V in Line.Cards do
+      begin
+        if (Length(Row) > 0) and (SumMin + CardGap + CardMin(V) > LevelMax - 2 * OuterPad) then
+        begin
+          Rows.Add(Row);
+          RowLines.Add(Line);
+          Row := nil;
+          SumMin := 0;
+        end;
+        if Length(Row) > 0 then
+          SumMin := SumMin + CardGap;
+        SumMin := SumMin + CardMin(V);
+        Row := Row + [V];
+      end;
+      if Length(Row) > 0 then
+      begin
+        Rows.Add(Row);
+        RowLines.Add(Line);
+      end;
     end;
-    Y := Y + H;
+
+    // The width: the widest line's need (each card at least its minimum width), between the level's minimum and its
+    // maximum.
+    W := LevelMin;
+    for Row in Rows do
+    begin
+      Need := CardGap * (Length(Row) - 1);
+      for V in Row do
+        Need := Need + Max(CardNeed(V), CardMin(V));
+      W := Max(W, Need + 2 * OuterPad);
+    end;
+    W := Min(W, LevelMax);
+
+    Result.Boxes := nil;
+    Y := OuterPad;
+    First := True;
+    for I := 0 to Rows.Count - 1 do
+    begin
+      Row := Rows[I];
+      Line := RowLines[I];
+      N := Length(Row);
+      if not First then
+        Y := Y + LineGap;
+      First := False;
+      // the cards share the width by their weights; one whose share is below its minimum gets its minimum, and the
+      // others share the rest
+      SetLength(Widths, N);
+      SetLength(Fixed, N);
+      for J := 0 to N - 1 do
+        Fixed[J] := False;
+      repeat
+        Changed := False;
+        Avail := W - 2 * OuterPad - CardGap * (N - 1);
+        FreeWeight := 0;
+        for J := 0 to N - 1 do
+          if Fixed[J] then
+            Avail := Avail - Widths[J]
+          else
+            FreeWeight := FreeWeight + CardWeight(Row[J]);
+        for J := 0 to N - 1 do
+          if not Fixed[J] then
+          begin
+            Widths[J] := Max(0, Avail) * CardWeight(Row[J]) / Max(FreeWeight, 0.0001);
+            if Widths[J] < CardMin(Row[J]) then
+            begin
+              Widths[J] := CardMin(Row[J]);
+              Fixed[J] := True;
+              Changed := True;
+            end;
+          end;
+      until not Changed;
+      // the line as high as its highest card
+      if (N = 1) and (Row[0].Kind = vkSeparator) then
+      begin
+        H := SeparatorHeight;
+        if (Row[0].Divider <> nil) and (Row[0].Divider.DividerText <> '') then
+          H := DividerTextHeight;
+      end
+      else
+      begin
+        H := 0;
+        for J := 0 to N - 1 do
+          H := Max(H, CardHeight(Row[J], Widths[J]));
+      end;
+      X := OuterPad;
+      for J := 0 to N - 1 do
+      begin
+        V := Row[J];
+        Box.Card := V;
+        OwnH := H;
+        Top := Y;
+        if V.Kind <> vkSeparator then
+        begin
+          // a lower card: stretched to the line, or at its own height at the line's top, centre or bottom
+          Fit := CardFitOf(V, Line);
+          if Fit <> cfStretch then
+          begin
+            OwnH := Min(H, CardHeight(V, Widths[J]));
+            case Fit of
+              cfCenter: Top := Y + (H - OwnH) / 2;
+              cfBottom: Top := Y + H - OwnH;
+            end;
+          end;
+        end;
+        Box.Rect := D2D1RectF(X, Top, X + Widths[J], Top + OwnH);
+        Result.Boxes := Result.Boxes + [Box];
+        X := X + Widths[J] + CardGap;
+      end;
+      Y := Y + H;
+    end;
+  finally
+    RowLines.Free;
+    Rows.Free;
   end;
   Result.Width := W;
   Result.Height := Y + OuterPad;

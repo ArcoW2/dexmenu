@@ -42,6 +42,9 @@ type
   // How a submenu opens (plan 02 3.4, 3.7): as the global setting, next to its card, under it, or
   // in place of the menu (with "<<" back)
   TSubmenuMode = (smDefault, smNext, smUnder, smReplace);
+  // How a card lower than its line fits it (plan 03 3.5): as the line says (cfDefault), as tall as the line, or at its
+  // own height at the line's top, centre or bottom.
+  TCardFit = (cfDefault, cfStretch, cfTop, cfCenter, cfBottom);
 
   // A level's width (DIP): from its minimum, grown by its lines up to its maximum (plan 02 3.4).
   TLevelWidth = record
@@ -85,6 +88,12 @@ type
     NoteText: string;
     NoteAlign: TNoteAlign;   // "align": left (default), text (with the items' text), center, right
     SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
+    // Its size on a line (plan 03 3.5): "weight", its share of the line's width (1 when not set); "minWidth" (DIP; 0
+    // none); "height", in lines of text (0: auto, from its content); "cardFit", how it fits a taller line.
+    Weight: Single;
+    MinWidth: Single;
+    Height: Single;
+    CardFit: TCardFit;
     Rules: TObjectList<TRule>;
     Menu: TObjectList<TLine>;   // a card with a menu; nil for a card with rules
     constructor Create;
@@ -104,6 +113,7 @@ type
     DividerAlign: TDividerAlign;
     IsMostUsed: Boolean;   // { "mostUsed": true }: the items chosen most, side by side (plan 02 3.9)
     IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
+    CardFit: TCardFit;     // "cardFit" of a line of cards: how its lower cards fit it (cfDefault: stretched)
     constructor Create;
     destructor Destroy; override;
   end;
@@ -169,6 +179,7 @@ constructor TCard.Create;
 begin
   inherited;
   Rules := TObjectList<TRule>.Create;
+  Weight := 1;
 end;
 
 destructor TCard.Destroy;
@@ -243,6 +254,33 @@ begin
     Result := smDefault;
 end;
 
+function ParseCardFit(Value: TJSONValue): TCardFit;
+begin
+  Result := cfDefault;
+  if not (Value is TJSONString) then
+    Exit;
+  if Value.Value = 'stretch' then
+    Result := cfStretch
+  else if Value.Value = 'top' then
+    Result := cfTop
+  else if Value.Value = 'center' then
+    Result := cfCenter
+  else if Value.Value = 'bottom' then
+    Result := cfBottom;
+end;
+
+// A card's size on its line (plan 03 3.5): weight, minWidth, height, cardFit; a value out of range is ignored.
+procedure ParseCardSize(Obj: TJSONObject; Card: TCard);
+begin
+  if (Obj.GetValue('weight') is TJSONNumber) and (TJSONNumber(Obj.GetValue('weight')).AsDouble > 0) then
+    Card.Weight := TJSONNumber(Obj.GetValue('weight')).AsDouble;
+  if (Obj.GetValue('minWidth') is TJSONNumber) and (TJSONNumber(Obj.GetValue('minWidth')).AsDouble > 0) then
+    Card.MinWidth := TJSONNumber(Obj.GetValue('minWidth')).AsDouble;
+  if (Obj.GetValue('height') is TJSONNumber) and (TJSONNumber(Obj.GetValue('height')).AsDouble > 0) then
+    Card.Height := TJSONNumber(Obj.GetValue('height')).AsDouble;
+  Card.CardFit := ParseCardFit(Obj.GetValue('cardFit'));
+end;
+
 function ParseCard(Value: TJSONValue; const Where: string; Parent: TCard; out Card: TCard; var Error: string): Boolean;
 var
   Obj: TJSONObject;
@@ -271,6 +309,7 @@ begin
       else if Obj.GetValue('align').Value = 'right' then
         Card.NoteAlign := naRight;
     Card.Parent := Parent;
+    ParseCardSize(Obj, Card);
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then
       Card.Id := Obj.GetValue('id').Value
@@ -287,6 +326,7 @@ begin
   try
     Card.Title := Obj.GetValue('card').Value;
     Card.Parent := Parent;
+    ParseCardSize(Obj, Card);
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then
       Card.Id := Obj.GetValue('id').Value
@@ -434,6 +474,7 @@ begin
     end;
     Line := TLine.Create;
     Lines.Add(Line);
+    Line.CardFit := ParseCardFit(TJSONObject(Entry).GetValue('cardFit'));
     for CardValue in TJSONArray(LineCards) do
     begin
       if not ParseCard(CardValue, Where, Parent, Card, Error) then
