@@ -1916,6 +1916,8 @@ begin
       Check((B.Kind = vkCommand) and (B.Command = ccWindowsMenu) and (B.Title = 'Back') and (B.Rule <> nil),
         'an own card of an earlier layout: a card with an own rule, its name its title, tagged windowsMenu');
       Check(Pos('Edit menu', Describe(Level)) = 0, 'an own item is no item of Windows'': not among the remaining items');
+      Check((InnerOf(Level.Lines[0].Cards[0])[High(InnerOf(Level.Lines[0].Cards[0]))].IconSpec = 'E70F') and
+        (Level.Lines[1].Cards[0].IconSpec = 'E700'), 'Dexmenu''s own items: an icon of their own where the layout gives none');
     finally
       Level.Free;
     end;

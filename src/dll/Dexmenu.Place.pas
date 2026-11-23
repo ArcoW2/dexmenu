@@ -297,18 +297,34 @@ begin
 end;
 
 function TViewCard.IconSpec: string;
+
+  // Dexmenu's own items: an icon of their own where the layout gives none (plan 03 3.8; Segoe Fluent Icons)
+  function OwnIcon: string;
+  begin
+    Result := '';
+    if Kind = vkCommand then
+      case Command of
+        ccEditMenu: Result := 'E70F';      // Edit: a pencil
+        ccWindowsMenu: Result := 'E700';   // GlobalNavigationButton: a menu's three lines
+      end;
+  end;
+
 begin
   Result := '';
   if (Card <> nil) and InGroup then
   begin
     if Template <> nil then
       Result := Template.Icon;
+    if Result = '' then
+      Result := OwnIcon;
     Exit;
   end;
   if (Card = nil) or IsMore then
     Exit;
   if (Kind in [vkMenu, vkCommand]) or ((Kind = vkItem) and not Card.IsRemaining) then
     Result := Card.Icon;
+  if Result = '' then
+    Result := OwnIcon;
 end;
 
 function TViewCard.Title: string;
