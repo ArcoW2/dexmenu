@@ -265,6 +265,16 @@
     check(M.colorState({ gradient: ["a", "b"] }).mode === "json" && M.colorState("none").mode === "json" &&
       back({ gradient: ["a", "b"] }) === '{"gradient":["a","b"]}', "a gradient and none: JSON, kept");
     check(!M.colorValue({ mode: "json", text: "{ bad" }).ok, "JSON that does not parse: not written");
+    const fill = (v, g = true) => JSON.stringify(M.fillValue(M.fillState(v, g)).value);
+    const two = { gradient: ["accent", { color: "#112233", intensity: 80, opacity: 50 }] };
+    check(M.fillState(two, true).kind === "gradient" && M.fillState(two, true).angle === 90 &&
+      fill(two) === JSON.stringify(two), "a gradient of two colours: From and To, each with its intensity and opacity; angle 90 left out");
+    check(fill({ gradient: ["#fff", "accent"], angle: 0 }) === '{"gradient":["#ffffff","accent"],"angle":0}', "a gradient's angle kept");
+    check(M.fillState(two, false).kind === "json", "where no gradient is drawn (text colour, border): a gradient as JSON");
+    check(M.fillState({ gradient: ["a", "b", "c"] }, true).kind === "json" && M.fillState({ gradient: ["a", { intensity: 5 }] }, true).kind === "json",
+      "a gradient of more colours, or with the theme's colour in it: as JSON");
+    check(M.fillState("accent", true).kind === "colour" && fill("accent") === '"accent"' && fill(undefined) === undefined,
+      "a colour field holding a colour, or nothing");
     const pal = { basecolor: "#000000ff", accent: "#ff0000ff", glass: "#ffffff80" };
     check(M.colorCss(M.colorState("accent"), pal) === "rgba(255, 0, 0, 1)" &&
       M.colorCss(M.colorState({ color: "accent", intensity: 50 }), pal) === "rgba(128, 0, 0, 1)" &&

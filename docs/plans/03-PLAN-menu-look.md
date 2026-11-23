@@ -42,7 +42,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Gradients | a background as a colour or a linear gradient (`"gradient": [ colours ]`, `"angle"`), for the menu, a card and a hovered card | 3.4; 6.3 |
 | Shipped themes | `light-parchment`, `dark-parchment`, `light-sky`, `dark-ocean`, `light-seafoam`, `dark-forest`, built into the DLL on the built-in light and dark, LexPen's colours as their palette; cards get their own background (`bgSide`) | 3.3; 6.2 |
 | Card | a card alone on its line drawn as the theme's `item`, others as its `card`; the extra text above or below the title; icon on top for a tall or square card; its own background, foreground, border, radius and hover / pressed look from the layout; the pressed state; the card panel's fields | 3.6; 3.7; 6.5 |
-| Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: the theme's own colour (as it is or adjusted), a colour, a colour of the theme's palette, or JSON for a gradient; an intensity, an opacity with an Overrule checkbox; a swatch; written in the shortest form | 3.6; 6.6 |
+| Colour fields | the card panel's colours (background, text colour, border, hover background) each a picker: a colour (the theme's own, as it is or adjusted; a colour; a palette colour), a gradient of two colours (the backgrounds), or JSON; an intensity, an opacity with an Overrule checkbox, both typed or slid; a swatch; written in the shortest form | 3.6; 6.6 |
 | Lines and cards | a card's `weight`, `minWidth`, `height` (in lines) and `cardFit`, a line's `cardFit`; the level grown for minimum widths up to its maximum, then the last cards wrapped; the theme's gaps between cards and lines; the card panel's size fields | 3.5; 6.4 |
 | Theme files | `Dexmenu.Theme`: JSON with comments, `base` (chains merged), the palette with `basecolor`, colours as a literal, a palette name or `{ color, intensity, opacity }`; built-in `light` and `dark`; the user's themes folder, then the DLL's, then the built-in; read again when a file changes; chosen per light and dark in the main window (`themeLight`, `themeDark`); the menu and the preview draw their colours and radii from it | 3.2; 3.3; 6.1 |
 
@@ -58,6 +58,7 @@ overrule its background and colours in the layout. Settings pick a theme for lig
 | Submenu panels | next, under, replace: where they appear and how they look | -- | 3.9 |
 | Blur | the screen behind the menu copied and blurred as a background, for the menu or per card; a later step, after the menu works | Menu window | 3.4 |
 | Preview marks | striped unavailable items, new | -- | 3.10 |
+| Image fill | an image as a third kind of the background fields' picker, beside a colour and a gradient | Menu window | 3.6 |
 | Tests | 3.11 | -- | 3.11 |
 
 ## 3. Details
@@ -227,7 +228,10 @@ A theme is drawn by Dexmenu itself, so it names every element and state the engi
   theme's colour as it is; `{ "intensity", "opacity" }` without `color` for the theme's colour adjusted (the DLL
   takes the theme's colour there and adjusts it, every colour of a gradient alike); `#rrggbb` or the palette name
   alone at intensity 100 without an overruled opacity; else `{ "color", "intensity", "opacity" }` with what is given.
-  A gradient (or `none`) stays a text field beside it, as JSON.
+  A field first says what it holds: a colour, a gradient (the backgrounds only, the colours the DLL draws as one), or
+  other as JSON (a gradient of more colours, `none`); later an image for some. A gradient has its From and To on rows
+  of their own, each a colour or a palette colour with its intensity and opacity as above, and its angle (90 when
+  not given): `{ "gradient": [ from, to ], "angle" }`.
 - **Template cards:** items Dexmenu places in a submenu itself are drawn with a template card's look (plan 02 3.3):
   the layout's, or a card's own submenu template. A template has the same look settings as a card, no rules.
 - **An action or a submenu:** the same card; the mark and the click differ (an item, or a card with a menu or an
@@ -398,7 +402,10 @@ None.
 - The DLL gives the palette of the theme the preview draws with (`DexmenuThemePalette`: `{ "<name>": "#rrggbbaa" }`,
   each palette colour resolved, `basecolor` among them); the settings app posts it to the editor with every reload,
   so a theme switched in the main window or the editor shows in the pickers.
-- A picker per colour field: a swatch (over a checkerboard, so the opacity shows; not for the theme's colour, which
+- A colour field starts with its kind: a colour, a gradient (Background and Hover background only), other (JSON).
+  A gradient of two colours reads as From and To (`fillState`, `fillValue`); one of more colours, or with the theme's
+  adjusted colour as a stop (the DLL resolves a stop as a colour only), stays JSON. Its angle is a typed number.
+- A picker per colour (the field's own, or From and To): a swatch (over a checkerboard, so the opacity shows; not for the theme's colour, which
   the editor does not know), a choice of the theme's, a colour (the web view's colour picker), each palette colour by
   name (its option tinted with its colour), or a gradient or other as JSON; for all but JSON an Intensity slider
   (0 - 200) and an Opacity slider (0 - 100) behind an Overrule checkbox, written when let go; beside each slider

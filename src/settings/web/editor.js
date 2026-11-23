@@ -366,13 +366,11 @@ function sizeFields(card) {
     number("height", "Height", "(its content) in lines of text"), fitRow];
 }
 
-// A colour picker (plan 03 3.6): the theme's own colour, a colour picked, a colour of the theme's palette by name, or
-// a gradient or anything else as JSON; for the first three an intensity (0 - 200, 100 the colour itself) and an
-// opacity (0 - 100) that only counts when "overrule" is ticked (else the colour's own alpha stays). Written in its
-// shortest form (LayoutModel.colorValue).
-function colorField(label, get, set) {
-  let state = M.colorState(get());
-  const row = el("div", "field color-field");
+// One colour's controls (plan 03 3.6): a swatch, where the colour comes from (the theme's own colour, when withTheme;
+// a colour picked; a colour of the theme's palette by name), an intensity (0 - 200, 100 the colour itself) and an
+// opacity (0 - 100) that only counts when "overrule" is ticked (else the colour's own alpha stays). cs (a
+// LayoutModel.colorState, not JSON) is changed in place; commit() after each change that is to be written.
+function colorControls(cs, withTheme, commit) {
   const controls = el("span", "color-controls");
   const swatch = el("span", "swatch");
   const source = el("select");
@@ -382,16 +380,15 @@ function colorField(label, get, set) {
     if (color) { o.style.background = color; o.style.color = "inherit"; }
     source.append(o);
   };
-  option("theme", "(the theme's)");
+  if (withTheme) option("theme", "(the theme's)");
   option("pick", "a colour");
   const names = Object.keys(palette);
-  if (state.mode === "pick" && !state.base.startsWith("#") && !names.includes(state.base)) names.push(state.base);
+  if (cs.mode === "pick" && !cs.base.startsWith("#") && !names.includes(cs.base)) names.push(cs.base);
   for (const n of names) option("name:" + n, n, M.colorCss({ mode: "pick", base: n, intensity: 100, opacity: 100 }, palette));
-  option("json", "a gradient or other (JSON)");
-  source.value = state.mode === "pick" ? (state.base.startsWith("#") ? "pick" : "name:" + state.base) : state.mode;
+  source.value = cs.mode === "pick" ? (cs.base.startsWith("#") ? "pick" : "name:" + cs.base) : "theme";
   const picker = el("input");
   picker.type = "color";
-  picker.value = state.mode === "pick" && state.base.startsWith("#") ? state.base : "#808080";
+  picker.value = cs.mode === "pick" && cs.base.startsWith("#") ? cs.base : "#808080";
   const slider = (min, max, value, title) => {
     const r = el("input");
     r.type = "range";
@@ -410,46 +407,34 @@ function colorField(label, get, set) {
     box.append(r, shown);
     return [box, r, shown];
   };
-  const [intensityBox, intensity, intensityShown] = slider(0, 200, state.intensity ?? 100,
+  const [intensityBox, intensity, intensityShown] = slider(0, 200, cs.intensity ?? 100,
     "Intensity: 0 the theme's base colour, 100 the colour itself, 200 towards the base colour inverted");
-  const [opacityBox, opacity, opacityShown] = slider(0, 100, state.opacity ?? 100,
+  const [opacityBox, opacity, opacityShown] = slider(0, 100, cs.opacity ?? 100,
     "Opacity: 0 invisible, 100 solid; only with overrule ticked, else the colour's own (the theme's) opacity");
   const overrule = el("input");
   overrule.type = "checkbox";
-  overrule.checked = !!state.overrule;
+  overrule.checked = !!cs.overrule;
   overrule.title = "Ticked: this opacity overrules the colour's own; not ticked: as the theme has it";
   intensityBox.prepend("Intensity ");
   opacityBox.prepend(overrule, " Opacity ");
-  const json = el("input");
-  json.type = "text";
-  json.value = state.mode === "json" ? state.text : "";
-  json.placeholder = '{ "gradient": [ "accent", "surface" ] } or "none"';
   const show = () => {
     picker.hidden = source.value !== "pick";
-    intensityBox.hidden = opacityBox.hidden = state.mode === "json";
-    opacity.disabled = opacityShown.disabled = !state.overrule;
-    json.hidden = state.mode !== "json";
-    swatch.hidden = state.mode !== "pick";
-    swatch.style.setProperty("--swatch", M.colorCss(state, palette) || "transparent");
-  };
-  const write = () => {
-    const r = M.colorValue(state);
-    if (!r.ok) return;
-    set(r.value);
-    changed();
+    opacity.disabled = opacityShown.disabled = !cs.overrule;
+    swatch.hidden = cs.mode !== "pick";
+    swatch.style.setProperty("--swatch", M.colorCss(cs, palette) || "transparent");
   };
   // the sliders' values follow while dragging; written when let go
   const live = () => {
-    state.intensity = +intensity.value;
-    state.opacity = +opacity.value;
+    cs.intensity = +intensity.value;
+    cs.opacity = +opacity.value;
     intensityShown.value = intensity.value;
     opacityShown.value = opacity.value;
     show();
   };
   intensity.addEventListener("input", live);
   opacity.addEventListener("input", live);
-  intensity.addEventListener("change", write);
-  opacity.addEventListener("change", write);
+  intensity.addEventListener("change", commit);
+  opacity.addEventListener("change", commit);
   // a value typed: a whole number within the slider's range, then written as a slider let go
   for (const [field, range] of [[intensityShown, intensity], [opacityShown, opacity]])
     field.addEventListener("change", () => {
@@ -457,27 +442,97 @@ function colorField(label, get, set) {
       if (field.value.trim() === "" || !Number.isFinite(n)) { field.value = range.value; return; }
       range.value = Math.max(+range.min, Math.min(+range.max, n));
       live();
-      write();
+      commit();
     });
-  overrule.addEventListener("change", () => { state.overrule = overrule.checked; write(); });
-  picker.addEventListener("change", () => { state.base = picker.value; write(); });
-  json.addEventListener("change", () => { state.text = json.value.trim(); write(); });
+  overrule.addEventListener("change", () => { cs.overrule = overrule.checked; commit(); });
+  picker.addEventListener("change", () => { cs.base = picker.value; commit(); });
+  // the intensity and opacity kept when switching between the theme's, a colour and a palette colour
   source.addEventListener("change", () => {
     const v = source.value;
-    // the intensity and opacity kept when switching between the theme's, a colour and a palette colour
-    const keep = state.mode === "json" ? { intensity: 100, opacity: 100, overrule: false }
-      : { intensity: state.intensity, opacity: state.opacity, overrule: state.overrule };
-    if (v === "theme") state = { mode: "theme", ...keep };
-    else if (v === "json") {
-      const current = M.colorValue(state).value;
-      state = { mode: "json", text: current === undefined ? "" : JSON.stringify(current) };
-    }
-    else state = { mode: "pick", base: v === "pick" ? picker.value : v.slice(5), ...keep };
-    if (state.mode !== "json" || state.text) write(); else show();
+    if (v === "theme") { cs.mode = "theme"; delete cs.base; }
+    else { cs.mode = "pick"; cs.base = v === "pick" ? picker.value : v.slice(5); }
+    commit();
   });
-  controls.append(swatch, source, picker, intensityBox, opacityBox, json);
-  row.append(el("span", "", label), controls);
+  controls.append(swatch, source, picker, intensityBox, opacityBox);
   show();
+  return controls;
+}
+
+// A colour field (plan 03 3.6): what it is, a colour (colorControls) or, where a gradient can be drawn (gradients), a
+// gradient of two colours (From and To on rows of their own, each a colour or a palette colour with its intensity and
+// opacity, and its angle), or anything else as JSON (a gradient of more colours, "none"). Written in its shortest form
+// (LayoutModel.fillValue).
+function colorField(label, get, set, gradients = false) {
+  let state = M.fillState(get(), gradients);
+  const row = el("div", "field color-field");
+  const body = el("div", "color-body");
+  const commit = () => {
+    const r = M.fillValue(state);
+    if (!r.ok) return;
+    set(r.value);
+    changed();
+  };
+  // a colour picked or a palette colour, for a gradient's colour: the field's own colour when it is one, else the
+  // first palette colour, else grey
+  const stop = () => state.kind === "colour" && state.colour.mode === "pick" ? { ...state.colour }
+    : { mode: "pick", base: Object.keys(palette).find(n => n !== "basecolor") || "#808080", intensity: 100, opacity: 100, overrule: false };
+  const build = () => {
+    const kind = el("select");
+    for (const [v, text] of [["colour", "a colour"], ...(gradients ? [["gradient", "a gradient"]] : []), ["json", "other (JSON)"]]) {
+      const o = el("option", "", text);
+      o.value = v;
+      kind.append(o);
+    }
+    kind.value = state.kind;
+    kind.title = "A colour; a gradient from one colour to another; or anything else written as JSON (" +
+      (gradients ? "a gradient of more colours, " : "") + "\"none\")";
+    kind.addEventListener("change", () => {
+      const current = M.fillValue(state);
+      if (kind.value === "colour")
+        state = { kind: "colour", colour: state.kind === "gradient" ? { ...state.start } : { mode: "theme", intensity: 100, opacity: 100, overrule: false } };
+      else if (kind.value === "gradient") { const s = stop(); state = { kind: "gradient", start: s, end: { ...s }, angle: 90 }; }
+      else state = { kind: "json", text: current.ok && current.value !== undefined ? JSON.stringify(current.value) : "" };
+      if (state.kind === "json" && !state.text) body.replaceChildren(...build());   // nothing to write yet
+      else commit();
+    });
+    const first = el("div", "color-row");
+    first.append(kind);
+    if (state.kind === "colour") {
+      first.append(colorControls(state.colour, true, commit));
+      return [first];
+    }
+    if (state.kind === "json") {
+      const json = el("input");
+      json.type = "text";
+      json.value = state.text;
+      json.placeholder = gradients ? '{ "gradient": [ "accent", "surface", "bar" ], "angle": 0 } or "none"' : '"none"';
+      json.addEventListener("change", () => { state.text = json.value.trim(); commit(); });
+      first.append(json);
+      return [first];
+    }
+    const angle = el("input", "slider-value");
+    angle.type = "number";
+    angle.step = 1;
+    angle.value = state.angle;
+    angle.title = "The gradient's direction in degrees: 0 left to right, 90 top to bottom";
+    angle.addEventListener("change", () => {
+      const n = Number(angle.value);
+      if (angle.value.trim() === "" || !Number.isFinite(n)) { angle.value = state.angle; return; }
+      state.angle = n;
+      commit();
+    });
+    const angleBox = el("label", "slider");
+    angleBox.append("Angle ", angle);
+    first.append(angleBox);
+    const stopRow = (name, cs) => {
+      const r = el("div", "color-row");
+      r.append(el("span", "color-stop", name), colorControls(cs, false, commit));
+      return r;
+    };
+    return [first, stopRow("From", state.start), stopRow("To", state.end)];
+  };
+  body.append(...build());
+  row.append(el("span", "", label), body);
   return row;
 }
 
@@ -503,7 +558,7 @@ function lookFields(card) {
   const extraRow = el("label", "field");
   extraRow.append(el("span", "", "Extra text at"), extraAt);
   return [extraRow,
-    colorField("Background", own("background").get, own("background").set),
+    colorField("Background", own("background").get, own("background").set, true),
     colorField("Text colour", own("foreground").get, own("foreground").set),
     colorField("Border", own("border").get, own("border").set),
     textField("Radius", card.radius === undefined ? "" : String(card.radius), v => {
@@ -511,7 +566,7 @@ function lookFields(card) {
       if (v.trim() && n >= 0) card.radius = n; else delete card.radius;
       changed();
     }, "(the theme's) corners, in DIP"),
-    colorField("Hover background", hover.get, hover.set)];
+    colorField("Hover background", hover.get, hover.set, true)];
 }
 
 function matchEditor(match, onChange) {

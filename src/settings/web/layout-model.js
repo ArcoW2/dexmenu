@@ -139,6 +139,33 @@ const LayoutModel = (() => {
     return { ok: true, value: v };
   }
 
+  // What a colour field holds (plan 03 3.6): kind "colour" (colour: a colorState that is not JSON), "gradient" (only
+  // where a gradient can be drawn, gradients true: two colours, each a colour or a palette colour with its intensity
+  // and opacity, start and end, and its angle, 90 when not given) or "json" (anything else, as text: a gradient of
+  // more colours, "none").
+  function fillState(value, gradients) {
+    if (gradients && value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.gradient) &&
+      value.gradient.length === 2 && Object.keys(value).every(k => k === "gradient" || k === "angle") &&
+      (value.angle === undefined || typeof value.angle === "number")) {
+      const start = colorState(value.gradient[0]), end = colorState(value.gradient[1]);
+      if (start.mode === "pick" && end.mode === "pick")
+        return { kind: "gradient", start, end, angle: value.angle === undefined ? 90 : value.angle };
+    }
+    const colour = colorState(value);
+    if (colour.mode === "json") return { kind: "json", text: colour.text };
+    return { kind: "colour", colour };
+  }
+
+  // The value written for a colour field's state; ok false when JSON text does not parse (left as it was). A
+  // gradient: { "gradient": [ start, end ], "angle" } with each colour in its shortest form, the angle only when not 90.
+  function fillValue(state) {
+    if (state.kind === "json") return colorValue({ mode: "json", text: state.text });
+    if (state.kind === "colour") return colorValue(state.colour);
+    const v = { gradient: [colorValue(state.start).value, colorValue(state.end).value] };
+    if (Math.round(state.angle) !== 90) v.angle = Math.round(state.angle);
+    return { ok: true, value: v };
+  }
+
   // A picker's colour as CSS (the swatch), with the theme's palette ({ name: "#rrggbbaa" }, basecolor among them) for
   // a palette name and the intensity: 0 the base colour, 100 the colour, 200 the base colour inverted. "" unknown.
   function colorCss(state, palette) {
@@ -553,7 +580,7 @@ const LayoutModel = (() => {
     return out;
   }
 
-  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, colorState, colorValue, colorCss,
+  return { matchKinds, isRemaining, isNote, addNote, isOwn, addOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addMostUsed, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };
