@@ -411,7 +411,13 @@ begin
   end;
 
   HideTip;
-  FLevels.Clear;   // the windows gone
+  // The activation back to the program first, as when the first level closes while active. A level in place of the
+  // menu (the first one hidden) would hand it to the window below, another program; and destroyed with the first
+  // level (owned by it) it would get that deactivation while still ours, and cancel the choice just made.
+  if (FOwner <> 0) and IsWindow(FOwner) and IsOurs(GetActiveWindow) then
+    SetActiveWindow(GetAncestor(FOwner, GA_ROOT));
+  for I := FLevels.Count - 1 downto 0 do
+    FLevels.Delete(I);   // the windows gone, the owned ones first
   if Notify then
     for I := FEarly.Count - 1 downto 0 do   // the submenus opened early close with the menu
       SendMessage(FOwner, WM_UNINITMENUPOPUP, WPARAM(FEarly[I]), 0);
