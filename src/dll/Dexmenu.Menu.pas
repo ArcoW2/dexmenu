@@ -106,6 +106,9 @@ type
     // A change was made to a menu while this one is shown (the hooks): read again and redraw, once.
     procedure Changed(Menu: HMENU);
     function Owns(Menu: HMENU): Boolean;
+    // Closed by another right-click while shown (Dexmenu.Hook): cancelled and its windows hidden now, before the new
+    // menu shows inside its message loop; the loop ends once that one is closed.
+    procedure Dismiss;
     property Original: HMENU read FOriginal;
     // Dexmenu's own item chosen, when one was (the menu then returned no choice)
     property Command: TCommand read FCommand;
@@ -493,6 +496,21 @@ procedure TMenuSession.Cancel;
 begin
   FChosen := 0;
   FDone := True;
+end;
+
+procedure TMenuSession.Dismiss;
+var
+  L: TLevelWindow;
+begin
+  Cancel;
+  HideTip;
+  for L in FLevels do
+  begin
+    if L.ShadowWnd <> 0 then
+      ShowWindow(L.ShadowWnd, SW_HIDE);
+    if L.Wnd <> 0 then
+      ShowWindow(L.Wnd, SW_HIDE);
+  end;
 end;
 
 procedure TMenuSession.Choose(V: TViewCard);
@@ -1079,6 +1097,8 @@ begin
   if L = nil then
     Exit(DefWindowProc(Wnd, Msg, WP, LP));
   S := L.Session;
+  if S.FDone and (Msg <> WM_PAINT) then
+    Exit(DefWindowProc(Wnd, Msg, WP, LP));   // closed (another menu may show inside its loop, Dismiss): no timer, no refresh
   Result := 0;
   case Msg of
     WM_MOUSEACTIVATE:

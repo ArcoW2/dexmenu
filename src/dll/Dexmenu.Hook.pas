@@ -188,7 +188,7 @@ function ShowOwn(Menu: HMENU; Flags: UINT; X, Y: Integer; Owner: HWND; Params: P
 var
   Layout: ILayout;
   Error: string;
-  Session: TMenuSession;
+  Session, Outer: TMenuSession;
   Kind, Where, LayoutKind: string;
   ToWindows: Boolean;
   Command: TCommand;
@@ -198,11 +198,20 @@ begin
   ChosenKey := '';
   Result := False;
   Shown := False;
-  if not TakeNoted(Menu, Kind, Where) or not Enabled or (ActiveSession <> nil) then
+  if not TakeNoted(Menu, Kind, Where) or not Enabled then
   begin
     if Tracing then
       Log(Format('show %s (%d items): not noted, passed through', [Hex(Menu), GetMenuItemCount(Menu)]));
     Exit;
+  end;
+  // A right-click while Dexmenu's menu is shown (Foldex hands it on through that menu's message loop): that menu
+  // closes and this one is Dexmenu's too, shown from inside the other's loop, which ends after it.
+  Outer := ActiveSession;
+  if Outer <> nil then
+  begin
+    if Tracing then
+      Log(Format('show %s: Dexmenu''s menu for %s still shown: closed for this one', [Hex(Menu), Hex(Outer.Original)]));
+    Outer.Dismiss;
   end;
   // Shift held while right-clicking: Windows' own menu (plan 02 3.11; in Explorer that is its extended menu)
   if GetKeyState(VK_SHIFT) < 0 then
