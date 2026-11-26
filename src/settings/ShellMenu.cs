@@ -54,6 +54,46 @@ static class ShellMenu
         }
     }
 
+    /// <summary>How long Windows takes to build the menu of a right-click (plan 16 3.1): binding the items and getting
+    /// the menu object, then QueryContextMenu (every extension's part), in ms, and the items it has; null and
+    /// <paramref name="error"/> when the shell gave none. Nothing opened, nothing read.</summary>
+    public static (long Bind, long Query, int Items)? Time(IntPtr owner, string kind, string folder, IReadOnlyList<string> items, out string error)
+    {
+        error = "";
+        IContextMenu? menu = null;
+        var pidls = new List<IntPtr>();
+        var hmenu = IntPtr.Zero;
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            menu = kind switch
+            {
+                "background" => Background(owner, folder, pidls),
+                "drive" => Items(owner, [Path.GetPathRoot(Path.GetFullPath(folder))!], pidls),
+                _ => Items(owner, items, pidls),
+            };
+            var bind = sw.ElapsedMilliseconds;
+            if (menu is null) { error = "Windows gave no menu for this right-click"; return null; }
+            hmenu = CreatePopupMenu();
+            sw.Restart();
+            var hr = menu.QueryContextMenu(hmenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_CANRENAME);
+            var query = sw.ElapsedMilliseconds;
+            if (hr < 0) { error = $"Windows gave no menu for this right-click (0x{hr:X8})"; return null; }
+            return (bind, query, GetMenuItemCount(hmenu));
+        }
+        catch (Exception e) when (e is COMException or ArgumentException or IOException or InvalidCastException)
+        {
+            error = "Windows gave no menu for this right-click: " + e.Message;
+            return null;
+        }
+        finally
+        {
+            if (hmenu != IntPtr.Zero) DestroyMenu(hmenu);
+            if (menu is not null) Marshal.ReleaseComObject(menu);
+            foreach (var p in pidls) Marshal.FreeCoTaskMem(p);
+        }
+    }
+
     // A file, a folder, several items of one folder, or a drive: the parent folder's menu for them.
     static IContextMenu? Items(IntPtr owner, IReadOnlyList<string> paths, List<IntPtr> pidls)
     {

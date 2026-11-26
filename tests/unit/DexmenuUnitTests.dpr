@@ -20,6 +20,7 @@ uses
   Dexmenu.Icons in '..\..\src\dll\Dexmenu.Icons.pas',
   Dexmenu.Theme in '..\..\src\dll\Dexmenu.Theme.pas',
   Dexmenu.Draw in '..\..\src\dll\Dexmenu.Draw.pas',
+  Dexmenu.Timings in '..\..\src\dll\Dexmenu.Timings.pas',
   Winapi.D2D1, System.JSON;
 
 var
@@ -2168,6 +2169,63 @@ begin
   end;
 end;
 
+// The right-clicks' timings (plan 16 3.2): an entry with its steps; the last ones kept per program.
+procedure TestTimings;
+var
+  T: TTiming;
+  Text: string;
+  Root: TJSONValue;
+  Entries: TJSONArray;
+  I, A, B: Integer;
+begin
+  T.Kind := 'file';
+  T.Shown := 'dexmenu';
+  T.Why := '';
+  T.First := True;
+  T.Wait := 812;
+  T.Steps := nil;
+  AddStep(T.Steps, 'layout', 3);
+  AddStep(T.Steps, 'draw', 20);
+  Text := TimingsWith('', 'C:/a.exe', '2026-11-26T08:00:00.000', T, 3);
+  Root := TJSONObject.ParseJSONValue(Text);
+  try
+    Check((Root is TJSONObject) and (TJSONObject(Root).GetValue('entries') is TJSONArray), 'timings: entries');
+    Entries := TJSONArray(TJSONObject(Root).GetValue('entries'));
+    Check(Entries.Count = 1, 'timings: one entry');
+    Check(TJSONObject(Entries.Items[0]).GetValue('wait').Value = '812', 'timings: wait');
+    Check(TJSONObject(Entries.Items[0]).GetValue('first').Value = 'true', 'timings: first');
+    Check(TJSONArray(TJSONObject(Entries.Items[0]).GetValue('steps')).Count = 2, 'timings: steps');
+    Check(TJSONObject(Entries.Items[0]).GetValue('why') = nil, 'timings: no why for Dexmenu''s menu');
+  finally
+    Root.Free;
+  end;
+  T.First := False;
+  for I := 1 to 5 do
+    Text := TimingsWith(Text, 'C:/a.exe', '2026-11-26T08:00:0' + IntToStr(I) + '.000', T, 3);
+  T.Shown := 'windows';
+  T.Why := 'Shift held';
+  T.Wait := -1;
+  Text := TimingsWith(Text, 'C:/B.exe', '2026-11-26T08:01:00.000', T, 3);
+  Text := TimingsWith(Text, 'c:/b.exe', '2026-11-26T08:01:01.000', T, 3);
+  Root := TJSONObject.ParseJSONValue(Text);
+  try
+    Entries := TJSONArray(TJSONObject(Root).GetValue('entries'));
+    A := 0;
+    B := 0;
+    for I := 0 to Entries.Count - 1 do
+      if SameText(TJSONObject(Entries.Items[I]).GetValue('program').Value, 'C:/a.exe') then
+        Inc(A)
+      else
+        Inc(B);
+    Check((A = 3) and (B = 2), 'timings: the last 3 per program kept (the program''s case ignored)');
+    Check(TJSONObject(Entries.Items[0]).GetValue('at').Value = '2026-11-26T08:00:03.000', 'timings: the oldest dropped');
+    Check(TJSONObject(Entries.Items[Entries.Count - 1]).GetValue('why').Value = 'Shift held', 'timings: why Windows'' menu');
+    Check(TJSONObject(Entries.Items[Entries.Count - 1]).GetValue('wait') = nil, 'timings: an unknown wait left out');
+  finally
+    Root.Free;
+  end;
+end;
+
 begin
   if ParamStr(1) = '--compare' then
   begin
@@ -2196,6 +2254,7 @@ begin
   TestButtons;
   TestOwnRules;
   TestHolders;
+  TestTimings;
   if Failures = 0 then
     Writeln('OK')
   else

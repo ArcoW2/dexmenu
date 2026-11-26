@@ -21,7 +21,7 @@ implementation
 
 uses
   System.SysUtils, System.StrUtils, System.SyncObjs, System.Diagnostics, System.Generics.Collections, DDetours, Dexmenu.Log,
-  Winapi.ShellAPI, Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen, Dexmenu.Place, Dexmenu.Usage;
+  Winapi.ShellAPI, Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen, Dexmenu.Place, Dexmenu.Usage, Dexmenu.Timings;
 
 const
   GET_MODULE_HANDLE_EX_FLAG_PIN = $00000001;
@@ -54,13 +54,16 @@ var
   Noted: TList<HMENU>;
   NotedKinds: TList<string>;   // the kind of right-click of each noted menu
   NotedWhere: TList<string>;   // and where it was (NoteMenu)
+  NotedAt: TList<Int64>;       // and when (TStopwatch.GetTimeStamp): the wait until the show call (Dexmenu.Timings)
+  ShownBefore: Boolean;        // Dexmenu showed a menu in this process before (a first one is slower)
   HooksLock: TCriticalSection;
   HooksTried, HooksSet: Boolean;
 
-function TakeNoted(Menu: HMENU; out Kind, Where: string): Boolean;
+function TakeNoted(Menu: HMENU; out Kind, Where: string; out Wait: Int64): Boolean;
 var
   I: Integer;
 begin
+  Wait := -1;
   NotedLock.Enter;
   try
     I := Noted.IndexOf(Menu);
@@ -69,9 +72,11 @@ begin
     begin
       Kind := NotedKinds[I];
       Where := NotedWhere[I];
+      Wait := (TStopwatch.GetTimeStamp - NotedAt[I]) * 1000 div TStopwatch.Frequency;
       Noted.Delete(I);
       NotedKinds.Delete(I);
       NotedWhere.Delete(I);
+      NotedAt.Delete(I);
     end;
   finally
     NotedLock.Leave;
@@ -194,17 +199,30 @@ var
   Command: TCommand;
   ChosenKey: string;
   Clock: TStopwatch;
+  Timing: TTiming;
+
+  // Windows' menu for this right-click: its timing entry, and why (plan 16 3.2)
+  procedure ToWindowsMenu(const Why: string);
+  begin
+    Timing.Shown := 'windows';
+    Timing.Why := Why;
+    RecordTiming(Timing);
+  end;
+
 begin
   Command := ccNone;
   ChosenKey := '';
   Result := False;
   Shown := False;
-  if not TakeNoted(Menu, Kind, Where) or not Enabled then
+  if not TakeNoted(Menu, Kind, Where, Timing.Wait) or not Enabled then
   begin
     if Tracing then
       Log(Format('show %s (%d items): not noted, passed through', [Hex(Menu), GetMenuItemCount(Menu)]));
     Exit;
   end;
+  Timing.Kind := Kind;
+  Timing.First := not ShownBefore;
+  Timing.Steps := nil;
   // A right-click while Dexmenu's menu is shown (Foldex hands it on through that menu's message loop): that menu
   // closes and this one is Dexmenu's too, shown from inside the other's loop, which ends after it.
   Outer := ActiveSession;
@@ -219,6 +237,7 @@ begin
   begin
     if Tracing then
       Log(Format('show %s: Shift held: Windows'' menu', [Hex(Menu)]));
+    ToWindowsMenu('Shift held');
     Exit;
   end;
   LayoutKind := Kind;   // the layout is chosen by the kind, in a dialog its dialog kind (plan 05 3.2)
@@ -226,17 +245,20 @@ begin
     LayoutKind := 'dialog-' + Kind;
   Clock := TStopwatch.StartNew;
   Layout := CurrentLayout(LayoutKind, ToWindows, Error);
+  AddStep(Timing.Steps, 'layout', Clock.ElapsedMilliseconds);
   if Tracing then
     Log(Format('show %s: layout read in %d ms', [Hex(Menu), Clock.ElapsedMilliseconds]));
   if ToWindows then
   begin
     if Tracing then
       Log(Format('show %s: kind %s set to none: Windows'' menu', [Hex(Menu), LayoutKind]));
+    ToWindowsMenu('set to None');
     Exit;
   end;
   if Layout = nil then
   begin
     Log('Windows'' menu shown: ' + Error);
+    ToWindowsMenu('layout not usable: ' + Error);
     Exit;
   end;
   if Tracing then
@@ -245,7 +267,9 @@ begin
   Session := TMenuSession.Create(Menu, Owner, Flags, Layout, Kind);
   try
     Shown := True;
+    ShownBefore := True;
     Result := Session.Run(X, Y, Params);
+    Timing.Steps := Timing.Steps + Session.Steps;
     Command := Session.Command;
     ChosenKey := Session.ChosenKey;
     if Session.TextSizeChanged then
@@ -257,6 +281,9 @@ begin
     WriteLastRightClick(Where);   // the settings app's preview starts on it
   if ChosenKey <> '' then
     CountChoice(Kind, ChosenKey);   // the use counts (plan 02 3.9), once the menu has closed
+  Timing.Shown := 'dexmenu';
+  Timing.Why := '';
+  RecordTiming(Timing);   // once the menu has closed: costs the user nothing
   case Command of
     ccWindowsMenu:
       Shown := False;   // the hook shows Windows' own menu now, at the same place
@@ -361,6 +388,7 @@ begin
         Noted.Delete(I);
         NotedKinds.Delete(I);
         NotedWhere.Delete(I);
+        NotedAt.Delete(I);
       end;
     I := Noted.IndexOf(Menu);
     if I < 0 then
@@ -368,11 +396,13 @@ begin
       Noted.Add(Menu);
       NotedKinds.Add(Kind);
       NotedWhere.Add(Where);
+      NotedAt.Add(TStopwatch.GetTimeStamp);
     end
     else
     begin
       NotedKinds[I] := Kind;
       NotedWhere[I] := Where;
+      NotedAt[I] := TStopwatch.GetTimeStamp;
     end;
   finally
     NotedLock.Leave;
@@ -386,6 +416,7 @@ initialization
   Noted := TList<HMENU>.Create;
   NotedKinds := TList<string>.Create;
   NotedWhere := TList<string>.Create;
+  NotedAt := TList<Int64>.Create;
   HooksLock := TCriticalSection.Create;
 
 end.

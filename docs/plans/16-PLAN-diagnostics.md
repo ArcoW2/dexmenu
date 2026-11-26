@@ -1,8 +1,9 @@
 # Plan 16: Diagnostics: where the time of a right-click goes
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-26: draft.
+- 2026-11-26: partly executed: everything but the check in a real right-click.
 
 Builds on the timing in the log (the log's times in ms; with tracing on, `menu shown, ms:` with Dexmenu's steps) and
 the test host's `timing:` lines.
@@ -30,17 +31,18 @@ DLL writes these timings to a small file; the page reads it.
 | Part | What | Reference |
 |---|---|---|
 | Timing in the log | ms in the log; Dexmenu's steps logged with tracing on; the test host's timings | 3.4 |
+| Measuring process | each handler of a kind timed (create, Initialize, QueryContextMenu), fresh and warm | 3.1; 6.1 |
+| Right-click timings | the DLL keeps the last right-clicks' timings per program in a file | 3.2; 6.2 |
+| Diagnostics page | the main window's page with both tables and a Measure button | 3.3; 6.3 |
+| Switching off | a handler switched off and on from the page (Windows' blocked list for the user) | 3.6; 6.4 |
+| Hang setting | how long one handler may take before it is stopped, a setting | 3.1; 6.1 |
+| Tests | all but the real right-click | 3.5; 6.5 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Measuring process | each handler of a kind timed (create, Initialize, QueryContextMenu), fresh and warm | -- | 3.1 |
-| Right-click timings | the DLL keeps the last right-clicks' timings per program in a file | -- | 3.2 |
-| Diagnostics page | the main window's page with both tables and a Measure button | Measuring process; Right-click timings | 3.3 |
-| Switching off | a handler switched off and on from the page (Windows' blocked list for the user) | Diagnostics page | 3.6 |
-| Hang setting | how long one handler may take before it is stopped, a setting | Measuring process | 3.1 |
-| Tests | 3.5 | -- | 3.5 |
+| Real right-click check | a right-click in Explorer and Foldex writes its entry, shown on the page | the new DLL installed in C:\Win32App\Dexmenu | 3.5; 6.5 |
 
 ## 3. Details
 
@@ -48,15 +50,15 @@ DLL writes these timings to a small file; the page reads it.
 
 - The handlers come from the registry, as Windows finds them for the kind: `*`, `AllFilesystemObjects` and the
   sample file's type for a file; `Directory`, `Folder` and `AllFilesystemObjects` for a folder;
-  `Directory\Background` for a background; `Drive` for a drive. A handler on the blocked list is shown as blocked,
-  not timed.
+  `Directory\Background` for a background; `Drive`, `Folder` and `AllFilesystemObjects` for a drive. For a file also
+  its extension's key, its ProgID, and `SystemFileAssociations` for the extension and for its perceived type. A
+  handler on the blocked list is shown as blocked, not timed.
 - The sample: a file and a folder the measuring process makes in a temp folder (a `.txt` file), the temp folder's
   background, the system drive. A handler that acts on a file's type only (Foxit on PDFs) is timed only with a file of
   that type; the page can be given a file of the user's choice to measure with.
 - Each handler is timed in its own measuring process (the settings app started with an argument), so a handler that
   crashes or hangs does not take the app with it. How long one handler may take before it is stopped and shown as
-  hanging is a setting on the page; its default is chosen once the first measurements show what is usual
-  ([not yet decided]). While a measurement runs, the page shows how long the current handler has taken, with a Stop
+  hanging is a setting on the page; its default is 10 s, far above the slowest one measured (6.1). While a measurement runs, the page shows how long the current handler has taken, with a Stop
   button that stops it by hand. Per handler: create (loading its DLL), Initialize, QueryContextMenu, fresh (first in the process) and
   warm (a second time in the same process), and the number of items it added.
 - Windows' own total for the kind: the menu built the way Explorer builds it (the test host's way), fresh and warm.
@@ -75,7 +77,8 @@ the extension's time (one that adds nothing is never seen), so it is not done.
   Dexmenu's steps (layout read, reading Windows' menu, files, submenus opened early, placing, measuring, drawing,
   showing), whether it was the first menu in that process, and Windows' menu instead when Dexmenu passed it on.
 - Kept: the last 10 entries per program; older ones dropped when written. A fixed number for now, not a setting.
-- Written always, not only with tracing on: one small write after the menu shows. The trace log keeps its own line.
+- Written always, not only with tracing on: one small write once the menu has closed, so it costs the user nothing.
+  The trace log keeps its own line.
 
 ### 3.3 The page
 
@@ -113,9 +116,69 @@ The test host prints how long binding the items and Windows' QueryContextMenu to
 - Only extensions the user switched off from the page are listed as such and can be switched on there; one on the
   blocked list by other means (the machine's list in HKLM, a policy) is shown as blocked, without a switch.
 - Dexmenu's own handler has no switch.
-- Whether Windows honours the user's list is [not yet checked]: the first part built checks it (3.5). If it does not,
-  the page shows the blocked state and no switch.
+- Windows honours the user's list: checked (6.4).
 
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+### 6.1 The measuring process
+
+- `Diagnostics.cs` in the settings app. `DexmenuSettings.exe --measure-handler <out> <kind> <sample> <clsid> <hang s>`
+  times one handler twice in one process (fresh, then warm): CoCreateInstance, IShellExtInit.Initialize (with a data
+  object of the sample; for a background the folder and no items), IContextMenu.QueryContextMenu, and the items it
+  added. `--measure-menu <out> <kind> <sample> <hang s>` builds Windows' whole menu as the preview does
+  (ShellMenu.Time: bind and QueryContextMenu), fresh and warm. Each writes JSON to the file.
+- The hang limit is a watchdog in the measuring process: when the handler has not returned in time, it writes
+  `"hanging": true` and ends the process (exit 3). The app also stops a process that runs 15 s past the limit
+  (one that never gets to the handler). The limit is `settings.json` `"diagnostics"."hangSeconds"`, default 10 s.
+- Measured on this machine (the page, 2026-11-26): for a file, the slowest handler loaded fresh took 109 ms (EPP,
+  Defender) and Windows' whole menu 1354 ms fresh and 1301 ms warm; for a folder's empty part the whole menu took
+  716 ms fresh and 258 ms warm. 10 s is a hang, not a slow extension. Starting a measuring process costs about
+  0.2 s, so a file's handlers took 10 s in all.
+- Warm, the handlers of a file together take little, while Windows' whole menu still takes over a second: most of a
+  warm right-click is in what is not timed one by one (3.1: the static verbs and Windows 11's newer extensions).
+
+### 6.2 The right-clicks' timings
+
+- `Dexmenu.Timings` in the DLL. The hook notes when Dexmenu's handler was asked (NoteMenu) and, at the show call, the
+  wait since then; the session keeps its steps (`init`, `read`, `files`, `submenus`, `place`, `window`, `measure`,
+  `draw`, `show`) after the hook's `layout`. A right-click Dexmenu passes to Windows' menu gets an entry with why
+  (Shift held, set to None, the layout not usable), no steps but the layout's.
+- Written to `%LOCALAPPDATA%\Dexmenu\timings.json` (DEXMENU_TIMINGS_FILE: the tests) under a named mutex, as several
+  programs write it; the last 10 per program kept, a program's path compared without case.
+
+### 6.3 The page
+
+- The main window's fourth tab, Diagnostics. Extensions: the kind, File... (a file of the user's own, for a file's
+  right-click), Measure, Stop (while measuring; it stops the extension being measured, the others are measured
+  still), "Stop an extension after ... s". While measuring: which one and how long it has taken, every 0.1 s. Then
+  the kept result (`%LOCALAPPDATA%\Dexmenu\measured.json`, per kind): when and on what, Windows' whole menu fresh
+  and warm, and per extension its DLL's name (its path on hover), fresh and warm (load, initialize and build on
+  hover), items and the switch, slowest first. The blocked state is read again whenever the page is shown.
+- Right-clicks: per program (the most recent first) its middle wait and middle Dexmenu time, then its entries,
+  newest first: when, the kind, Dexmenu's or Windows' menu (and why), the wait, Dexmenu's time, its steps. Read again
+  when the tab is shown and whenever the file changes.
+
+### 6.4 Switching off
+
+- Off: the CLSID as a value in the user's blocked list (its name as the data) and in `settings.json`
+  `"diagnostics"."switchedOff"`; on: both removed. Dexmenu's own handler, and one blocked by other means, have no
+  switch.
+- Checked by hand: 7-Zip on the user's list, then the test host's menu for a .txt file: no 7-Zip item; off the list
+  again: back. The test's blocked list key did not exist before and was removed after.
+
+### 6.5 Tests
+
+- Unit (DLL): an entry with its wait, first and steps, no "why" for Dexmenu's menu; the last ones kept per program
+  (case ignored), the oldest dropped; Windows' menu with why and no wait.
+- The page, run by script on its own data folder (WebView2 driven over its debug port): the right-clicks from a
+  sample timings file grouped and ordered per program with their middle values; a background and a file measured,
+  every handler listed with its times or why not (one not loaded); 7-Zip switched off from the page (the blocked
+  value and the settings list written, its row "switched off") and on again (both removed); Stop during Windows'
+  whole menu (it shows "stopped", the extensions after it measured); the hang limit at 0.5 s on Windows' whole menu
+  (exit 3, "hanging").
+- Not yet: a real right-click in Explorer or Foldex writing its entry. They run the installed DLL, which is older
+  than this build.

@@ -5,9 +5,10 @@ using Microsoft.Web.WebView2.WinForms;
 namespace Dexmenu.Settings;
 
 /// <summary>The main window (docs/plans/executed/05-PLAN-settings-windows.md 3.3 - 3.5): only about Dexmenu itself, never inside
-/// a layout. The page (web\main.html) has three panels as tabs: General (the registration; every menu's settings by
+/// a layout. The page (web\main.html) has its panels as tabs: General (the registration; every menu's settings by
 /// what they are about: action, collecting, look), Right-clicks (which layout each kind of right-click gets, in the
-/// order they are tried) and Layouts (new, edit, copy, rename, delete). The page measures the
+/// order they are tried), Layouts (new, edit, copy, rename, delete) and Diagnostics (plan 16: the extensions timed,
+/// the last right-clicks' timings per program). The page measures the
 /// panels and tells the window its minimum size. settings.json and the layouts are watched, so another window's
 /// change shows here at once.</summary>
 sealed class HomeForm : Form, IThemed
@@ -19,6 +20,9 @@ sealed class HomeForm : Form, IThemed
     bool pageReady;
     bool restartPending;            // a registration change Explorer has not taken yet (Restart Explorer lit)
     HashSet<int> explorersAtChange = [];
+    readonly System.Windows.Forms.Timer timingsSettle = new() { Interval = 300 };
+    bool measuring;                 // a Diagnostics measurement runs (one at a time)
+    CancellationTokenSource? stopCurrent;   // Stop: the handler being measured now stopped
 
     public HomeForm()
     {
@@ -30,6 +34,7 @@ sealed class HomeForm : Form, IThemed
         Controls.Add(web);
         settle.Tick += (_, _) => { settle.Stop(); PostState(); };
         explorerCheck.Tick += (_, _) => CheckExplorer();
+        timingsSettle.Tick += (_, _) => { timingsSettle.Stop(); PostDiagnostics(); };
         HandleCreated += (_, _) => Themes.Apply(this, web);
         Load += async (_, _) =>
         {
@@ -55,6 +60,89 @@ sealed class HomeForm : Form, IThemed
             w.Deleted += Changed;
             w.Renamed += Changed;
             watchers.Add(w);
+        }
+        // the right-clicks' timings, written by the DLL after each menu (plan 16 3.2)
+        var timings = Diagnostics.TimingsFile;
+        Directory.CreateDirectory(Path.GetDirectoryName(timings)!);
+        var t = new FileSystemWatcher(Path.GetDirectoryName(timings)!, Path.GetFileName(timings))
+            { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName, EnableRaisingEvents = true };
+        FileSystemEventHandler again = (_, _) => BeginInvoke(() => { timingsSettle.Stop(); timingsSettle.Start(); });
+        t.Changed += again;
+        t.Created += again;
+        t.Renamed += (_, _) => BeginInvoke(() => { timingsSettle.Stop(); timingsSettle.Start(); });
+        watchers.Add(t);
+    }
+
+    // ---- Diagnostics (plan 16) ------------------------------------------------------------------------------------
+
+    void PostDiagnostics()
+    {
+        if (!pageReady) return;
+        var message = new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "diagnostics",
+            ["measured"] = Diagnostics.MeasuredNow(),
+            ["timings"] = Diagnostics.TimingEntries(),
+            ["hangSeconds"] = Diagnostics.HangSeconds,
+            ["measuring"] = measuring,
+            ["dexmenu"] = Registration.Clsid,
+        };
+        web.CoreWebView2?.PostWebMessageAsJson(message.ToJsonString());
+    }
+
+    // Each handler of the kind in a measuring process of its own, one after another, the page told which one runs;
+    // the result kept (Diagnostics.KeepMeasured) and shown.
+    async Task Measure(string kind, string? file)
+    {
+        if (measuring || !Diagnostics.Kinds.Contains(kind)) return;
+        measuring = true;
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            var hang = Diagnostics.HangSeconds;
+            var sample = Diagnostics.Sample(kind, file);
+            var handlers = Diagnostics.Handlers(kind, sample);
+            var result = new System.Text.Json.Nodes.JsonObject
+            {
+                ["at"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", invariant),
+                ["sample"] = sample,
+                ["hangSeconds"] = hang,
+            };
+            Post(new { type = "measuring", kind, name = "Windows' whole menu", index = 0, count = handlers.Count });
+            stopCurrent = new CancellationTokenSource();
+            result["windows"] = await Diagnostics.RunMeasuring(["--measure-menu", kind, sample, hang.ToString(invariant)], hang, stopCurrent.Token)
+                ?? new System.Text.Json.Nodes.JsonObject { ["stopped"] = true };
+            var list = new System.Text.Json.Nodes.JsonArray();
+            for (var i = 0; i < handlers.Count; i++)
+            {
+                var h = handlers[i];
+                var entry = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["clsid"] = h.Clsid, ["name"] = h.Name, ["key"] = h.Key, ["dll"] = h.Dll,
+                    ["blocked"] = h.Blocked, ["byDexmenu"] = h.ByDexmenu,
+                };
+                if (h.Blocked is null)
+                {
+                    Post(new { type = "measuring", kind, name = h.Name, index = i + 1, count = handlers.Count });
+                    stopCurrent = new CancellationTokenSource();
+                    var r = await Diagnostics.RunMeasuring(["--measure-handler", kind, sample, h.Clsid, hang.ToString(invariant)], hang, stopCurrent.Token);
+                    if (r is null) entry["stopped"] = true;
+                    else foreach (var (k, v) in r) entry[k] = v?.DeepClone();
+                }
+                list.Add(entry);
+            }
+            result["handlers"] = list;
+            Diagnostics.KeepMeasured(kind, result);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            Problem("Measuring stopped: " + e.Message);
+        }
+        finally
+        {
+            measuring = false;
+            stopCurrent = null;
+            PostDiagnostics();
         }
     }
 
@@ -112,6 +200,29 @@ sealed class HomeForm : Form, IThemed
             {
                 case "closeReady":
                     BeginInvoke(CloseNow);
+                    break;
+                case "diagnostics":
+                    PostDiagnostics();
+                    break;
+                case "measure":
+                    _ = Measure(Str("kind"), Str("file") is { Length: > 0 } f ? f : null);
+                    break;
+                case "stopMeasure":
+                    stopCurrent?.Cancel();
+                    break;
+                case "pickMeasureFile":
+                    using (var dialog = new OpenFileDialog { Title = "A file to measure the extensions with" })
+                    {
+                        if (dialog.ShowDialog(this) == DialogResult.OK) Post(new { type = "pickedMeasureFile", path = dialog.FileName });
+                    }
+                    break;
+                case "switchHandler":
+                    Diagnostics.Switch(Str("clsid"), Str("name"), m.TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.True);
+                    PostDiagnostics();
+                    break;
+                case "setHang":
+                    if (m.TryGetProperty("value", out var hv) && hv.TryGetDouble(out var hs) && hs > 0) Diagnostics.HangSeconds = hs;
+                    PostDiagnostics();
                     break;
                 case "register":
                 case "unregister":

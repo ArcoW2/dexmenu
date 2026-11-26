@@ -10,7 +10,7 @@ namespace Dexmenu.Settings;
 /// Registering for every user of the computer is the installer's (plan 00 step 7).</summary>
 static class Registration
 {
-    const string Clsid = "{CD4EEF01-47D9-4172-A48A-F6E61850D170}";
+    public const string Clsid = "{CD4EEF01-47D9-4172-A48A-F6E61850D170}";
     const string Classes = @"Software\Classes";
     // files and folders, a folder's empty part, the desktop's empty part (plan 05 3.2), drives
     static readonly string[] Kinds = ["AllFilesystemObjects", @"Directory\Background", "DesktopBackground", "Drive"];

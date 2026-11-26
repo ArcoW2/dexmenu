@@ -16,7 +16,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.Types, System.Generics.Collections, System.JSON, Dexmenu.Tree, Dexmenu.Place,
-  Dexmenu.Layout, Dexmenu.Draw, Dexmenu.Tip;
+  Dexmenu.Layout, Dexmenu.Draw, Dexmenu.Tip, Dexmenu.Timings;
 
 type
   TMenuSession = class;
@@ -75,6 +75,7 @@ type
     FLastMouse: TPoint;   // the mouse's last screen position: a move that is no move keeps the keys' focus ring
     FSettings: TMenuSettings;   // the global settings (settings.json "menu"), read when the menu shows
     FCommand: TCommand;         // Dexmenu's own item chosen ("Windows' menu", "Edit menu..."); ccNone else
+    FSteps: TArray<TTimingStep>;   // how long each step until the menu showed took (Dexmenu.Timings)
     function OpensOnHover(V: TViewCard): Boolean;
     procedure HoverTip(L: TLevelWindow; Box: Integer);
     procedure ShowTip(L: TLevelWindow);
@@ -116,6 +117,8 @@ type
     property ChosenKey: string read FChosenKey;
     property TextSize: Single read FTextSize;
     property TextSizeChanged: Boolean read FTextSizeChanged;
+    // How long each step until the menu showed took, in ms, in order (plan 16 3.2)
+    property Steps: TArray<TTimingStep> read FSteps;
     // Whether a search is being typed (a space then goes into it)
     function IsSearching: Boolean;
   end;
@@ -349,9 +352,10 @@ var
   Clock: TStopwatch;
   Times: string;
 
-  // with tracing on: how long each step took, in ms, logged once the menu shows
+  // how long each step took, in ms (Steps; with tracing on, logged once the menu shows)
   procedure Mark(const Step: string);
   begin
+    AddStep(FSteps, Step, Clock.ElapsedMilliseconds);
     Times := Times + Format(' %s %d', [Step, Clock.ElapsedMilliseconds]);
     Clock := TStopwatch.StartNew;
   end;
