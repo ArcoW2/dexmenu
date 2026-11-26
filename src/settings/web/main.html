@@ -13,6 +13,7 @@
     <button data-panel="rightclicks">Right-clicks</button>
     <button data-panel="layouts">Layouts</button>
     <button data-panel="diagnostics">Diagnostics</button>
+    <button data-panel="about">About</button>
     <button id="themeSwitch" class="theme"></button>
   </nav>
   <main id="panels">
@@ -122,6 +123,19 @@
           <h3>The last right-clicks</h3>
           <div id="timings"></div>
         </details>
+      </div>
+    </section>
+    <!-- About (as Foldex's and LexPen's): what Dexmenu is, why, by whom, a coffee, this build and what it runs on -->
+    <section class="panel" id="about">
+      <div class="scroll">
+        <h1>Dexmenu</h1>
+        <p>Your own right-click menu for Windows, built from layouts you arrange yourself.</p>
+        <p>Made out of frustration with Windows' right-click menu: little control over what is in it, and a long list
+          of items, some of them hardly useful. Dexmenu shows what you choose, where you want it.</p>
+        <p class="created">Created by Arco Witter</p>
+        <p class="coffee"><a href="https://ko-fi.com/arcowitter" target="_blank">Buy me a coffee or a chocolate</a></p>
+        <p id="aboutVersion" class="hint"></p>
+        <table id="aboutTable" class="diag"></table>
       </div>
     </section>
   </main>

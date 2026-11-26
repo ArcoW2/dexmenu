@@ -136,6 +136,13 @@ static class Pages
         {
             if (e.PermissionKind == CoreWebView2PermissionKind.ClipboardRead) e.State = CoreWebView2PermissionState.Allow;
         };
+        // a link to the web (About's Buy me a coffee) opens in the browser, as Foldex's; nothing opens a window here
+        web.CoreWebView2.NewWindowRequested += (_, n) =>
+        {
+            n.Handled = true;
+            if (Uri.TryCreate(n.Uri, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && uri.Host != WebFiles.Host)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        };
         web.CoreWebView2.WebMessageReceived += (_, e) => received(e.WebMessageAsJson);
         web.CoreWebView2.NavigationCompleted += async (_, _) =>
         {

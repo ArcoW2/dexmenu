@@ -192,6 +192,27 @@ sealed class HomeForm : Form, IThemed
         });
     }
 
+    // What the About tab shows (as Foldex's): this build and what it runs on.
+    void PostAbout()
+    {
+        var asm = typeof(HomeForm).Assembly;
+        string? Meta(string key) => asm.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .OfType<System.Reflection.AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == key)?.Value;
+        var v = asm.GetName().Version;
+        var os = Environment.OSVersion.Version;
+        Post(new
+        {
+            type = "about",
+            version = v is null ? "0.0.0" : $"{v.Major}.{v.Minor}.{v.Build}",
+            commit = Meta("Commit"),
+            built = Meta("BuildTime"),
+            os = $"Windows {(os.Build >= 22000 ? 11 : 10)} (build {os.Build}), {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}",
+            dotnet = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+            webView2 = web.CoreWebView2?.Environment.BrowserVersionString,
+            webView2Sdk = typeof(Microsoft.Web.WebView2.Core.CoreWebView2).Assembly.GetName().Version?.ToString(),
+        });
+    }
+
     void Post(object message) => web.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(message));
 
     void Problem(string text) => Post(new { type = "problem", text });
@@ -210,6 +231,9 @@ sealed class HomeForm : Form, IThemed
                     break;
                 case "diagnostics":
                     PostDiagnostics();
+                    break;
+                case "about":
+                    PostAbout();
                     break;
                 case "measure":
                     _ = Measure(Str("kind"), Str("file") is { Length: > 0 } f ? f : null);

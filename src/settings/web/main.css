@@ -8,6 +8,7 @@
   --layouts-min-w: 380px; --layouts-min-h: 300px;
   --rightclicks-min-w: 380px; --rightclicks-min-h: 300px;
   --diagnostics-min-w: 440px; --diagnostics-min-h: 300px;
+  --about-min-w: 380px; --about-min-h: 300px;
   --margin: 12px; --tabs-h: 38px;
   color-scheme: light dark;
 }
@@ -43,6 +44,15 @@ button.lit { background: var(--accent); color: var(--on-accent); border-color: v
 #diagnostics .scroll { flex: 1; min-height: 120px; overflow: auto; }
 #diagnostics .measure { align-items: center; }
 #hangSeconds { width: 4.5em; }
+/* About (as Foldex's): the name, what and why, by whom, the coffee, the build, a table */
+#about { min-width: var(--about-min-w); min-height: var(--about-min-h); flex: 1 1 0; }
+#about .scroll { flex: 1; min-height: 120px; overflow: auto; }
+#about h1 { font-size: 20px; margin: 0 0 8px; }
+#about p { margin: 0 0 8px; max-width: 60em; }
+#about .created { color: var(--dim); }
+#about .coffee a { color: var(--accent); text-decoration: none; }   /* opens in the browser: Pages.Start */
+#about .coffee a:hover, #about .coffee a:focus-visible { text-decoration: underline; }
+#aboutTable th { color: var(--fg); font-weight: 600; padding-top: 8px; }
 #measureStatus { min-height: 1.4em; }
 table.diag { border-collapse: collapse; width: 100%; margin: 4px 0 8px; }
 table.diag th { font-weight: normal; color: var(--dim); font-size: 12px; text-align: left; padding: 2px 6px; border-bottom: 1px solid var(--line); }

@@ -6,6 +6,8 @@
        A publish (as Foldex and LexPen): one exe, with only DexmenuShell.dll and WebView2Loader.dll next to it. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- Major.minor; the last number is the git commit count (see GitVersion), as Foldex's and LexPen's. -->
+    <VersionBase>1.0</VersionBase>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
@@ -36,7 +38,29 @@
   <ItemGroup>
     <!-- The page's files: inside the exe (WebFiles). -->
     <EmbeddedResource Include="web\**" LogicalName="web\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AssemblyMetadata Include="BuildTime" Value="$([System.DateTime]::UtcNow.ToString('o'))" />
   </ItemGroup>
+
+  <!-- The build number is the git commit count, so each commit gets its own version: 1.0.1, 1.0.2, ...
+       The short commit hash goes into the assembly metadata. Without git it is 1.0.0. Skipped for the IDE's
+       background design-time builds. -->
+  <Target Name="GitVersion" BeforeTargets="BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="git rev-list --count HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="BuildNumber" />
+      <Output TaskParameter="ExitCode" PropertyName="GitExitCode" />
+    </Exec>
+    <Exec Command="git rev-parse --short HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreExitCode="true" ContinueOnError="true" Condition="'$(GitExitCode)' == '0'">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommit" />
+    </Exec>
+    <PropertyGroup>
+      <BuildNumber Condition="'$(GitExitCode)' != '0'">0</BuildNumber>
+      <Version>$(VersionBase).$(BuildNumber)</Version>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(GitCommit)' != ''">
+      <AssemblyMetadata Include="Commit" Value="$(GitCommit)" />
+    </ItemGroup>
+    <Message Importance="high" Text="Dexmenu version $(Version) $(GitCommit)" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />

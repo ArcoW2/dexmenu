@@ -461,7 +461,7 @@ function listMinimum(list) {
 // minimum (three rows). Set as --general-min-h, --rightclicks-min-h and --layouts-min-h, so the panels' arrangement and the window's
 // minimum follow what the panel holds.
 function measureMinimums() {
-  for (const id of ["general", "rightclicks", "layouts", "diagnostics"]) {
+  for (const id of ["general", "rightclicks", "layouts", "diagnostics", "about"]) {
     const panel = $(id), saved = panel.getAttribute("style");
     panel.style.display = "flex";
     panel.style.flex = "none";
@@ -492,8 +492,8 @@ function arrange() {
 function minimumSize() {
   const m = px("--margin");
   return {
-    w: Math.max(px("--general-min-w"), px("--rightclicks-min-w"), px("--layouts-min-w"), px("--diagnostics-min-w")) + 2 * m,
-    h: Math.max(px("--general-min-h"), px("--rightclicks-min-h"), px("--layouts-min-h"), px("--diagnostics-min-h")) + 2 * m + px("--tabs-h"),
+    w: Math.max(px("--general-min-w"), px("--rightclicks-min-w"), px("--layouts-min-w"), px("--diagnostics-min-w"), px("--about-min-w")) + 2 * m,
+    h: Math.max(px("--general-min-h"), px("--rightclicks-min-h"), px("--layouts-min-h"), px("--diagnostics-min-h"), px("--about-min-h")) + 2 * m + px("--tabs-h"),
   };
 }
 
@@ -502,6 +502,7 @@ for (const b of document.querySelectorAll("#tabs button[data-panel]"))   // the 
     shownTab = b.dataset.panel;
     arrange();
     if (shownTab === "diagnostics") post({ type: "diagnostics" });   // the right-clicks' timings as they are now
+    if (shownTab === "about") post({ type: "about" });   // this build and what it runs on
   });
 // Measured again whenever the page changes (a state fills the lists and the registration line); the window's minimum
 // sent when it changed.
@@ -551,6 +552,8 @@ chrome.webview.addEventListener("message", e => {
     renderMeasured();
     renderTimings();
     renderMeasuring();
+  } else if (m.type === "about") {
+    renderAbout(m);
   } else if (m.type === "measuring") {
     measuringNow = { name: m.name, index: m.index, count: m.count, since: Date.now() };
     renderMeasuring();
@@ -562,3 +565,23 @@ chrome.webview.addEventListener("message", e => {
     $("problem").textContent = m.text;
   }
 });
+
+// About (as Foldex's): this build, what it needs to run (with what is installed here), and what is included.
+function renderAbout(a) {
+  const built = a.built ? new Date(a.built).toLocaleString() : "unknown";
+  $("aboutVersion").textContent = `Version ${a.version}${a.commit ? ` (${a.commit})` : ""}, built ${built}`;
+  const table = $("aboutTable");
+  table.replaceChildren();
+  const section = (title, rows) => {
+    const head = table.insertRow();
+    head.append(Object.assign(document.createElement("th"), { colSpan: 2, textContent: title }));
+    for (const [name, value] of rows) {
+      const row = table.insertRow();
+      row.insertCell().textContent = name;
+      row.insertCell().textContent = value ?? "";
+    }
+  };
+  section("Needed to run (installed)", [["Windows 10 or 11, x64", a.os], [".NET 10 Desktop Runtime (this window)", a.dotnet],
+    ["Microsoft Edge WebView2 Runtime (this window)", a.webView2]]);
+  section("Included", [["DexmenuShell.dll: the menu in Explorer (Delphi, no other libraries)", ""], ["WebView2 SDK", a.webView2Sdk]]);
+}
