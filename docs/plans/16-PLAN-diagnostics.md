@@ -5,6 +5,7 @@ Status: partly executed; see Status.
 - 2026-11-26: draft.
 - 2026-11-26: partly executed: everything but the check in a real right-click.
 - 2026-11-26: partly executed: the profile of Windows' whole menu; packaged apps' extensions.
+- 2026-11-26: partly executed: the page as a list of programs, the rest under Details.
 
 Builds on the timing in the log (the log's times in ms; with tracing on, `menu shown, ms:` with Dexmenu's steps) and
 the test host's `timing:` lines.
@@ -36,7 +37,7 @@ DLL writes these timings to a small file; the page reads it.
 | Timing in the log | ms in the log; Dexmenu's steps logged with tracing on; the test host's timings | 3.4 |
 | Measuring process | each handler of a kind timed (create, Initialize, QueryContextMenu), fresh and warm | 3.1; 6.1 |
 | Right-click timings | the DLL keeps the last right-clicks' timings per program in a file | 3.2; 6.2 |
-| Diagnostics page | the main window's page with both tables and a Measure button | 3.3; 6.3 |
+| Diagnostics page | the programs that take time, the slowest first, a switch each; the rest under Details | 3.3; 6.3 |
 | Switching off | a handler switched off and on from the page (Windows' blocked list for the user) | 3.6; 6.4 |
 | Hang setting | how long one handler may take before it is stopped, a setting | 3.1; 6.1 |
 | Tests | all but the real right-click | 3.5; 6.5 |
@@ -87,11 +88,18 @@ the extension's time (one that adds nothing is never seen), so it is not done.
 
 ### 3.3 The page
 
-- A Diagnostics page in the main window, as its other pages.
-- Extensions: a table per kind (name, file, fresh and warm times, items), slowest first, with Windows' total above
-  it; a Measure button runs the measuring process; the result is kept until measured again.
-- Right-clicks: a table per program: the last entries, and per program the middle value of the time to show and of
-  Dexmenu's own time. A first menu in a process is marked, as it is slower.
+- A Diagnostics page in the main window, as its other pages. It answers one question: which programs make the
+  right-click slow. On top: the right-click to measure (a file, a folder, an empty part, a drive; a file of the user's
+  own), Measure, and then a list of programs, the slowest first: each program's extensions added up (Windows' own as
+  one row, Dexmenu's with its own time at the user's right-clicks), and a switch per program that switches all its
+  extensions off or on. After a switch, a lit Restart Explorer with one line why.
+- A program: the folder it is installed in (the product folder after the maker's, as Foxit Software\Foxit PDF
+  Editor; not bin, a version or the like), Windows for Windows' own files, a packaged app's own name.
+- The time a program costs: per extension what a right-click pays: a packaged app's extension its start (its process
+  ends soon after a right-click), an extension in a DLL its time when loaded already (Explorer keeps it).
+- Everything else is under a closed "Details (for experts)": each part with its own switch, Windows' whole menu with
+  the processes started for it and its profile, the last right-clicks per program (when, on what, Windows' time,
+  Dexmenu's time, Dexmenu's steps on hover), the hang limit and the profile switch.
 
 ### 3.4 The timing already built
 

@@ -89,10 +89,8 @@
     <section class="panel" id="diagnostics">
       <h2>Diagnostics</h2>
       <div class="scroll">
-        <h3>Extensions</h3>
-        <div class="hint">Windows builds its menu with every installed extension before Dexmenu gets it. Each extension
-          is timed here on its own, in a separate process: loaded fresh (as at the first right-click in a program)
-          and again warm.</div>
+        <div class="hint">Which programs make your right-click slow. Choose a right-click, press Measure, and switch off
+          what you do not use.</div>
         <div class="buttons measure">
           <label>Right-click on <select id="measureKind">
             <option value="file">a file</option>
@@ -103,19 +101,27 @@
           <button id="measureFile" title="A file of your own, so the extensions for its type are measured too">File...</button>
           <span id="measureFileName" class="hint"></span>
           <button id="measure" class="lit">Measure</button>
-          <button id="stopMeasure" hidden title="Stop the extension being measured now; the others are measured still">Stop</button>
-          <label title="An extension that takes longer is stopped and shown as hanging">Stop an extension after
-            <input type="number" id="hangSeconds" min="0.5" max="600" step="0.5"> s</label>
-          <label title="Windows' whole menu sampled while it is built: where its time goes, per DLL and call path"><input
-            type="checkbox" id="profile"> Profile Windows' whole menu</label>
+          <button id="stopMeasure" hidden title="Stop the part being measured now; the others are measured still">Stop</button>
         </div>
         <div id="measureStatus" class="hint"></div>
-        <div id="measured"></div>
-        <h3>Right-clicks</h3>
-        <div class="hint">The last right-clicks per program: the wait from Dexmenu's extension being asked to the
-          program showing the menu (the extensions after Dexmenu's and the program itself), and Dexmenu's own time.
-          A first menu in a program is slower: Dexmenu's drawing is set up then.</div>
-        <div id="timings"></div>
+        <div id="restartLine" hidden>
+          <button id="diagRestart" class="lit">Restart Explorer</button>
+          <span class="hint">An extension was switched on or off: Explorer uses the change once it starts again.</span>
+        </div>
+        <div id="ranking"></div>
+        <details id="more">
+          <summary>Details (for experts)</summary>
+          <div id="parts"></div>
+          <div class="buttons measure">
+            <label title="A part that takes longer is stopped and shown as hanging">Stop a part after
+              <input type="number" id="hangSeconds" min="0.5" max="600" step="0.5"> s</label>
+            <label title="Windows' whole menu sampled while it is built: where its time goes, per DLL and call path"><input
+              type="checkbox" id="profile"> Profile Windows' whole menu</label>
+          </div>
+          <div id="measured"></div>
+          <h3>The last right-clicks</h3>
+          <div id="timings"></div>
+        </details>
       </div>
     </section>
   </main>

@@ -33,7 +33,8 @@ static class Diagnostics
 
     /// <summary>A handler as the registry has it. Blocked: "user" (HKCU's list), "machine" (HKLM's) or null;
     /// ByDexmenu: switched off from the page (only those can be switched on there).</summary>
-    public record Handler(string Clsid, string Name, string Key, string Dll, string? Blocked, bool ByDexmenu, bool Packaged = false);
+    public record Handler(string Clsid, string Name, string Key, string Dll, string? Blocked, bool ByDexmenu, bool Packaged = false,
+        string Program = "");
 
     // ---- the samples ------------------------------------------------------------------------------------------------
 
@@ -121,7 +122,7 @@ static class Diagnostics
                 using var server = c?.OpenSubKey("InprocServer32");
                 var name = !IsGuid(sub) ? sub : c?.GetValue("") is string { Length: > 0 } n ? n : clsid;
                 var dll = Environment.ExpandEnvironmentVariables(server?.GetValue("") as string ?? "");
-                list.Add(new Handler(clsid, name, key, dll, BlockedState(clsid), ours.Contains(clsid)));
+                list.Add(new Handler(clsid, name, key, dll, BlockedState(clsid), ours.Contains(clsid), Program: ProgramOf(dll)));
             }
         }
         foreach (var p in PackagedHandlers(kind, sample))
@@ -164,11 +165,12 @@ static class Diagnostics
             try { text = File.ReadAllText(manifest); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
             if (!text.Contains("FileExplorerContextMenus", StringComparison.Ordinal)) continue;
-            var display = p?.GetValue("DisplayName") as string ?? "";
-            if (display.Length == 0 || display.StartsWith("ms-resource:", StringComparison.Ordinal)) display = full.Split('_')[0];
             try
             {
                 var doc = System.Xml.Linq.XDocument.Parse(text);
+                // the app's name: its manifest's DisplayName (looked up when it is a resource), else the package's
+                var display = PackageDisplayName(full, doc.Descendants().FirstOrDefault(d => d.Name.LocalName == "DisplayName")?.Value ?? "");
+                if (display.Length == 0) display = full.Split('_')[0];
                 foreach (var menus in doc.Descendants().Where(d => d.Name.LocalName == "FileExplorerContextMenus"))
                     foreach (var itemType in menus.Elements().Where(e => e.Name.LocalName == "ItemType"))
                     {
@@ -180,8 +182,14 @@ static class Diagnostics
                             if (!Guid.TryParse(raw, out var g)) continue;
                             var clsid = "{" + g.ToString().ToUpperInvariant() + "}";
                             if (list.Any(h => h.Clsid == clsid)) continue;
+                            // its DLL in the package (PackagedCom: DllPath, in the package's folder)
+                            var folder = root.Length > 0 ? root : Path.GetDirectoryName(manifest)!;
+                            using var cls = Registry.ClassesRoot.OpenSubKey($@"PackagedCom\Package\{full}\Class\{clsid}");
+                            var dll = cls?.GetValue("DllPath") is string { Length: > 0 } d ? Path.Combine(folder, d) : folder;
+                            // the program: the package's folder names it (PowerToys, OneDrive), else the app's name
+                            var inStore = folder.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase);
                             list.Add(new Handler(clsid, display + " (" + ((string?)verb.Attribute("Id") ?? "app") + ")",
-                                "app: " + type, root.Length > 0 ? root : Path.GetDirectoryName(manifest)!, null, false, Packaged: true));
+                                "app: " + type, dll, null, false, Packaged: true, Program: inStore ? display : ProgramOf(dll)));
                         }
                     }
             }
@@ -189,6 +197,58 @@ static class Diagnostics
         }
         return list;
     }
+
+    // Folders that name no program: a program's own subfolders, and versions (they start with a digit).
+    static readonly HashSet<string> NotAProgram = new(StringComparer.OrdinalIgnoreCase)
+        { "bin", "bin64", "plugins", "plugin", "x64", "x86", "amd64", "lib", "shell", "shellext", "WinUI3Apps", "app",
+          "appx", "modules", "extensions", "Common Files", "Programs" };
+
+    /// <summary>The program an extension belongs to, as the user knows it (plan 16 3.3): Windows for Windows' own
+    /// files; else the folder it is installed in (under Program Files, AppData\Local\Programs or AppData\Local: the
+    /// product folder when the first one is the maker's, as Foxit Software\Foxit PDF Editor); a packaged app's own
+    /// name; else the file's folder.</summary>
+    public static string ProgramOf(string path, string? packageName = null)
+    {
+        if (packageName is { Length: > 0 }) return packageName;
+        if (path.Length == 0) return "(unknown)";
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (path.StartsWith(windows + @"\", StringComparison.OrdinalIgnoreCase)) return "Windows";
+        var roots = new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs"),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        };
+        foreach (var root in roots)
+        {
+            if (!path.StartsWith(root + @"\", StringComparison.OrdinalIgnoreCase)) continue;
+            var parts = path[(root.Length + 1)..].Split('\\');
+            if (parts.Length < 2) break;
+            var first = parts[0];
+            // the product folder after the maker's (not a subfolder, not a version, not the file itself)
+            if (parts.Length > 2 && !NotAProgram.Contains(parts[1]) && !char.IsDigit(parts[1][0])
+                && !parts[1].EndsWith(".app", StringComparison.OrdinalIgnoreCase)) return parts[1];
+            return first;
+        }
+        return Path.GetFileName(Path.GetDirectoryName(path)) is { Length: > 0 } folder ? folder : path;
+    }
+
+    // A packaged app's name from its manifest's DisplayName: the text itself, or an ms-resource looked up in the
+    // package (SHLoadIndirectString); "" when it cannot be had.
+    static string PackageDisplayName(string full, string value)
+    {
+        if (!value.StartsWith("ms-resource:", StringComparison.Ordinal)) return value;
+        var name = full.Split('_')[0];
+        var rest = value["ms-resource:".Length..];
+        var uri = rest.StartsWith("//", StringComparison.Ordinal) ? "ms-resource:" + rest
+            : rest.Contains('/') ? $"ms-resource://{name}/{rest}" : $"ms-resource://{name}/Resources/{rest}";
+        var buffer = new System.Text.StringBuilder(512);
+        return SHLoadIndirectString($"@{{{full}?{uri}}}", buffer, buffer.Capacity, IntPtr.Zero) >= 0 ? buffer.ToString() : "";
+    }
+
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+    static extern int SHLoadIndirectString(string source, System.Text.StringBuilder output, int size, IntPtr reserved);
 
     static bool SafeExists(string path)
     {

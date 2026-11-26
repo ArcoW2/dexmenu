@@ -186,8 +186,10 @@ function renderMeasured() {
   const r = diag && diag.measured && diag.measured[kind];
   $("measureFileName").textContent = kind === "file" && measureFile ? measureFile : "";
   $("measureFile").hidden = kind !== "file";
-  if (!r) { box.append(el("div", "hint", "Not measured yet.")); return; }
-  box.append(el("div", "hint", "Measured " + r.at + " on " + r.sample + "; an extension stopped after " + r.hangSeconds + " s."));
+  renderRanking();
+  renderParts();
+  if (!r) return;
+  box.append(el("div", "hint", "Measured " + r.at + " on " + r.sample + "; a part stopped after " + r.hangSeconds + " s."));
   const w = r.windows || {};
   const pass = p => !p ? "--" : p.error ? p.error : (p.bind + p.query) + " ms (" + p.items + " items)";
   box.append(el("div", "diag-total", w.hanging ? "Windows' whole menu: hanging" : w.stopped ? "Windows' whole menu: stopped"
@@ -199,30 +201,129 @@ function renderMeasured() {
         + p.started.map(s => s.name).join(", ")));
   for (const [label, p] of [["fresh", w.fresh], ["warm", w.warm]])
     if (p && p.profile) box.append(profileBox(label, p, r.handlers || []));
+}
+
+// The time a right-click pays for one part: a packaged app's extension starts its process again at most right-clicks
+// (it ends soon after), so its start counts unless it ran already; an extension in a DLL stays loaded in Explorer, so
+// its warm time counts. undefined: not timed (switched off, failed, hanging).
+function partTime(h) {
+  if (h.blocked || h.hanging || h.stopped || h.error || !h.fresh || h.fresh.error) return undefined;
+  return h.packaged ? handlerTotal(h.fresh) : handlerTotal(h.warm ?? h.fresh);
+}
+
+// Dexmenu's own time at your right-clicks of this kind in Explorer (the middle one, first menus left out); undefined
+// when there are none yet.
+function dexmenuTime(kind) {
+  const own = ((diag && diag.timings) || [])
+    .filter(e => e.kind === kind && e.shown === "dexmenu" && !e.first && /explorer\.exe$/i.test(e.program || ""))
+    .map(ownTime);
+  return median(own);
+}
+
+// Each part of the right-click measured (Details): the slowest first, each with its switch; the parts switched off
+// last.
+// The programs that take time at a right-click (plan 16 3.3): each program's parts (its extensions) added up, the
+// slowest first; a switch for all of a program's parts. Windows' own parts are one row, without a switch; Dexmenu's
+// row has its own time at your right-clicks too. The parts one by one: renderParts, under Details.
+function renderRanking() {
+  const box = $("ranking");
+  box.replaceChildren();
+  const kind = $("measureKind").value;
+  const r = diag && diag.measured && diag.measured[kind];
+  if (!r) { box.append(el("div", "hint", "Not measured yet: choose the right-click and press Measure.")); return; }
+  const programs = new Map();
+  for (const h of r.handlers || []) {
+    const name = h.clsid === diag.dexmenu ? "Dexmenu" : h.program || h.name;
+    if (!programs.has(name)) programs.set(name, { name, parts: [], ms: 0, broken: false });
+    const p = programs.get(name);
+    p.parts.push(h);
+    const ms = partTime(h);
+    if (ms !== undefined) p.ms += ms;
+    if (h.hanging || h.error || (h.fresh && h.fresh.error && !h.blocked)) p.broken = true;
+  }
+  const own = dexmenuTime(kind);
+  if (own !== undefined) {
+    if (!programs.has("Dexmenu")) programs.set("Dexmenu", { name: "Dexmenu", parts: [], ms: 0, broken: false });
+    programs.get("Dexmenu").ms += own;
+  }
+  const list = [...programs.values()];
+  const off = p => p.parts.length > 0 && p.parts.every(h => h.blocked);
+  list.sort((a, b) => (off(a) - off(b)) || (b.ms - a.ms));
+  box.append(el("h3", "", "Programs that take time at a right-click on " + (KindWords[kind] || kind)));
+  const table = el("table", "diag programs");
+  const head = el("tr");
+  for (const t of ["Program", "Time", "On"]) head.append(el("th", t === "Time" ? "ms" : "", t));
+  table.append(head);
+  for (const p of list) {
+    const tr = el("tr", off(p) ? "off" : "");
+    cell(tr, p.name, "", p.parts.map(h => h.name).join(", "));
+    const someOff = !off(p) && p.parts.some(h => h.blocked);
+    cell(tr, off(p) ? "switched off" : p.ms + " ms" + (p.broken ? " (a part does not work)" : someOff ? " (a part switched off)" : ""),
+      "ms" + (p.broken ? " bad" : ""));
+    const on = el("td");
+    const switchable = p.name !== "Windows" && p.name !== "Dexmenu" && p.parts.length > 0
+      && p.parts.every(h => !h.blocked || h.byDexmenu);
+    if (switchable) {
+      const box2 = el("input");
+      box2.type = "checkbox";
+      box2.checked = !off(p);
+      box2.title = off(p) ? "Tick to switch it on again" : "Untick to switch it off (its items leave every program's right-click)";
+      box2.addEventListener("change", () => {
+        for (const h of p.parts) if (!!h.blocked !== !box2.checked) post({ type: "switchHandler", clsid: h.clsid, name: h.name, off: !box2.checked });
+      });
+      on.append(box2);
+    }
+    tr.append(on);
+    table.append(tr);
+  }
+  box.append(table);
+  box.append(el("div", "hint", "Measured " + r.at + ". Windows' own parts cannot be switched off here."));
+}
+
+function renderParts() {
+  const box = $("parts");
+  box.replaceChildren();
+  const kind = $("measureKind").value;
+  const r = diag && diag.measured && diag.measured[kind];
+  if (!r) return;
+  box.append(el("h3", "", "Each part"));
+  const rows = (r.handlers || []).map(h => ({ h, ms: partTime(h) }));
+  const own = dexmenuTime(kind);
+  if (own !== undefined) rows.push({ dexmenu: true, ms: own });
+  const rank = x => x.h && (x.h.hanging || x.h.error || (x.h.fresh && x.h.fresh.error)) ? 3 : x.h && x.h.blocked ? 0 : 1;
+  rows.sort((a, b) => (rank(b) - rank(a)) || ((b.ms ?? -1) - (a.ms ?? -1)));
   const table = el("table", "diag");
   const head = el("tr");
-  for (const t of ["Extension", "File", "Fresh", "Warm", "Items", "On"]) head.append(el("th", ["Extension", "File"].includes(t) ? "" : "ms", t));
+  for (const t of ["Part", "Time", "What it is", "On"]) head.append(el("th", t === "Time" ? "ms" : "", t));
   table.append(head);
-  const rows = (r.handlers || []).slice().sort((a, b) => (handlerTotal(b.fresh) ?? -1) - (handlerTotal(a.fresh) ?? -1));
-  for (const h of rows) {
-    const tr = el("tr", h.blocked ? "off" : "");
+  for (const x of rows) {
+    const tr = el("tr", x.h && x.h.blocked ? "off" : "");
+    if (x.dexmenu) {
+      cell(tr, "Dexmenu's menu");
+      cell(tr, x.ms + " ms", "ms");
+      cell(tr, "Dexmenu itself: its time at your right-clicks of this kind in Explorer", "file");
+      tr.append(el("td"));
+      table.append(tr);
+      continue;
+    }
+    const h = x.h;
     const ours = h.clsid === diag.dexmenu;
-    cell(tr, h.name + (ours && !/dexmenu/i.test(h.name) ? " (Dexmenu)" : "") + (h.packaged ? " [app]" : ""), "",
-      h.key + " " + h.clsid + (h.packaged ? " - a packaged app's extension: Windows runs it in a process of its own" : ""));
-    cell(tr, (h.dll || "").split(/[\\/]/).pop(), "file", h.dll);   // the DLL's name; its path on hover
-    const breakdown = p => p && p.create !== undefined ? (h.packaged
+    const breakdown = p => !p || p.create === undefined ? "" : h.packaged
       ? `start ${p.create} ms${p.running ? " (its process ran already)" : ""}, title ${p.init ?? "--"} ms, state ${p.query ?? "--"} ms`
-      : `load ${p.create} ms, initialize ${p.init} ms, build ${p.query ?? "--"} ms`) : "";
+      : `load ${p.create} ms, initialize ${p.init} ms, build ${p.query ?? "--"} ms`;
+    cell(tr, h.name.replace(/ \((\w+)\)$/, "") + (ours && !/dexmenu/i.test(h.name) ? " (Dexmenu)" : ""), "", h.clsid);
     const bad = h.hanging || h.error || (h.fresh && h.fresh.error);
-    cell(tr, passText(h, h.fresh) + (h.fresh && h.fresh.running ? " *" : ""), "ms" + (bad ? " bad" : ""), breakdown(h.fresh));
-    cell(tr, h.blocked || h.hanging || h.stopped || h.error || (h.fresh && h.fresh.error) ? "" : passText(h, h.warm), "ms", breakdown(h.warm));
-    cell(tr, h.fresh && h.fresh.items !== undefined ? String(h.fresh.items) : "", "ms");
+    cell(tr, x.ms !== undefined ? x.ms + " ms" : passText(h, h.fresh), "ms" + (bad ? " bad" : ""),
+      "first time: " + (handlerTotal(h.fresh) ?? "--") + " ms (" + breakdown(h.fresh) + "); again: "
+      + (handlerTotal(h.warm) ?? "--") + " ms (" + breakdown(h.warm) + ")");
+    cell(tr, h.packaged ? "an app's extension: Windows starts a process for it" : "an extension: " + (h.dll || "").split(/[\\/]/).pop(),
+      "file", h.dll);
     const on = el("td");
     if (!ours && (!h.blocked || h.byDexmenu)) {
       const box2 = el("input");
       box2.type = "checkbox";
       box2.checked = !h.blocked;
-      box2.title = h.blocked ? "Switched off from here: tick to switch it on again" : "Untick to switch this extension off";
+      box2.title = h.blocked ? "Switched off from here: tick to switch it on again" : "Untick to switch this part off";
       box2.addEventListener("change", () => post({ type: "switchHandler", clsid: h.clsid, name: h.name, off: !box2.checked }));
       on.append(box2);
     }
@@ -230,10 +331,8 @@ function renderMeasured() {
     table.append(tr);
   }
   box.append(table);
-  box.append(el("div", "hint", "[app]: a packaged app's extension, which Windows runs in a process of its own; * its "
-    + "process ran already, so its start is not in the time. Switching an extension off changes every program's "
-    + "right-click, not only Dexmenu's; a program already running (Explorer) may keep it until it starts again. Only an "
-    + "extension switched off here can be switched on here."));
+  box.append(el("div", "hint", "Switching a part off changes every program's right-click, not only Dexmenu's. Only a "
+    + "part switched off here can be switched on here. Hover over a time for how it adds up."));
 }
 
 // Where one build of Windows' whole menu spent its time (the profile, plan 16 3.7): the call paths of the thread
@@ -281,6 +380,9 @@ const median = list => {
 };
 const ownTime = e => e.shown === "dexmenu" ? (e.steps || []).reduce((t, [, ms]) => t + ms, 0) : undefined;
 
+const KindWords = { file: "a file", folder: "a folder", several: "several items", background: "an empty part",
+  desktop: "the desktop", drive: "a drive", default: "other" };
+
 function renderTimings() {
   const box = $("timings");
   box.replaceChildren();
@@ -296,23 +398,24 @@ function renderTimings() {
   for (const list of groups.values()) {
     const path = list[0].program || "";
     const name = path.split(/[\\/]/).pop();
-    const mw = median(list.map(e => e.wait)), mo = median(list.map(ownTime));
     const title = el("div", "program", name);
     title.title = path;
-    title.append(" ", el("span", "hint", "middle: wait " + (mw ?? "--") + " ms, Dexmenu " + (mo ?? "--") + " ms"));
     box.append(title);
     const table = el("table", "diag");
     const head = el("tr");
-    for (const t of ["When", "Right-click", "Menu", "Wait", "Dexmenu", "Dexmenu's steps (ms)"]) head.append(el("th", ["Wait", "Dexmenu"].includes(t) ? "ms" : "", t));
+    const withMenu = list.some(e => e.shown !== "dexmenu");   // only when Windows' own menu was shown for one
+    for (const t of ["When", "Right-click on", "Windows", "Dexmenu", ...(withMenu ? ["Menu"] : [])])
+      head.append(el("th", ["Windows", "Dexmenu"].includes(t) ? "ms" : "", t));
     table.append(head);
     for (const e of list) {
       const tr = el("tr");
       cell(tr, (e.at || "").replace("T", " ").replace(/\.\d+$/, ""));
-      cell(tr, e.kind || "");
-      cell(tr, e.shown === "dexmenu" ? "Dexmenu's" + (e.first ? " (first in the program)" : "") : "Windows' (" + (e.why || "") + ")");
-      cell(tr, e.wait !== undefined ? e.wait + " ms" : "--", "ms");
-      cell(tr, ownTime(e) !== undefined ? ownTime(e) + " ms" : "--", "ms");
-      cell(tr, (e.steps || []).map(([n, ms]) => n + " " + ms).join(", "), "file");
+      cell(tr, (KindWords[e.kind] || e.kind || "") + (e.first ? " (first after the program started)" : ""));
+      cell(tr, e.wait !== undefined ? e.wait + " ms" : "--", "ms",
+        "From Dexmenu's extension being asked until the program showed the menu: Windows and the extensions after Dexmenu's");
+      cell(tr, ownTime(e) !== undefined ? ownTime(e) + " ms" : "--", "ms",
+        (e.steps || []).map(([n, ms]) => n + " " + ms + " ms").join(", "));
+      if (withMenu) cell(tr, e.shown === "dexmenu" ? "" : "Windows' (" + (e.why || "") + ")");
       table.append(tr);
     }
     box.append(table);
@@ -340,6 +443,7 @@ $("measure").addEventListener("click", () => {
 });
 $("stopMeasure").addEventListener("click", () => post({ type: "stopMeasure" }));
 $("hangSeconds").addEventListener("change", () => post({ type: "setHang", value: +$("hangSeconds").value }));
+$("diagRestart").addEventListener("click", () => post({ type: "restart" }));
 $("profile").addEventListener("change", () => post({ type: "setProfile", value: $("profile").checked }));
 
 // ---- the panels' arrangement (plan 05 3.3) -------------------------------------------------------------------------
@@ -440,6 +544,7 @@ chrome.webview.addEventListener("message", e => {
     postMinimum();
   } else if (m.type === "diagnostics") {
     diag = m;
+    $("restartLine").hidden = !m.restartPending;
     if (!m.measuring) measuringNow = null;
     if (document.activeElement !== $("hangSeconds")) $("hangSeconds").value = m.hangSeconds;
     $("profile").checked = !!m.profile;

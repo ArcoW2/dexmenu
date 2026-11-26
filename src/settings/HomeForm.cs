@@ -86,6 +86,7 @@ sealed class HomeForm : Form, IThemed
             ["hangSeconds"] = Diagnostics.HangSeconds,
             ["profile"] = Diagnostics.Profile,
             ["measuring"] = measuring,
+            ["restartPending"] = restartPending,
             ["dexmenu"] = Registration.Clsid,
         };
         web.CoreWebView2?.PostWebMessageAsJson(message.ToJsonString());
@@ -122,7 +123,7 @@ sealed class HomeForm : Form, IThemed
                 var entry = new System.Text.Json.Nodes.JsonObject
                 {
                     ["clsid"] = h.Clsid, ["name"] = h.Name, ["key"] = h.Key, ["dll"] = h.Dll,
-                    ["blocked"] = h.Blocked, ["byDexmenu"] = h.ByDexmenu, ["packaged"] = h.Packaged,
+                    ["blocked"] = h.Blocked, ["byDexmenu"] = h.ByDexmenu, ["packaged"] = h.Packaged, ["program"] = h.Program,
                 };
                 if (h.Blocked is null)
                 {
@@ -169,6 +170,7 @@ sealed class HomeForm : Form, IThemed
             restartPending = false;
             explorerCheck.Stop();
             PostState();
+            PostDiagnostics();
         }
     }
 
@@ -223,6 +225,11 @@ sealed class HomeForm : Form, IThemed
                     break;
                 case "switchHandler":
                     Diagnostics.Switch(Str("clsid"), Str("name"), m.TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.True);
+                    // Explorer takes the change when it starts again: Restart Explorer lit, here and in General
+                    restartPending = true;
+                    explorersAtChange = Explorers();
+                    explorerCheck.Start();
+                    PostState();
                     PostDiagnostics();
                     break;
                 case "setProfile":
@@ -245,6 +252,7 @@ sealed class HomeForm : Form, IThemed
                     Registration.RestartExplorer();
                     restartPending = false;
                     PostState();
+                    PostDiagnostics();
                     break;
                 case "setKind":
                     DataFolder.SetLayout(Str("kind"), m.TryGetProperty("layout", out var l) && l.ValueKind == JsonValueKind.String ? l.GetString() : null);
