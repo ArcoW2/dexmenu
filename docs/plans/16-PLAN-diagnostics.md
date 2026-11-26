@@ -4,6 +4,7 @@ Status: partly executed; see Status.
 
 - 2026-11-26: draft.
 - 2026-11-26: partly executed: everything but the check in a real right-click.
+- 2026-11-26: partly executed: the profile of Windows' whole menu; packaged apps' extensions.
 
 Builds on the timing in the log (the log's times in ms; with tracing on, `menu shown, ms:` with Dexmenu's steps) and
 the test host's `timing:` lines.
@@ -20,7 +21,9 @@ wants to see it in the settings app: which extension costs how much, and what De
 A Diagnostics page in the main window with two tables. Extensions: every context menu handler registered for a kind
 of right-click (file, folder, background, drive), each timed in a separate measuring process on a sample of that
 kind, loaded fresh and again warm, with its name, file and the items it adds; a slow one the user does not need can
-be switched off there, and on again. Right-clicks: the last ten right-clicks Dexmenu showed per program (Explorer,
+be switched off there, and on again. Windows' whole menu is also profiled: sampled while it is built, so its time
+shows per call path and per DLL, with the processes Windows starts for it; packaged apps' extensions (Windows 11's,
+each run in a process of its own) are listed and timed with the others. Right-clicks: the last ten right-clicks Dexmenu showed per program (Explorer,
 Foldex, a dialog), with the time from Dexmenu's handler being asked to the menu shown, and Dexmenu's own steps. The
 DLL writes these timings to a small file; the page reads it.
 
@@ -37,6 +40,8 @@ DLL writes these timings to a small file; the page reads it.
 | Switching off | a handler switched off and on from the page (Windows' blocked list for the user) | 3.6; 6.4 |
 | Hang setting | how long one handler may take before it is stopped, a setting | 3.1; 6.1 |
 | Tests | all but the real right-click | 3.5; 6.5 |
+| Profile | Windows' whole menu sampled: call paths, other threads, DLLs on the stack; on or off on the page | 3.7; 6.6 |
+| Packaged extensions | packaged apps' menu extensions listed, timed and switched; the processes started for the menu | 3.8; 6.7 |
 
 ### Not yet built
 
@@ -62,8 +67,8 @@ DLL writes these timings to a small file; the page reads it.
   button that stops it by hand. Per handler: create (loading its DLL), Initialize, QueryContextMenu, fresh (first in the process) and
   warm (a second time in the same process), and the number of items it added.
 - Windows' own total for the kind: the menu built the way Explorer builds it (the test host's way), fresh and warm.
-- Not covered: Windows 11's newer kind of extension (IExplorerCommand, the items of packaged apps) and the static
-  verbs from `shell` keys are part of Windows' total, not timed one by one.
+- Packaged apps' extensions are timed too (3.8). Not covered one by one: the static verbs from `shell` keys and
+  Windows' own parts; the profile (3.7) shows where their time goes.
 
 The measuring process times each extension on its own, not inside Explorer: the numbers show an extension's own
 cost, not the order or the sharing of a real right-click. Timing them inside the real right-click was looked at:
@@ -117,6 +122,24 @@ The test host prints how long binding the items and Windows' QueryContextMenu to
   blocked list by other means (the machine's list in HKLM, a policy) is shown as blocked, without a switch.
 - Dexmenu's own handler has no switch.
 - Windows honours the user's list: checked (6.4).
+
+### 3.7 The profile of Windows' whole menu
+
+The extensions timed one by one do not add up to Windows' whole menu: most of a warm right-click is spent elsewhere.
+So the measuring process can sample Windows' whole menu while it is built (fresh and warm): about every millisecond
+the building thread is paused, its call stack walked and the DLLs on it noted. Shown per build: the call paths (the
+function the thread was in, then the DLLs that called it), what the process's other threads did while it waited, and
+the DLLs on the stack, each the most first; an extension's own DLL named as that extension. A checkbox on the page
+switches the profile on or off (on unless switched off); it adds a little to the times.
+
+### 3.8 Packaged apps' extensions
+
+Windows 11's menu extensions of packaged apps (IExplorerCommand: PowerToys, Notepad, OneDrive, VS Code, TortoiseGit's
+newer menu) are not in the `shellex` keys: each app's manifest names them (FileExplorerContextMenus, per item type).
+Windows runs each in a process of its own (a COM surrogate), started at a right-click when it does not run. They are
+listed with the other extensions for the kinds their item types fit, timed as Windows uses them (started out of
+process, then their title and state for the sample), and switched off and on through the same blocked list. Windows'
+whole menu also lists the processes Windows started for it.
 
 ## 4. Open questions
 
@@ -182,3 +205,34 @@ None.
   (exit 3, "hanging").
 - Not yet: a real right-click in Explorer or Foldex writing its entry. They run the installed DLL, which is older
   than this build.
+
+### 6.6 The profile
+
+- `Profiler.cs`: a sampler thread on a high-resolution waitable timer (Windows 11 ignores timeBeginPeriod for a
+  process without a visible window: with Sleep(1) it got a sample every 15 ms or so). While the thread is paused only
+  system calls and reads of memory: the stack is walked with RtlVirtualUnwind and the unwind data read from the DLL's
+  own headers (no RtlLookupFunctionEntry, no loader lock); the DLL's name and the nearest export are read once it runs
+  again. While the building thread waits, the process's other threads are sampled too (their stacks' bounds from
+  their TEB; idle pool threads and .NET's own left out).
+- `--measure-menu ... profile` samples the fresh and the warm build; settings.json `"diagnostics"."profile"`.
+- What it showed here, for a .txt file (the page, 2026-11-26): the fresh build waited about 0.45 s in Windows.Storage
+  for a worker thread that was in a COM call to another process; the slow warm builds waited about 0.8 - 1 s in such a
+  call themselves (`NtUserMsgWaitForMultipleObjectsEx < combase < RPCRT4 < combase < Windows.Storage < SHELL32`).
+  Warm builds right after another one took about 0.25 - 0.45 s.
+
+### 6.7 Packaged apps' extensions
+
+- Found from the user's packages (`AppModel\Repository\Packages` in HKCU): the manifest in the package's root
+  folder, or for a sparse package under `Program Files\WindowsApps\<package>`; the item types `*` and the file's
+  extension for a file, `Directory` and `Folder` for a folder, `Directory\Background`, `Drive`. Shown as
+  "<app> (<verb>) [app]".
+- Timed in the measuring process: CoCreateInstance out of process (the start of its surrogate when none runs), then
+  IExplorerCommand GetTitle and GetState; "*" when its process ran already.
+- The processes started for Windows' whole menu: the COM surrogates (`dllhost /Processid:{clsid}`) running after a
+  build and not before, named by their package (PackagedCom ClassIndex) or their AppID.
+- What it showed here: for a file, Windows started seven processes for one menu (OneDrive, PowerToys File Locksmith,
+  Image Resizer and PowerRename, Notepad, VS Code, TortoiseGit), each taking about 0.1 - 0.2 s to start (104 - 216 ms
+  measured); together about the second the slow builds waited. They end soon after their last user, so they start
+  again at a later right-click.
+- Switching off: Notepad's on the user's blocked list, then Windows' whole menu built: its process was not started
+  (it did not run before); off the list again after.

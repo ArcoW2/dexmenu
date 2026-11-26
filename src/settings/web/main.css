@@ -54,6 +54,8 @@ table.diag tr.off td { opacity: .55; }
 table.diag .bad { color: var(--bad); }
 table.diag .slow { color: var(--bad); font-weight: 600; }
 .diag-total { margin: 4px 0; }
+details.profile { margin: 4px 0 8px; border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
+details.profile summary { cursor: pointer; }
 .program { font-weight: 600; margin-top: 8px; }
 .program .hint { font-weight: normal; }
 /* General's groups: Action, Collecting, Look */

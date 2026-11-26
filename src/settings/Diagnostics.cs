@@ -33,7 +33,7 @@ static class Diagnostics
 
     /// <summary>A handler as the registry has it. Blocked: "user" (HKCU's list), "machine" (HKLM's) or null;
     /// ByDexmenu: switched off from the page (only those can be switched on there).</summary>
-    public record Handler(string Clsid, string Name, string Key, string Dll, string? Blocked, bool ByDexmenu);
+    public record Handler(string Clsid, string Name, string Key, string Dll, string? Blocked, bool ByDexmenu, bool Packaged = false);
 
     // ---- the samples ------------------------------------------------------------------------------------------------
 
@@ -124,7 +124,99 @@ static class Diagnostics
                 list.Add(new Handler(clsid, name, key, dll, BlockedState(clsid), ours.Contains(clsid)));
             }
         }
+        foreach (var p in PackagedHandlers(kind, sample))
+            if (seen.Add(p.Clsid)) list.Add(p with { Blocked = BlockedState(p.Clsid), ByDexmenu = ours.Contains(p.Clsid) });
         return list;
+    }
+
+    // ---- packaged apps' extensions (plan 16 3.8) ---------------------------------------------------------------------
+
+    const string Repository = @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages";
+
+    /// <summary>The item types a packaged app's menu extension names (its manifest's FileExplorerContextMenus) that
+    /// fit the kind.</summary>
+    static string[] ItemTypesOf(string kind, string sample) => kind switch
+    {
+        "file" => ["*", Path.GetExtension(sample).ToLowerInvariant()],
+        "folder" => ["Directory", "Folder"],
+        "background" => [@"Directory\Background"],
+        _ => ["Drive"],
+    };
+
+    /// <summary>The packaged apps' menu extensions for the kind (Windows 11's: IExplorerCommand, run by Windows in a
+    /// process of their own): from each of the user's packages' manifest, its FileExplorerContextMenus verbs whose item
+    /// type fits. Dll: the package's folder.</summary>
+    public static List<Handler> PackagedHandlers(string kind, string sample)
+    {
+        var list = new List<Handler>();
+        var types = ItemTypesOf(kind, sample);
+        using var packages = Registry.CurrentUser.OpenSubKey(Repository);
+        if (packages is null) return list;
+        foreach (var full in packages.GetSubKeyNames())
+        {
+            using var p = packages.OpenSubKey(full);
+            var root = p?.GetValue("PackageRootFolder") as string ?? "";
+            var manifest = new[] { Path.Combine(root, "AppxManifest.xml"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps", full, "AppxManifest.xml") }
+                .FirstOrDefault(m => m.Length > 0 && SafeExists(m));
+            if (manifest is null) continue;
+            string text;
+            try { text = File.ReadAllText(manifest); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
+            if (!text.Contains("FileExplorerContextMenus", StringComparison.Ordinal)) continue;
+            var display = p?.GetValue("DisplayName") as string ?? "";
+            if (display.Length == 0 || display.StartsWith("ms-resource:", StringComparison.Ordinal)) display = full.Split('_')[0];
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Parse(text);
+                foreach (var menus in doc.Descendants().Where(d => d.Name.LocalName == "FileExplorerContextMenus"))
+                    foreach (var itemType in menus.Elements().Where(e => e.Name.LocalName == "ItemType"))
+                    {
+                        var type = (string?)itemType.Attribute("Type") ?? "";
+                        if (!types.Contains(type, StringComparer.OrdinalIgnoreCase)) continue;
+                        foreach (var verb in itemType.Elements().Where(e => e.Name.LocalName == "Verb"))
+                        {
+                            var raw = (string?)verb.Attribute("Clsid") ?? "";
+                            if (!Guid.TryParse(raw, out var g)) continue;
+                            var clsid = "{" + g.ToString().ToUpperInvariant() + "}";
+                            if (list.Any(h => h.Clsid == clsid)) continue;
+                            list.Add(new Handler(clsid, display + " (" + ((string?)verb.Attribute("Id") ?? "app") + ")",
+                                "app: " + type, root.Length > 0 ? root : Path.GetDirectoryName(manifest)!, null, false, Packaged: true));
+                        }
+                    }
+            }
+            catch (System.Xml.XmlException) { }
+        }
+        return list;
+    }
+
+    static bool SafeExists(string path)
+    {
+        try { return File.Exists(path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>A packaged COM class's package and its app's name (HKCR\PackagedCom\ClassIndex; the user's packages'
+    /// display names): what a COM surrogate (dllhost /Processid:{clsid}) Windows started runs. Not packaged: the
+    /// AppID's or the class's own name (Windows' thumbnail cache, ...); null when it has none.</summary>
+    public static string? PackagedClassName(string clsid)
+    {
+        using var index = Registry.ClassesRoot.OpenSubKey(@"PackagedCom\ClassIndex\" + clsid);
+        if (index is null)
+        {
+            using var app = Registry.ClassesRoot.OpenSubKey(@"AppID\" + clsid);
+            using var cls = Registry.ClassesRoot.OpenSubKey(@"CLSID\" + clsid);
+            return app?.GetValue("") as string is { Length: > 0 } a ? a : cls?.GetValue("") as string is { Length: > 0 } c ? c : null;
+        }
+        using var packages = Registry.CurrentUser.OpenSubKey(Repository);
+        foreach (var full in index.GetSubKeyNames().Reverse())   // the newest version last in the index
+        {
+            using var p = packages?.OpenSubKey(full);
+            if (p is null) continue;
+            var display = p.GetValue("DisplayName") as string ?? "";
+            return display.Length > 0 && !display.StartsWith("ms-resource:", StringComparison.Ordinal) ? display : full.Split('_')[0];
+        }
+        return index.GetSubKeyNames().FirstOrDefault()?.Split('_')[0];
     }
 
     static string? BlockedState(string clsid)
@@ -174,6 +266,21 @@ static class Diagnostics
         DataFolder.WriteSettings(settings);
     }
 
+    /// <summary>Whether Windows' whole menu is profiled too (settings.json "diagnostics"."profile"; on unless set off).
+    /// </summary>
+    public static bool Profile
+    {
+        get => DataFolder.ReadSettings()["diagnostics"]?["profile"] is not JsonValue v || !v.TryGetValue<bool>(out var on) || on;
+        set
+        {
+            var settings = DataFolder.ReadSettings();
+            var d = settings["diagnostics"] as JsonObject ?? [];
+            settings["diagnostics"] = d;
+            d["profile"] = value;
+            DataFolder.WriteSettings(settings);
+        }
+    }
+
     /// <summary>The hang limit, in seconds (settings.json "diagnostics"."hangSeconds").</summary>
     public static double HangSeconds
     {
@@ -192,8 +299,9 @@ static class Diagnostics
     // ---- the measuring process's side --------------------------------------------------------------------------------
 
     /// <summary>--measure-handler &lt;out&gt; &lt;kind&gt; &lt;sample&gt; &lt;clsid&gt; &lt;hang seconds&gt;: one handler, fresh and warm, as
-    /// JSON to the file. A handler that takes longer than the hang limit: "hanging" written, the process ended.</summary>
-    public static int MeasureHandlerMain(string outFile, string kind, string sample, string clsid, double hang)
+    /// JSON to the file. A handler that takes longer than the hang limit: "hanging" written, the process ended.
+    /// Packaged: a packaged app's extension (MeasureCommandOnce).</summary>
+    public static int MeasureHandlerMain(string outFile, string kind, string sample, string clsid, double hang, bool packaged)
     {
         var result = new JsonObject();
         using var watchdog = new System.Threading.Timer(_ =>
@@ -204,8 +312,8 @@ static class Diagnostics
         }, null, (int)(hang * 1000), Timeout.Infinite);
         try
         {
-            result["fresh"] = MeasureOnce(kind, sample, clsid);
-            result["warm"] = MeasureOnce(kind, sample, clsid);
+            result["fresh"] = packaged ? MeasureCommandOnce(kind, sample, clsid) : MeasureOnce(kind, sample, clsid);
+            result["warm"] = packaged ? MeasureCommandOnce(kind, sample, clsid) : MeasureOnce(kind, sample, clsid);
         }
         catch (Exception e) when (e is COMException or ArgumentException or InvalidCastException or FileNotFoundException)
         {
@@ -279,9 +387,96 @@ static class Diagnostics
         }
     }
 
-    /// <summary>--measure-menu &lt;out&gt; &lt;kind&gt; &lt;sample&gt; &lt;hang seconds&gt;: Windows' whole menu for the sample, built as
-    /// Explorer builds it (ShellMenu), fresh and warm.</summary>
-    public static int MeasureMenuMain(string outFile, string kind, string sample, double hang)
+    // A packaged app's extension as Windows uses it: made in a process of its own (COM, out of process: a surrogate
+    // Windows starts when none runs), then its title and its state for the sample asked (IExplorerCommand). create: the
+    // activation, init: GetTitle, query: GetState; items: 1 when it shows, 0 when hidden.
+    static JsonObject MeasureCommandOnce(string kind, string sample, string clsid)
+    {
+        var r = new JsonObject();
+        IntPtr item = IntPtr.Zero, array = IntPtr.Zero, unknown = IntPtr.Zero;
+        try
+        {
+            var shellItem = new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");
+            var shellItemArray = new Guid("b63ea76d-1f85-456f-a19c-48159efa858b");
+            if (SHCreateItemFromParsingName(Path.GetFullPath(sample), IntPtr.Zero, ref shellItem, out item) < 0)
+                throw new FileNotFoundException("the sample is not there", sample);
+            if (SHCreateShellItemArrayFromShellItem(item, ref shellItemArray, out array) < 0)
+                throw new ArgumentException("no item array for the sample");
+            // its process runs already (an earlier right-click, Windows' whole menu just measured): no start in the time
+            if (Surrogates().ContainsValue(clsid.ToUpperInvariant())) r["running"] = true;
+            var sw = Stopwatch.StartNew();
+            var c = new Guid(clsid);
+            var unk = new Guid("00000000-0000-0000-C000-000000000046");
+            var hr = CoCreateInstance(ref c, IntPtr.Zero, 4 /* CLSCTX_LOCAL_SERVER */, ref unk, out unknown);
+            r["create"] = sw.ElapsedMilliseconds;
+            if (hr < 0) { r["error"] = $"not started (0x{hr:X8})"; return r; }
+            var cmdIid = typeof(IExplorerCommand).GUID;
+            if (Marshal.QueryInterface(unknown, in cmdIid, out var cmdPtr) < 0) { r["error"] = "not a menu extension"; return r; }
+            try
+            {
+                var cmd = (IExplorerCommand)Marshal.GetObjectForIUnknown(cmdPtr);
+                sw.Restart();
+                if (cmd.GetTitle(array, out var title) >= 0 && title != IntPtr.Zero)
+                {
+                    r["title"] = Marshal.PtrToStringUni(title);
+                    Marshal.FreeCoTaskMem(title);
+                }
+                r["init"] = sw.ElapsedMilliseconds;
+                sw.Restart();
+                var shr = cmd.GetState(array, false, out var state);
+                r["query"] = sw.ElapsedMilliseconds;
+                r["items"] = shr >= 0 && (state & 2 /* ECS_HIDDEN */) == 0 ? 1 : 0;
+            }
+            finally { Marshal.Release(cmdPtr); }
+            return r;
+        }
+        finally
+        {
+            if (unknown != IntPtr.Zero) Marshal.Release(unknown);
+            if (array != IntPtr.Zero) Marshal.Release(array);
+            if (item != IntPtr.Zero) Marshal.Release(item);
+        }
+    }
+
+    // The COM surrogates running now (dllhost.exe /Processid:{clsid}), by process id: the class each runs.
+    static Dictionary<int, string> Surrogates()
+    {
+        var list = new Dictionary<int, string>();
+        foreach (var p in Process.GetProcessesByName("dllhost"))
+            using (p)
+            {
+                var line = CommandLine(p.Id);
+                var at = line.IndexOf("/Processid:", StringComparison.OrdinalIgnoreCase);
+                if (at >= 0) list[p.Id] = line[(at + "/Processid:".Length)..].Trim().Trim('"').ToUpperInvariant();
+            }
+        return list;
+    }
+
+    // A process's command line (NtQueryInformationProcess, ProcessCommandLineInformation); "" when it cannot be read.
+    static string CommandLine(int pid)
+    {
+        var h = OpenProcess(0x1000 /* QUERY_LIMITED_INFORMATION */, false, pid);
+        if (h == IntPtr.Zero) return "";
+        var buffer = Marshal.AllocHGlobal(4096);
+        try
+        {
+            if (NtQueryInformationProcess(h, 60, buffer, 4096, out _) != 0) return "";
+            var length = (ushort)Marshal.ReadInt16(buffer);
+            var text = Marshal.ReadIntPtr(buffer, 8);
+            return text == IntPtr.Zero ? "" : Marshal.PtrToStringUni(text, length / 2);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+            CloseHandle(h);
+        }
+    }
+
+    /// <summary>--measure-menu &lt;out&gt; &lt;kind&gt; &lt;sample&gt; &lt;hang seconds&gt; [profile]: Windows' whole menu for the
+    /// sample, built as Explorer builds it (ShellMenu), fresh and warm; with profile, each sampled (Profiler: where its
+    /// time goes, per DLL; the sampling adds a little to the times). Per pass also the processes Windows started for
+    /// it (COM surrogates of packaged apps' extensions: "started").</summary>
+    public static int MeasureMenuMain(string outFile, string kind, string sample, double hang, bool profile)
     {
         var result = new JsonObject();
         using var watchdog = new System.Threading.Timer(_ =>
@@ -296,9 +491,16 @@ static class Diagnostics
         else { folder = Path.GetDirectoryName(Path.GetFullPath(sample))!; items = [Path.GetFullPath(sample)]; }
         foreach (var pass in new[] { "fresh", "warm" })
         {
-            var t = ShellMenu.Time(owner.Handle, kind, folder, items, out var error);
+            var before = Surrogates();
+            var t = ShellMenu.Time(owner.Handle, kind, folder, items, out var error, profile, out var profiled);
             result[pass] = t is { } x ? new JsonObject { ["bind"] = x.Bind, ["query"] = x.Query, ["items"] = x.Items }
                 : new JsonObject { ["error"] = error };
+            if (profiled is not null) result[pass]!["profile"] = profiled;
+            var started = new JsonArray();
+            foreach (var (pid, clsid) in Surrogates())
+                if (!before.ContainsKey(pid))
+                    started.Add(new JsonObject { ["clsid"] = clsid, ["name"] = PackagedClassName(clsid) ?? clsid });
+            result[pass]!["started"] = started;
         }
         watchdog.Change(Timeout.Infinite, Timeout.Infinite);
         File.WriteAllText(outFile, result.ToJsonString());
@@ -404,6 +606,31 @@ static class Diagnostics
 
     [DllImport("shell32.dll")]
     static extern IntPtr ILFindLastID(IntPtr pidl);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    static extern int SHCreateItemFromParsingName(string path, IntPtr bindContext, ref Guid riid, out IntPtr item);
+
+    [DllImport("shell32.dll")]
+    static extern int SHCreateShellItemArrayFromShellItem(IntPtr item, ref Guid riid, out IntPtr array);
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+
+    [DllImport("kernel32.dll")]
+    static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("ntdll.dll")]
+    static extern int NtQueryInformationProcess(IntPtr process, int infoClass, IntPtr info, int length, out int returned);
+
+    [ComImport, Guid("a08ce4d0-fa25-44ab-b57c-c7b1c323e0b9"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IExplorerCommand
+    {
+        [PreserveSig] int GetTitle(IntPtr items, out IntPtr name);
+        [PreserveSig] int GetIcon(IntPtr items, out IntPtr icon);
+        [PreserveSig] int GetToolTip(IntPtr items, out IntPtr tip);
+        [PreserveSig] int GetCanonicalName(out Guid guid);
+        [PreserveSig] int GetState(IntPtr items, [MarshalAs(UnmanagedType.Bool)] bool okToBeSlow, out uint state);
+    }
 
     [DllImport("shell32.dll")]
     static extern IntPtr ILClone(IntPtr pidl);

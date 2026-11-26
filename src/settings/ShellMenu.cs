@@ -56,13 +56,17 @@ static class ShellMenu
 
     /// <summary>How long Windows takes to build the menu of a right-click (plan 16 3.1): binding the items and getting
     /// the menu object, then QueryContextMenu (every extension's part), in ms, and the items it has; null and
-    /// <paramref name="error"/> when the shell gave none. Nothing opened, nothing read.</summary>
-    public static (long Bind, long Query, int Items)? Time(IntPtr owner, string kind, string folder, IReadOnlyList<string> items, out string error)
+    /// <paramref name="error"/> when the shell gave none. Nothing opened, nothing read. Profile: the whole of it
+    /// sampled (Profiler; plan 16 3.7), the result in <paramref name="profiled"/>.</summary>
+    public static (long Bind, long Query, int Items)? Time(IntPtr owner, string kind, string folder, IReadOnlyList<string> items,
+        out string error, bool profile, out System.Text.Json.Nodes.JsonObject? profiled)
     {
         error = "";
+        profiled = null;
         IContextMenu? menu = null;
         var pidls = new List<IntPtr>();
         var hmenu = IntPtr.Zero;
+        var profiler = profile ? Profiler.Start() : null;
         try
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -78,6 +82,9 @@ static class ShellMenu
             sw.Restart();
             var hr = menu.QueryContextMenu(hmenu, 0, 1, 0x7FFF, CMF_NORMAL | CMF_CANRENAME);
             var query = sw.ElapsedMilliseconds;
+            // stopped before the menu's handlers are let go: their DLLs' names read while loaded
+            profiled = profiler?.Stop();
+            profiler = null;
             if (hr < 0) { error = $"Windows gave no menu for this right-click (0x{hr:X8})"; return null; }
             return (bind, query, GetMenuItemCount(hmenu));
         }
@@ -88,6 +95,7 @@ static class ShellMenu
         }
         finally
         {
+            profiler?.Stop();
             if (hmenu != IntPtr.Zero) DestroyMenu(hmenu);
             if (menu is not null) Marshal.ReleaseComObject(menu);
             foreach (var p in pidls) Marshal.FreeCoTaskMem(p);

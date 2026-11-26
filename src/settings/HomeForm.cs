@@ -84,6 +84,7 @@ sealed class HomeForm : Form, IThemed
             ["measured"] = Diagnostics.MeasuredNow(),
             ["timings"] = Diagnostics.TimingEntries(),
             ["hangSeconds"] = Diagnostics.HangSeconds,
+            ["profile"] = Diagnostics.Profile,
             ["measuring"] = measuring,
             ["dexmenu"] = Registration.Clsid,
         };
@@ -110,7 +111,9 @@ sealed class HomeForm : Form, IThemed
             };
             Post(new { type = "measuring", kind, name = "Windows' whole menu", index = 0, count = handlers.Count });
             stopCurrent = new CancellationTokenSource();
-            result["windows"] = await Diagnostics.RunMeasuring(["--measure-menu", kind, sample, hang.ToString(invariant)], hang, stopCurrent.Token)
+            string[] menuArgs = ["--measure-menu", kind, sample, hang.ToString(invariant)];
+            if (Diagnostics.Profile) menuArgs = [.. menuArgs, "profile"];
+            result["windows"] = await Diagnostics.RunMeasuring(menuArgs, hang, stopCurrent.Token)
                 ?? new System.Text.Json.Nodes.JsonObject { ["stopped"] = true };
             var list = new System.Text.Json.Nodes.JsonArray();
             for (var i = 0; i < handlers.Count; i++)
@@ -119,13 +122,15 @@ sealed class HomeForm : Form, IThemed
                 var entry = new System.Text.Json.Nodes.JsonObject
                 {
                     ["clsid"] = h.Clsid, ["name"] = h.Name, ["key"] = h.Key, ["dll"] = h.Dll,
-                    ["blocked"] = h.Blocked, ["byDexmenu"] = h.ByDexmenu,
+                    ["blocked"] = h.Blocked, ["byDexmenu"] = h.ByDexmenu, ["packaged"] = h.Packaged,
                 };
                 if (h.Blocked is null)
                 {
                     Post(new { type = "measuring", kind, name = h.Name, index = i + 1, count = handlers.Count });
                     stopCurrent = new CancellationTokenSource();
-                    var r = await Diagnostics.RunMeasuring(["--measure-handler", kind, sample, h.Clsid, hang.ToString(invariant)], hang, stopCurrent.Token);
+                    string[] handlerArgs = ["--measure-handler", kind, sample, h.Clsid, hang.ToString(invariant)];
+                    if (h.Packaged) handlerArgs = [.. handlerArgs, "packaged"];
+                    var r = await Diagnostics.RunMeasuring(handlerArgs, hang, stopCurrent.Token);
                     if (r is null) entry["stopped"] = true;
                     else foreach (var (k, v) in r) entry[k] = v?.DeepClone();
                 }
@@ -218,6 +223,10 @@ sealed class HomeForm : Form, IThemed
                     break;
                 case "switchHandler":
                     Diagnostics.Switch(Str("clsid"), Str("name"), m.TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.True);
+                    PostDiagnostics();
+                    break;
+                case "setProfile":
+                    Diagnostics.Profile = m.TryGetProperty("value", out var pv) && pv.ValueKind == JsonValueKind.True;
                     PostDiagnostics();
                     break;
                 case "setHang":

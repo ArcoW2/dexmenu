@@ -106,6 +106,8 @@
           <button id="stopMeasure" hidden title="Stop the extension being measured now; the others are measured still">Stop</button>
           <label title="An extension that takes longer is stopped and shown as hanging">Stop an extension after
             <input type="number" id="hangSeconds" min="0.5" max="600" step="0.5"> s</label>
+          <label title="Windows' whole menu sampled while it is built: where its time goes, per DLL and call path"><input
+            type="checkbox" id="profile"> Profile Windows' whole menu</label>
         </div>
         <div id="measureStatus" class="hint"></div>
         <div id="measured"></div>

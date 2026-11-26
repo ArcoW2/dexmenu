@@ -192,6 +192,13 @@ function renderMeasured() {
   const pass = p => !p ? "--" : p.error ? p.error : (p.bind + p.query) + " ms (" + p.items + " items)";
   box.append(el("div", "diag-total", w.hanging ? "Windows' whole menu: hanging" : w.stopped ? "Windows' whole menu: stopped"
     : "Windows' whole menu: fresh " + pass(w.fresh) + ", warm " + pass(w.warm)));
+  // the processes Windows started for it: packaged apps' extensions (and Windows' own helpers), each a process
+  for (const [label, p] of [["fresh", w.fresh], ["warm", w.warm]])
+    if (p && p.started && p.started.length)
+      box.append(el("div", "hint", "Started for the " + label + " menu (each a process of its own): "
+        + p.started.map(s => s.name).join(", ")));
+  for (const [label, p] of [["fresh", w.fresh], ["warm", w.warm]])
+    if (p && p.profile) box.append(profileBox(label, p, r.handlers || []));
   const table = el("table", "diag");
   const head = el("tr");
   for (const t of ["Extension", "File", "Fresh", "Warm", "Items", "On"]) head.append(el("th", ["Extension", "File"].includes(t) ? "" : "ms", t));
@@ -200,11 +207,14 @@ function renderMeasured() {
   for (const h of rows) {
     const tr = el("tr", h.blocked ? "off" : "");
     const ours = h.clsid === diag.dexmenu;
-    cell(tr, h.name + (ours && !/dexmenu/i.test(h.name) ? " (Dexmenu)" : ""), "", h.key + " " + h.clsid);
+    cell(tr, h.name + (ours && !/dexmenu/i.test(h.name) ? " (Dexmenu)" : "") + (h.packaged ? " [app]" : ""), "",
+      h.key + " " + h.clsid + (h.packaged ? " - a packaged app's extension: Windows runs it in a process of its own" : ""));
     cell(tr, (h.dll || "").split(/[\\/]/).pop(), "file", h.dll);   // the DLL's name; its path on hover
-    const breakdown = p => p && p.create !== undefined ? `load ${p.create} ms, initialize ${p.init} ms, build ${p.query ?? "--"} ms` : "";
+    const breakdown = p => p && p.create !== undefined ? (h.packaged
+      ? `start ${p.create} ms${p.running ? " (its process ran already)" : ""}, title ${p.init ?? "--"} ms, state ${p.query ?? "--"} ms`
+      : `load ${p.create} ms, initialize ${p.init} ms, build ${p.query ?? "--"} ms`) : "";
     const bad = h.hanging || h.error || (h.fresh && h.fresh.error);
-    cell(tr, passText(h, h.fresh), "ms" + (bad ? " bad" : ""), breakdown(h.fresh));
+    cell(tr, passText(h, h.fresh) + (h.fresh && h.fresh.running ? " *" : ""), "ms" + (bad ? " bad" : ""), breakdown(h.fresh));
     cell(tr, h.blocked || h.hanging || h.stopped || h.error || (h.fresh && h.fresh.error) ? "" : passText(h, h.warm), "ms", breakdown(h.warm));
     cell(tr, h.fresh && h.fresh.items !== undefined ? String(h.fresh.items) : "", "ms");
     const on = el("td");
@@ -220,9 +230,47 @@ function renderMeasured() {
     table.append(tr);
   }
   box.append(table);
-  box.append(el("div", "hint", "Switching an extension off changes every program's right-click, not only Dexmenu's; a "
-    + "program already running (Explorer) may keep it until it starts again. Only an extension switched off here can be "
-    + "switched on here."));
+  box.append(el("div", "hint", "[app]: a packaged app's extension, which Windows runs in a process of its own; * its "
+    + "process ran already, so its start is not in the time. Switching an extension off changes every program's "
+    + "right-click, not only Dexmenu's; a program already running (Explorer) may keep it until it starts again. Only an "
+    + "extension switched off here can be switched on here."));
+}
+
+// Where one build of Windows' whole menu spent its time (the profile, plan 16 3.7): the call paths of the thread
+// building it, what the other threads did while it waited, and the DLLs on its stack, each the most first.
+const ProfileRows = 12;
+function profileBox(label, pass, handlers) {
+  const p = pass.profile;
+  const box = el("details", "profile");
+  box.append(el("summary", "", `Where the ${label} menu's ${pass.bind + pass.query} ms went (sampled, ${p.samples} samples)`));
+  const table = (title, head, rows) => {
+    if (!rows.length) return;
+    box.append(el("div", "program", title));
+    const t = el("table", "diag");
+    const h = el("tr");
+    for (const x of head) h.append(el("th", x === "ms" ? "ms" : "", x));
+    t.append(h);
+    for (const r of rows) t.append(r);
+    box.append(t);
+  };
+  const shortName = path => path.split(/[\\/]/).pop();
+  table("Waiting or working in (the function, then the DLLs that called it)", ["ms", "Path"],
+    (p.paths || []).slice(0, ProfileRows).map(x => { const tr = el("tr"); cell(tr, x.ms + " ms", "ms"); cell(tr, x.path, "file"); return tr; }));
+  table("Meanwhile on other threads (what it may have waited for)", ["ms", "Path"],
+    (p.otherThreads || []).slice(0, ProfileRows).map(x => { const tr = el("tr"); cell(tr, x.ms + " ms", "ms"); cell(tr, x.path, "file"); return tr; }));
+  table("DLLs on the stack", ["ms", "DLL", "Extension"],
+    (p.modules || []).slice(0, ProfileRows).map(x => {
+      const tr = el("tr");
+      cell(tr, x.onStack + " ms", "ms");
+      cell(tr, shortName(x.module), "file", x.module);
+      // an extension's own DLL (not one of Windows', which several share)
+      const ext = /^[a-z]:.windows./i.test(x.module) ? null : handlers.find(h => h.dll && h.dll.toLowerCase() === x.module.toLowerCase());
+      cell(tr, ext ? ext.name : "");
+      return tr;
+    }));
+  box.append(el("div", "hint", "Ntdll's and win32u's Wait functions are waiting: for another thread, a disk, or another "
+    + "process (combase and RPCRT4 on the path: a COM call to another process). The first " + ProfileRows + " of each."));
+  return box;
 }
 
 const median = list => {
@@ -292,6 +340,7 @@ $("measure").addEventListener("click", () => {
 });
 $("stopMeasure").addEventListener("click", () => post({ type: "stopMeasure" }));
 $("hangSeconds").addEventListener("change", () => post({ type: "setHang", value: +$("hangSeconds").value }));
+$("profile").addEventListener("change", () => post({ type: "setProfile", value: $("profile").checked }));
 
 // ---- the panels' arrangement (plan 05 3.3) -------------------------------------------------------------------------
 
@@ -393,6 +442,7 @@ chrome.webview.addEventListener("message", e => {
     diag = m;
     if (!m.measuring) measuringNow = null;
     if (document.activeElement !== $("hangSeconds")) $("hangSeconds").value = m.hangSeconds;
+    $("profile").checked = !!m.profile;
     renderMeasured();
     renderTimings();
     renderMeasuring();
