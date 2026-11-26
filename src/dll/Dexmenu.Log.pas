@@ -114,7 +114,7 @@ begin
   if H = INVALID_HANDLE_VALUE then
     Exit;
   GetModuleFileName(0, Exe, MAX_PATH);
-  Line := FormatDateTime('yyyy-mm-dd hh:nn:ss ', Now) + string(Exe) + ': ' + Text + #13#10;
+  Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz ', Now) + string(Exe) + ': ' + Text + #13#10;
   Bytes := TEncoding.UTF8.GetBytes(Line);
   WriteFile(H, Bytes[0], Length(Bytes), Written, nil);
   CloseHandle(H);

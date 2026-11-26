@@ -462,7 +462,15 @@ int wmain(int argc, wchar_t** argv)
         nullptr, nullptr, wc.hInstance, nullptr);
     SetForegroundWindow(hwnd);
 
-    // The parent folder's menu for the items, as Explorer asks for it.
+    // The parent folder's menu for the items, as Explorer asks for it. How long each step takes: printed (timing:).
+    LARGE_INTEGER freq, t0, t1;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&t0);
+    auto lap = [&](const wchar_t* step) {
+        QueryPerformanceCounter(&t1);
+        wprintf(L"timing: %s %lld ms\n", step, (t1.QuadPart - t0.QuadPart) * 1000 / freq.QuadPart);
+        t0 = t1;
+    };
     IShellFolder* parent = nullptr;
     std::vector<PIDLIST_ABSOLUTE> absolute;
     std::vector<PCUITEMID_CHILD> children;
@@ -477,10 +485,12 @@ int wmain(int argc, wchar_t** argv)
     }
     if (FAILED(parent->GetUIObjectOf(hwnd, static_cast<UINT>(children.size()), children.data(), IID_IContextMenu, nullptr,
         reinterpret_cast<void**>(&menu)))) return 2;
+    lap(L"bind and GetUIObjectOf");
     menu->QueryInterface(IID_PPV_ARGS(&menu3));
     const HMENU hmenu = CreatePopupMenu();
     windowsMenu = hmenu;
     if (FAILED(menu->QueryContextMenu(hmenu, 0, First, Last, CMF_NORMAL | CMF_CANRENAME))) return 2;
+    lap(L"QueryContextMenu");
 
     // --invoke verb: the item run as a program runs a choice (by its id), no UI; its result printed, nothing shown.
     if (!invoke.empty())

@@ -20,7 +20,7 @@ procedure NoteMenu(Menu: HMENU; Flags: UINT; const Kind, Where: string);
 implementation
 
 uses
-  System.SysUtils, System.StrUtils, System.SyncObjs, System.Generics.Collections, DDetours, Dexmenu.Log,
+  System.SysUtils, System.StrUtils, System.SyncObjs, System.Diagnostics, System.Generics.Collections, DDetours, Dexmenu.Log,
   Winapi.ShellAPI, Dexmenu.Layout, Dexmenu.Menu, Dexmenu.Seen, Dexmenu.Place, Dexmenu.Usage;
 
 const
@@ -193,6 +193,7 @@ var
   ToWindows: Boolean;
   Command: TCommand;
   ChosenKey: string;
+  Clock: TStopwatch;
 begin
   Command := ccNone;
   ChosenKey := '';
@@ -223,7 +224,10 @@ begin
   LayoutKind := Kind;   // the layout is chosen by the kind, in a dialog its dialog kind (plan 05 3.2)
   if InFileDialog(Owner) then
     LayoutKind := 'dialog-' + Kind;
+  Clock := TStopwatch.StartNew;
   Layout := CurrentLayout(LayoutKind, ToWindows, Error);
+  if Tracing then
+    Log(Format('show %s: layout read in %d ms', [Hex(Menu), Clock.ElapsedMilliseconds]));
   if ToWindows then
   begin
     if Tracing then

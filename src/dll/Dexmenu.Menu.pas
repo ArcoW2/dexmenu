@@ -126,7 +126,7 @@ threadvar
 implementation
 
 uses
-  System.SysUtils, System.Math, System.Classes, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage, Dexmenu.Icons;
+  System.SysUtils, System.Math, System.Classes, System.Diagnostics, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage, Dexmenu.Icons;
 
 const
   MenuClassName = 'DexmenuMenu';
@@ -346,14 +346,28 @@ var
   I: Integer;
   Quit: Boolean;
   QuitCode: WPARAM;
+  Clock: TStopwatch;
+  Times: string;
+
+  // with tracing on: how long each step took, in ms, logged once the menu shows
+  procedure Mark(const Step: string);
+  begin
+    Times := Times + Format(' %s %d', [Step, Clock.ElapsedMilliseconds]);
+    Clock := TStopwatch.StartNew;
+  end;
+
 begin
   Result := False;
+  Clock := TStopwatch.StartNew;
+  Times := '';
   if Notify then
   begin
     SendMessage(FOwner, WM_ENTERMENULOOP, 1, 0);
     SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(FOriginal), MakeLParam(0, 0));
   end;
+  Mark('init');
   FTop := ReadLevel(FOriginal, '');
+  Mark('read');
   FSettings := MenuSettings;
   if FLayout.MenuCard.SubmenuMode <> smDefault then
     FSettings.Submenus := FLayout.MenuCard.SubmenuMode;   // the layout's own (its menu card's) over the general one
@@ -362,13 +376,16 @@ begin
   FHints := HintsOf(ReadSeenText(FKind));
   FUsage := ReadUsage(FKind);
   FLastUse := ReadLastUse(FKind);
+  Mark('files');
   // the rules look inside submenus, or a used rule may hold an item of one: those filled only
   // when opened are opened now
   FDeep := RulesLookDeeper(FLayout, FKind) or (UsesUsage(FLayout, FKind) and UsageGoesDeeper(FUsage));
   FindEmpty(FTop);
+  Mark('submenus');
   if Notify and ProbingIcons then
     ProbeOwnerDrawn(FOwner, FTop);   // Explorer's own icons: the probe (plan 02 3.8), off unless switched on
   FPlacement := TPlacement.Create(FLayout, FKind, FTop, FUsage, FLastUse);
+  Mark('place');
   FPlacement.Empty := FEmpty;
   FPlacement.AtRightClick := True;
   FPlacement.Usage := FUsage;
@@ -382,12 +399,18 @@ begin
   L.Wnd := MakeWindow(0, True);
   SetWindowLongPtr(L.Wnd, GWLP_USERDATA, LONG_PTR(L));
   FTip := TTip.Create(L.Wnd);
+  Mark('window');
   PlaceTop(X, Y, Params);
+  Mark('measure');
   L.Redraw;
+  Mark('draw');
   ShowWindow(L.Wnd, SW_SHOW);
   L.UpdateShadow;
   SetForegroundWindow(L.Wnd);
   SetFocus(L.Wnd);
+  Mark('show');
+  if Tracing then
+    Log('menu shown, ms:' + Times);
 
   ActiveSession := Self;
   Quit := False;
