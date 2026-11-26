@@ -583,5 +583,6 @@ function renderAbout(a) {
   };
   section("Needed to run (installed)", [["Windows 10 or 11, x64", a.os], [".NET 10 Desktop Runtime (this window)", a.dotnet],
     ["Microsoft Edge WebView2 Runtime (this window)", a.webView2]]);
-  section("Included", [["DexmenuShell.dll: the menu in Explorer (Delphi, no other libraries)", ""], ["WebView2 SDK", a.webView2Sdk]]);
+  section("Included", [["DexmenuShell.dll: the menu in Explorer (Delphi)", ""],
+    ["DDetours by Mahdi Safsafi, MPL 2.0 (github.com/MahdiSafsafi/DDetours)", "0083d1e"], ["WebView2 SDK", a.webView2Sdk]]);
 }
