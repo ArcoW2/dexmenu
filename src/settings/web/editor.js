@@ -1011,6 +1011,25 @@ function ruleEditor(card, rule, index) {
     "Dexmenu's own item, Edit Dexmenu (this editor on the layout in use) or Windows' menu (Windows' own menu shown instead)";
   typeSel.addEventListener("change", () => { M.setRuleType(rule, typeSel.value); changed(); });
   head.append(number, priority, typeSel);
+  // exclude (a rule by name): it finds nothing; what it matches, the card's rules after it do not take. Ticked, the
+  // settings that only apply to taking (also, skip duplicates, consumes, latest, template) go
+  const excluding = M.ruleType(rule) === "name" && !!rule.exclude;
+  if (M.ruleType(rule) === "name") {
+    const ex = el("input");
+    ex.type = "checkbox";
+    ex.checked = excluding;
+    ex.addEventListener("change", () => {
+      if (ex.checked) {
+        rule.exclude = true;
+        for (const k of ["also", "skipDuplicates", "consume", "latest", "template"]) delete rule[k];
+      } else delete rule.exclude;
+      changed();
+    });
+    const exl = el("label", "exclude-flag");
+    exl.title = "It finds nothing: what it matches, this card's rules after it do not take (it stays free for other cards)";
+    exl.append(ex, " exclude");
+    head.append(exl);
+  }
   // a setting's row: its label in the first column, its fields in the second
   const body = el("div", "rule-body");
   const row = (label, ...fields) => {
@@ -1065,7 +1084,7 @@ function ruleEditor(card, rule, index) {
   });
   if (M.ruleType(rule) === "name")
     row("Where", placeSel, ...(rule.path ? matchEditor(rule.path, m => { rule.path = m; changed(); }) : []));
-  if (M.ruleType(rule) === "name") {
+  if (M.ruleType(rule) === "name" && !excluding) {
     // "latest": of what it finds only the ones seen most recently (an item whose name changes each time)
     const latest = el("input");
     latest.type = "text";
@@ -1083,7 +1102,7 @@ function ruleEditor(card, rule, index) {
     row("Latest", latest);
   }
   // the template the items it finds follow, when its card picks templates by rule (plan 11 3.1)
-  if (card.templatesBy === "rule" && Array.isArray(card.templates) && card.templates.length > 0) {
+  if (!excluding && card.templatesBy === "rule" && Array.isArray(card.templates) && card.templates.length > 0) {
     const tsel = el("select");
     for (let i = 0; i <= card.templates.length; i++) {
       const o = el("option", "", i === 0 ? "(the first)" : "Template " + i);
@@ -1128,17 +1147,14 @@ function ruleEditor(card, rule, index) {
     statesBox.append(l);
   }
   if (!ownType) body.append(el("span", "rule-label"), statesBox);
-  const opts = ownType ? el("div") : row("Options");
-  for (const [flag, label, tip] of [["also", "also when taken"],
-    ["skipDuplicates", "skip duplicates (one per name)"],
-    ["exclude", "exclude", "It finds nothing: what it matches, this card's rules after it do not take (it stays free for other cards)"]]) {
-    if (flag === "exclude" && M.ruleType(rule) !== "name") continue;   // a rule by name only
+  // an exclude rule takes nothing: no options
+  const opts = ownType || excluding ? el("div") : row("Options");
+  for (const [flag, label] of [["also", "also when taken"], ["skipDuplicates", "skip duplicates (one per name)"]]) {
     const cb = el("input");
     cb.type = "checkbox";
     cb.checked = !!rule[flag];
     cb.addEventListener("change", () => { if (cb.checked) rule[flag] = true; else delete rule[flag]; changed(); });
     const l = el("label");
-    if (tip) l.title = tip;
     l.append(cb, " " + label);
     opts.append(l);
   }
