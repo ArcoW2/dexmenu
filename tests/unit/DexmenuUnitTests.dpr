@@ -2145,11 +2145,12 @@ begin
       P.Free;
     end;
     // a bottom divider left out when nothing follows, or what follows has a border; drawn before a plain item
-    for I := 0 to 2 do
+    for I := 0 to 3 do
     begin
       case I of
         0: Titles_ := '';
         1: Titles_ := ', { "card": "Framed", "title": "F", "content": [ ' + Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }') + ' ] }';
+        3: Titles_ := ', { "id": "d2", "divider": "Next" }, ' + Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }');
       else
         Titles_ := ', ' + Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }');
       end;
@@ -2167,9 +2168,47 @@ begin
                'a bottom divider with nothing after it: left out');
           1: Check((Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom) < 0.5),
                'a bottom divider before a framed group: left out');
+          3: Check((Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom) < 0.5),
+               'a bottom divider before a divider with a title: left out');
         else
           Check((Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom - SeparatorHeight) < 0.5),
             'a bottom divider before a plain item: drawn');
+        end;
+      finally
+        L.Free;
+        P.Free;
+      end;
+    end;
+    // a plain divider right after a group ending in a border: left out; one with a title kept
+    for I := 0 to 2 do
+    begin
+      case I of
+        0: Titles_ := '{ "card": "Framed", "title": "F", "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" }, "priority": 1 }') +
+             ' ] }, { "id": "d1", "divider": "" }';
+        1: Titles_ := '{ "card": "Framed", "title": "F", "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" }, "priority": 1 }') +
+             ' ] }, { "id": "d1", "divider": "Next" }';
+      else
+        Titles_ := '{ "card": "Box", "border": "divider", "dividerTop": false, "dividerBottom": true, "content": [ ' +
+          Card('Cut', '{ "name": { "equals": "Cut" }, "priority": 1 }') + ' ] }, { "id": "d1", "divider": "" }';
+      end;
+      L := Level(Titles_ + ', ' + Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }') +
+        ', { "card": "All", "hidden": true, "rules": [ { "name": { "wildcard": "*" }, "scope": "anywhere", "priority": 3 } ] }', P);
+      try
+        G := Measure(L);
+        Inside := (L.Lines.Count >= 2) and (L.Lines[1].Cards[0].Kind = vkSeparator);
+        case I of
+          0: Check(not Inside and (L.Lines.Count = 2), 'a plain divider after a framed group: left out');
+          1: Check(Inside, 'a divider with a title after a framed group: kept');
+        else
+          begin
+            Box := -1;
+            for K := 0 to High(G.Boxes) do
+              if G.Boxes[K].Card = L.Lines[0].Cards[0] then
+                Box := K;
+            Check(not Inside and (Box >= 0) and
+              (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom - SeparatorHeight) < 0.5),
+              'a plain divider after a group''s bottom divider: left out, the bottom divider drawn');
+          end;
         end;
       finally
         L.Free;

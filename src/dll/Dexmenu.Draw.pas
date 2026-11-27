@@ -647,6 +647,53 @@ begin
   Result := (C.Inner <> nil) and (C.Inner.Lines.Count > 0) and StartsBordered(C.Inner.Lines[0]);
 end;
 
+// Whether a line ends with a border of its own: its last card a framed card holding cards whose border is drawn (flat or
+// 3D), one with dividers as its border and a bottom divider set, or a plain holder whose last line does.
+function EndsBordered(Line: TViewLine): Boolean;
+var
+  C: TViewCard;
+  Look: TJSONObject;
+begin
+  Result := False;
+  if (Line = nil) or (Line.Cards.Count = 0) then
+    Exit;
+  C := Line.Cards[Line.Cards.Count - 1];
+  if C.Kind <> vkGroup then
+    Exit;
+  if DividerBorder(C) then
+    Exit(DividerBottomSet(C));
+  if C.Framed then
+  begin
+    Look := nil;
+    if C.Card <> nil then
+      Look := C.Card.Look;
+    Result := not ((Look <> nil) and (Look.GetValue('border') is TJSONString) and (Look.GetValue('border').Value = 'none')
+      and not (Look.GetValue('border3d') is TJSONObject));
+    Exit;
+  end;
+  Result := (C.Inner <> nil) and (C.Inner.Lines.Count > 0) and EndsBordered(C.Inner.Lines[C.Inner.Lines.Count - 1]);
+end;
+
+// A plain divider (no title; a layout's or Windows' separator) right after a line that ends with a border left out:
+// the border already divides. Inside the cards holding cards too. Runs before MarkBottoms.
+procedure DropDividers(Level: TViewLevel);
+var
+  I: Integer;
+  C: TViewCard;
+begin
+  if Level = nil then
+    Exit;
+  for I := Level.Lines.Count - 1 downto 1 do
+    if (Level.Lines[I].Cards.Count = 1) and (Level.Lines[I].Cards[0].Kind = vkSeparator) and
+      ((Level.Lines[I].Cards[0].Divider = nil) or (Level.Lines[I].Cards[0].Divider.DividerText = '')) and
+      EndsBordered(Level.Lines[I - 1]) then
+      Level.Lines.Delete(I);
+  for I := 0 to Level.Lines.Count - 1 do
+    for C in Level.Lines[I].Cards do
+      if C.Kind = vkGroup then
+        DropDividers(C.Inner);
+end;
+
 // Each group's bottom divider left out where it would double a border or end the menu (NoBottomDivider): when nothing
 // follows it or what follows starts with a border. EndBordered: what follows the end of this level counts so (the
 // menu's end; a frame's bottom; a drawn bottom divider; else what follows the holder).
@@ -1055,6 +1102,7 @@ var
   V: TViewCard;
 begin
   EnsureFactories;
+  DropDividers(Level);
   MarkBottoms(Level, True);   // nothing follows the level's end
   LevelMin := MinWidth;
   LevelMax := MaxWidth;

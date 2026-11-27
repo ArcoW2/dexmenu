@@ -332,7 +332,9 @@ None.
 - Dividers as a border (`"border": "divider"` on a card holding or showing cards inside it; `"dividerTop": false`,
   `"dividerBottom": true`): no frame line and no padding, its items in line with the menu's; a divider at the top
   with its title as the text (a plain line without one), one at the bottom when set, left out where nothing follows
-  or what follows starts with a border of its own (a divider, a framed group, a group's top divider); its
+  or what follows starts with a border of its own (a divider, also one with a title; a framed group; a group's top
+  divider); a plain divider (no title; also Windows' separator) right after a group ending in a border (a frame
+  drawn, or a bottom divider set) left out, before the bottom divider is decided; its
   background and hover look stay. Editor: Border "dividers (top, bottom)" with the two checkboxes; "Title shown as" not offered then. Tested:
   unit tests (the boxes: no side padding, the titled divider above, the plain one below; neither; the bottom one with
   nothing after, before a framed group, before an item); the user's layout
