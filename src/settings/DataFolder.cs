@@ -108,6 +108,7 @@ static class DataFolder
                 foreach (var file in Directory.GetFiles(folder, "*.json"))
                     if (Path.GetFileNameWithoutExtension(file) is { } n && !names.Contains(n, StringComparer.OrdinalIgnoreCase))
                         names.Add(n);
+        names.Sort(StringComparer.OrdinalIgnoreCase);   // by name, the built-in ones among the user's
         return names;
     }
 

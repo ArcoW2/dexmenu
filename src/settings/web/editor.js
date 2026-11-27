@@ -2476,7 +2476,7 @@ chrome.webview.addEventListener("message", e => {
   }
   else if (m.type === "themes") {
     const next = Array.isArray(m.names) ? m.names : [];
-    if (JSON.stringify(next) !== JSON.stringify(themeNames)) { themeNames = next; if (selectedId === "menu") renderCardPane(); }
+    if (JSON.stringify(next) !== JSON.stringify(themeNames)) { themeNames = next; renderCardPane(); }   // every Theme field
   }
   else if (m.type === "theme") { Theme.show(m.theme); paletteAskedFor = ""; askPalette(); }
   else if (m.type === "palette") {
