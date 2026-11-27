@@ -1194,7 +1194,8 @@ begin
       'the dark theme the main card names, from the user''s themes folder, on the built-in dark');
     Check(Near(CurrentTheme(False).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), $1B, $1B, $1B),
       'light not named: the built-in light');
-    for var Shipped in ['light-parchment', 'dark-parchment', 'light-sky', 'dark-ocean', 'light-seafoam', 'dark-forest'] do
+    for var Shipped in ['light-parchment', 'dark-parchment', 'light-sky', 'dark-ocean', 'light-seafoam', 'dark-forest',
+      'medium-sage', 'medium-sandstone', 'medium-lagoon'] do
     begin
       SetLayoutThemes(Shipped, '');
       Check((CurrentTheme(False).Name = Shipped) and (CurrentTheme(False).Problems = '') and

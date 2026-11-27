@@ -326,6 +326,11 @@ None.
   rules view. A card with only exclude rules finds nothing (outlined red). Tested: unit tests (without, with, only
   its own card, only the rules after it, by use invalid); the editor's self-test.
 - A theme per card, the main card's for the whole menu: see plan 15 (`15-PLAN-card-themes.md`).
+- Three medium themes built in: medium-sage (between light-seafoam and dark-forest), medium-sandstone (the
+  parchments), medium-lagoon (light-sky and dark-ocean). On the built-in dark; a background at CIELAB lightness
+  33 (the menu) to 38 (a bar), its hue's light text: WCAG contrast 7.2:1 on a card, dim text 5.4:1, the accent
+  5.5:1 (computed when made). Listed in the app's themes. Tested: unit test (read without problems, cards with a
+  background); the user's layout drawn by a probe in each.
 - A card's Menustyle (`"submenuStyle": { ... }` on a card opening a submenu: its held cards, its found items, a
   "More"): the submenu drawn in it over the theme's menu, as the menu in the menu card's style (background, also
   none for see-through; border; radius; shadow). Editor: a dashed "Menustyle" item inside such a card, as a

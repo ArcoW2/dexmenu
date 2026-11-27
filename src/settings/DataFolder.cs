@@ -101,8 +101,8 @@ static class DataFolder
     /// themes folder and the one next to the app, by name.</summary>
     public static List<string> ThemeNames()
     {
-        var names = new List<string> { "light", "dark", "light-parchment", "dark-parchment", "light-sky", "dark-ocean",
-            "light-seafoam", "dark-forest" };   // built into the DLL (Dexmenu.Theme)
+        var names = new List<string> { "light", "dark", "light-parchment", "medium-sandstone", "dark-parchment", "light-sky",
+            "medium-lagoon", "dark-ocean", "light-seafoam", "medium-sage", "dark-forest" };   // built into the DLL (Dexmenu.Theme)
         foreach (var folder in new[] { Path.Combine(Root, "themes"), Path.Combine(AppContext.BaseDirectory, "themes") })
             if (Directory.Exists(folder))
                 foreach (var file in Directory.GetFiles(folder, "*.json"))

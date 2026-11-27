@@ -150,6 +150,27 @@ const
     '"dim": "#90a898", "border": "#2f4436", "line": "#2f4436", "accent": "#5fd38d", ' +
     '"active": "rgba(95, 211, 141, .18)" }, "card": { "normal": { "background": "side" }, ' +
     '"pressed": { "background": "active" } } }';
+  // medium-sage, medium-sandstone, medium-lagoon: between light-seafoam and dark-forest, the parchments, light-sky and
+  // dark-ocean: a background at the middle of light and dark (CIELAB lightness 33 - 38), light text of the same hue at
+  // least 7:1 on a card, dim text 5.4:1, the accent 5.5:1 (WCAG contrast, measured when they were made)
+  MediumSageText =
+    '{ "name": "medium-sage", "base": "dark", "palette": { "basecolor": "#435146", ' +
+    '"surface": "#435146", "side": "#47564a", "bar": "#4d5e50", "text": "#f1f8f2", ' +
+    '"dim": "#cedad0", "border": "#637768", "line": "#637768", "accent": "#a9ecb9", ' +
+    '"active": "rgba(169, 236, 185, .22)" }, "card": { "normal": { "background": "side" }, ' +
+    '"pressed": { "background": "active" } } }';
+  MediumSandstoneText =
+    '{ "name": "medium-sandstone", "base": "dark", "palette": { "basecolor": "#564c40", ' +
+    '"surface": "#564c40", "side": "#5b5143", "bar": "#635848", "text": "#fbf6ef", ' +
+    '"dim": "#dfd6ca", "border": "#7d705e", "line": "#7d705e", "accent": "#ffd79a", ' +
+    '"active": "rgba(255, 215, 154, .22)" }, "card": { "normal": { "background": "side" }, ' +
+    '"pressed": { "background": "active" } } }';
+  MediumLagoonText =
+    '{ "name": "medium-lagoon", "base": "dark", "palette": { "basecolor": "#40505b", ' +
+    '"surface": "#40505b", "side": "#435561", "bar": "#495c6a", "text": "#f0f7fe", ' +
+    '"dim": "#ccd9e3", "border": "#5f7585", "line": "#5f7585", "accent": "#90e7ff", ' +
+    '"active": "rgba(144, 231, 255, .22)" }, "card": { "normal": { "background": "side" }, ' +
+    '"pressed": { "background": "active" } } }';
 
 function RGBA(R, G, B: Byte; A: Single): TRGBA;
 begin
@@ -564,7 +585,13 @@ begin
   else if SameText(Name, 'light-seafoam') then
     Result := LightSeafoamText
   else if SameText(Name, 'dark-forest') then
-    Result := DarkForestText;
+    Result := DarkForestText
+  else if SameText(Name, 'medium-sage') then
+    Result := MediumSageText
+  else if SameText(Name, 'medium-sandstone') then
+    Result := MediumSandstoneText
+  else if SameText(Name, 'medium-lagoon') then
+    Result := MediumLagoonText;
 end;
 
 // What a theme's files are now (their times), so a change reads it again.
