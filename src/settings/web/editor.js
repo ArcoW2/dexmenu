@@ -1846,9 +1846,16 @@ function summary(rule) {
 function renderRules() {
   const list = $("rules");
   list.replaceChildren();
+  // the selected card's rules highlighted; a card holding cards (a group, a submenu, a row): every card's inside it
+  const mine = new Set();
+  const sel = selectedId ? M.find(linesOf(), selectedId) : null;
+  if (sel) {
+    mine.add(sel.card.id);
+    if (M.isHolder(sel.card)) for (const at of M.cards(sel.card.content)) mine.add(at.card.id);
+  }
   M.ruleList(linesOf()).forEach((r, i) => {
     const classes = [];
-    if (r.card.id === selectedId) classes.push("mine");   // the selected card's rules
+    if (mine.has(r.card.id)) classes.push("mine");
     if (r.card.id === selectedId && r.index === selectedRule) classes.push("selected");
     if (r.rule.exclude) classes.push("exclude");
     const li = el("li", classes.join(" "));
