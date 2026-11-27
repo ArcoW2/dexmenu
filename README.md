@@ -69,6 +69,8 @@ zip and its SHA-256 go in `release\` too, but only to GitHub Releases, not into 
 ## License and support
 
 Copyright (c) 2026 Arco Witter. Released under the [MIT License](LICENSE).
+
 Includes [DDetours](https://github.com/MahdiSafsafi/DDetours) by Mahdi Safsafi (MPL 2.0, unchanged, in
 `src\vendor\DDetours` with its licence).
-Like Dexmenu? [Support me on Ko-fi](https://ko-fi.com/arcowitter).
+
+Like Dexmenu? [Buy me a coffee or a chocolate](https://ko-fi.com/arcowitter).

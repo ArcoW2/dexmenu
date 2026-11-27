@@ -43,4 +43,5 @@ PowerShell: `Get-FileHash .\Dexmenu-{VERSION}-win-x64.zip -Algorithm SHA256`
 Includes [DDetours](https://github.com/MahdiSafsafi/DDetours) by Mahdi Safsafi (MPL 2.0, unchanged).
 
 Copyright (c) 2026 Arco Witter. Released under the [MIT License](https://github.com/ArcoW2/dexmenu/blob/main/LICENSE).
-Like Dexmenu? [Support me on Ko-fi](https://ko-fi.com/arcowitter).
+
+Like Dexmenu? [Buy me a coffee or a chocolate](https://ko-fi.com/arcowitter).
