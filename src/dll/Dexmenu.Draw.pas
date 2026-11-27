@@ -23,6 +23,7 @@ type
     Pressed: Integer;        // the box the mouse button is down on (the "pressed" state), or -1; Measure sets -1
     KeyFocus: Boolean;       // the selection moved by the keys (plan 03 3.7): it gets the focus ring; Measure sets False
     MenuCard: TCard;         // the top level's: the layout's menu card, its style over the theme's menu (plan 11 3.9)
+    ThemeCard: TCard;        // the level's theme's card (TViewLevel.ThemeCard); nil: the main card's (plan 15 3.3)
   end;
 
   TLook = record
@@ -63,6 +64,9 @@ procedure DexmenuSetTheme(Mode: Integer); stdcall;
 // The palette of the theme the preview draws with (DexmenuSetTheme's mode), as TTheme.PaletteText, into Buffer; the
 // number of characters it needs (with the #0).
 function DexmenuThemePalette(Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+// The palette of a theme pair (a card's resolved themeLight, themeDark; '' the built-in one) for the mode the preview
+// draws in (plan 15 3.4), as DexmenuThemePalette.
+function DexmenuThemePaletteOf(Light, Dark: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
 // The box at a point (DIP within the level, scroll applied), or -1.
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
 
@@ -119,6 +123,22 @@ var
 procedure DexmenuSetTheme(Mode: Integer); stdcall;
 begin
   ThemeMode := Mode;
+end;
+
+function DexmenuThemePaletteOf(Light, Dark: PWideChar; Buffer: PWideChar; Chars: Integer): Integer; stdcall;
+var
+  Text: string;
+begin
+  Text := '{}';
+  try
+    Text := ThemePaletteOf(string(Light), string(Dark), TLook.Current.Dark);
+  except
+    on E: Exception do
+      Log('theme palette: ' + E.Message);
+  end;
+  Result := Length(Text) + 1;
+  if (Buffer <> nil) and (Chars > 0) then
+    StrPLCopy(Buffer, Text, Chars - 1);
 end;
 
 function DexmenuThemePalette(Buffer: PWideChar; Chars: Integer): Integer; stdcall;
@@ -804,13 +824,27 @@ begin
       Result := Result + TitleHeight + ButtonGap;
 end;
 
-// The gaps between the cards on a line and between lines (plan 03 3.5): the theme's, none unless it gives them; inside
-// a framed card at least ButtonGap.
+// A level's theme (plan 15 3.3): its theme card's, else the main card's.
+function LevelThemeOf(ThemeCard: TCard; Dark: Boolean): TTheme;
+begin
+  if ThemeCard <> nil then
+    Result := CardTheme(ThemeCard, Dark)
+  else
+    Result := CurrentTheme(Dark);
+end;
+
+var
+  GapTheme: TTheme;   // the theme of the level Measure lays out, for Gaps; nil outside Measure
+
+// The gaps between the cards on a line and between lines (plan 03 3.5): the level's theme's, none unless it gives them;
+// inside a framed card at least ButtonGap.
 procedure Gaps(Framed: Boolean; out CardGap, LineGap: Single);
 var
   Theme: TTheme;
 begin
-  Theme := CurrentTheme(TLook.Current.Dark);
+  Theme := GapTheme;   // the level's being measured (Measure)
+  if Theme = nil then
+    Theme := CurrentTheme(TLook.Current.Dark);
   CardGap := Max(0, Theme.Number('card', 'normal', 'gap', 0));
   LineGap := Max(0, Theme.Number('line', 'normal', 'gap', 0));
   if Framed then
@@ -1168,6 +1202,7 @@ var
   V: TViewCard;
 begin
   EnsureFactories;
+  GapTheme := LevelThemeOf(Level.ThemeCard, TLook.Current.Dark);   // the level's gaps (plan 15 3.3)
   DropDividers(Level);
   MarkBottoms(Level, True);   // nothing follows the level's end
   LevelMin := MinWidth;
@@ -1203,6 +1238,8 @@ begin
   Result.Pressed := -1;
   Result.KeyFocus := False;
   Result.MenuCard := Level.MenuCard;
+  Result.ThemeCard := Level.ThemeCard;
+  GapTheme := nil;
 end;
 
 function BoxAt(const G: TGeometry; X, Y, ScrollY: Single): Integer;
@@ -1693,9 +1730,34 @@ var
   GroupState: string;
   TitleLine: TLine;
   MenuOwn: TJSONObject;
+  LevelTheme, BoxTheme, MarkTheme: TTheme;   // the level's, a box's (plan 15 3.3)
+  GroupRects: TArray<TD2D1RectF>;            // the boxes of the cards holding cards around the box drawn now
+  GroupThemes: TArray<TTheme>;               // and their themes
+
+  // the brushes a card's drawing takes from its theme, made again when the theme changes from one box to the next
+  procedure UseTheme(Th: TTheme);
+  begin
+    Theme := Th;
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'foreground', RGBA($1B, $1B, $1B))), nil, Text);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'disabled', 'foreground', RGBA($A0, $A0, $A0))), nil, Dim);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'normal', 'extra', RGBA($A0, $A0, $A0))), nil, Extra);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'hover', 'background', RGBA(0, 0, 0, 0.06))), nil, Hover);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'border', RGBA($E0, $E0, $E0))), nil, Sep);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0))), nil, LabelBrush);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'focused', 'border', RGBA($2F, $6F, $D6))), nil, Accent);
+    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'unavailable', 'background', RGBA(0, 0, 0, 0.09))), nil, Stripe);
+  end;
+
+  function Within(const A, B: TD2D1RectF): Boolean;
+  begin
+    Result := (A.left >= B.left - 0.5) and (A.right <= B.right + 0.5) and (A.top >= B.top - 0.5) and
+      (A.bottom <= B.bottom + 0.5);
+  end;
+
 begin
-  // every colour and radius from the theme for light or dark (plan 03 3.2; Dexmenu.Theme)
-  Theme := CurrentTheme(Look.Dark);
+  // every colour and radius from the level's theme for light or dark (plan 03 3.2; plan 15 3.3: its card's theme)
+  LevelTheme := LevelThemeOf(G.ThemeCard, Look.Dark);
+  Theme := LevelTheme;
   T.CreateSolidColorBrush(ToD2D(Theme.Color('menu', 'normal', 'background', RGBA($F9, $F9, $F9))), nil, Bg);
   // the menu window in the theme's menu look, the layout's menu card's own style over it (plan 11 3.9)
   MenuOwn := nil;
@@ -1730,9 +1792,30 @@ begin
     T.DrawRoundedRectangle(D2D1RoundedRect(R, MenuRadius, MenuRadius), Border, 1);
   end;
   T.PushAxisAlignedClip(D2D1RectF(1, OuterPad, G.Width - 1, VisibleHeight - OuterPad), D2D1_ANTIALIAS_MODE_ALIASED);
+  GroupRects := nil;
+  GroupThemes := nil;
   for I := 0 to High(G.Boxes) do
   begin
     V := G.Boxes[I].Card;
+    // its theme (plan 15 3.3): its layout card's, else that of the card holding cards around it, else the level's
+    while (Length(GroupRects) > 0) and not Within(G.Boxes[I].Rect, GroupRects[High(GroupRects)]) do
+    begin
+      SetLength(GroupRects, Length(GroupRects) - 1);
+      SetLength(GroupThemes, Length(GroupThemes) - 1);
+    end;
+    if V.Card <> nil then
+      BoxTheme := CardTheme(V.Card, Look.Dark)
+    else if Length(GroupThemes) > 0 then
+      BoxTheme := GroupThemes[High(GroupThemes)]
+    else
+      BoxTheme := LevelTheme;
+    if V.Kind = vkGroup then
+    begin
+      GroupRects := GroupRects + [G.Boxes[I].Rect];
+      GroupThemes := GroupThemes + [BoxTheme];
+    end;
+    if BoxTheme <> Theme then
+      UseTheme(BoxTheme);
     R := G.Boxes[I].Rect;
     R.top := R.top - ScrollY;
     R.bottom := R.bottom - ScrollY;
@@ -2073,6 +2156,8 @@ begin
         TitleBottom), Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
   end;
   T.PopAxisAlignedClip;
+  if Theme <> LevelTheme then
+    UseTheme(LevelTheme);   // what follows is the level's: its scrollbar
   // a level taller than it is shown (the work area's height): a thin bar at its right edge, where the shown part is
   // (plan 03 3.4); the wheel and the keys scroll it
   if G.Height > VisibleHeight + 0.5 then
@@ -2089,7 +2174,6 @@ begin
   // outside it on every side, so it stays clear of the card's own border; drawn after every card, so none covers it
   if Marked <> '' then
   begin
-    T.CreateSolidColorBrush(ToD2D(Theme.Color('card', 'marked', 'border', RGBA($E0, $20, $20), nil)), nil, Outline);
     MarkId := Marked;
     MarkTemplate := -1;
     if Pos('~t', Marked) > 0 then
@@ -2118,7 +2202,13 @@ begin
       Own := nil;
       if V.LookCard <> nil then
         Own := V.LookCard.Look;
-      CardRadius := Theme.Number('card', 'normal', 'radius', ItemRadius, Own) + MarkGap;
+      // in the marked card's theme (plan 15 3.3)
+      if V.Card <> nil then
+        MarkTheme := CardTheme(V.Card, Look.Dark)
+      else
+        MarkTheme := LevelTheme;
+      T.CreateSolidColorBrush(ToD2D(MarkTheme.Color('card', 'marked', 'border', RGBA($E0, $20, $20), nil)), nil, Outline);
+      CardRadius := MarkTheme.Number('card', 'normal', 'radius', ItemRadius, Own) + MarkGap;
       T.DrawRoundedRectangle(D2D1RoundedRect(D2D1RectF(R.left + 2 - MarkGap, R.top + 1 - MarkGap, R.right - 2 + MarkGap,
         R.bottom - 1 + MarkGap), CardRadius, CardRadius), Outline, 1.5);
     end;
@@ -2189,7 +2279,7 @@ begin
   if not (MenuOwn.GetValue('shadow') is TJSONObject) then
     Exit;
   EnsureFactories;
-  Theme := CurrentTheme(TLook.Current.Dark);
+  Theme := LevelThemeOf(G.ThemeCard, TLook.Current.Dark);   // the level's (plan 15 3.3)
   if SeeThrough(Theme, MenuOwn) then
     Exit;   // no window to shade: the cards' own shadows
   S := TJSONObject(MenuOwn.GetValue('shadow'));

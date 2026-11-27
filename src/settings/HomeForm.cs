@@ -188,7 +188,6 @@ sealed class HomeForm : Form, IThemed
             layouts = layouts.Select(n => new { name = n, kinds = LayoutFiles.KindsOf(n).Select(k => DataFolder.KindNames.GetValueOrDefault(k, k)) }),
             theme = Themes.Name,
             menu = DataFolder.Menu(),
-            themes = DataFolder.ThemeNames(),
         });
     }
 
@@ -289,7 +288,6 @@ sealed class HomeForm : Form, IThemed
                     else if (name == "onClickOnly")
                         DataFolder.SetMenu(name, m.TryGetProperty("value", out var on) && on.ValueKind == JsonValueKind.True);
                     else if (name is "submenuMark" or "actionMark") DataFolder.SetMenu(name, Str("value"));
-                    else if (name is "themeLight" or "themeDark" && Str("value").Length > 0) DataFolder.SetMenu(name, Str("value"));
                     else if (name == "textSize" && m.TryGetProperty("value", out var t) && t.TryGetDouble(out var size))
                         DataFolder.SetMenu(name, Math.Clamp(Math.Round(size, 1), 0.6, 2.5));
                     else if (name == "states") DataFolder.SetMenu(name, Str("value") is "enabled" or "disabled" ? Str("value") : "both");

@@ -82,7 +82,8 @@ type
     Widths: TArray<TLevelWidth>;   // per level: the top, a first submenu, ...; the last for every deeper one
     States: TStates;          // the states a rule takes when it does not say
     TextSize: Single;         // the menu's size, 1 as drawn; Ctrl+scroll in the menu changes it (plan 02 3.4)
-    ThemeLight, ThemeDark: string;   // the themes for Windows' light and dark mode (plan 03 3.3)
+    // the built-in "light" and "dark" (plan 03 3.3); no longer read from settings.json: a theme is a card's (plan 15)
+    ThemeLight, ThemeDark: string;
     Submenus: TSubmenuMode;   // smNext, smUnder or smReplace
     OnClickOnly: Boolean;     // submenus open only on a click, never on hover
   end;
@@ -117,8 +118,9 @@ type
     NoteHideEmpty: Boolean;  // "empty": "hide": left out when its filled text is empty (plan 14 3.1)
     Font: TFontSpec;   // a note's "font" (plan 03 3.6)
     SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
-    // the menu card's "themeLight", "themeDark": the layout's own themes for Windows' light and dark mode, over the
-    // global settings' (Dexmenu.Theme.SetLayoutThemes); '' none
+    // "themeLight", "themeDark": the themes it and what is in it are drawn in, in Windows' light and dark mode
+    // (docs/plans/15-PLAN-card-themes.md 3.1); '' none: its parent's (Dexmenu.Theme.CardTheme), the main card's
+    // none: the built-in light and dark
     ThemeLight, ThemeDark: string;
     // Its size on a line (plan 03 3.5): "weight", its share of the line's width (1 when not set); "minWidth" (DIP; 0
     // none); "height", in lines of text (0: auto, from its content); "cardFit", how it fits a taller line.
@@ -875,6 +877,10 @@ begin
     Card.Parent := Parent;
     ParseCardSize(Obj, Card);
     ParseCardLook(Obj, Card);
+    if Obj.GetValue('themeLight') is TJSONString then
+      Card.ThemeLight := Obj.GetValue('themeLight').Value;
+    if Obj.GetValue('themeDark') is TJSONString then
+      Card.ThemeDark := Obj.GetValue('themeDark').Value;
     if Obj.GetValue('submenuStyle') is TJSONObject then
     begin
       Card.SubmenuStyle := TCard.Create;
@@ -1343,10 +1349,7 @@ begin
       Result.Submenus := smNext;
     if TJSONObject(Menu).GetValue('onClickOnly') is TJSONBool then
       Result.OnClickOnly := TJSONBool(TJSONObject(Menu).GetValue('onClickOnly')).AsBoolean;
-    if (TJSONObject(Menu).GetValue('themeLight') is TJSONString) and (TJSONObject(Menu).GetValue('themeLight').Value <> '') then
-      Result.ThemeLight := TJSONObject(Menu).GetValue('themeLight').Value;
-    if (TJSONObject(Menu).GetValue('themeDark') is TJSONString) and (TJSONObject(Menu).GetValue('themeDark').Value <> '') then
-      Result.ThemeDark := TJSONObject(Menu).GetValue('themeDark').Value;
+    // "themeLight", "themeDark" no longer read here: a theme is the layout's (plan 15 3.5); the settings app moved them
     if TJSONObject(Menu).GetValue('textSize') is TJSONNumber then
       Result.TextSize := ClampTextSize(TJSONNumber(TJSONObject(Menu).GetValue('textSize')).AsDouble);
     if TJSONObject(Menu).GetValue('submenuMark') is TJSONString then

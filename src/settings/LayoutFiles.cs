@@ -92,6 +92,24 @@ static class LayoutFiles
         Check(DataFolder.Resolve("dialog-file") == "Default", "a file in a dialog with its kind not set: the file kind decides");
         DataFolder.SetLayout("dialog-file", "Mine copy");
         Check(DataFolder.Resolve("dialog-file") == "Default", "file before dialog-file in the order: file still decides");
+        // plan 15 3.5: a theme chosen in General moved once onto the main card of the layouts that set none
+        File.WriteAllText(DataFolder.LayoutPath("Themed"), "{ \"format\": 2, \"menu\": { \"themeLight\": \"Own\", \"content\": [] } }");
+        var settings = DataFolder.ReadSettings();
+        settings["menu"] = new System.Text.Json.Nodes.JsonObject { ["themeLight"] = "light-sky", ["themeDark"] = "dark" };
+        DataFolder.WriteSettings(settings);
+        DataFolder.MoveThemesToLayouts();
+        System.Text.Json.Nodes.JsonObject MenuOf(string name) => (System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(DataFolder.LayoutPath(name)),
+            documentOptions: new System.Text.Json.JsonDocumentOptions { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!["menu"]
+            as System.Text.Json.Nodes.JsonObject)!;
+        Check(MenuOf("Default")["themeLight"]?.GetValue<string>() == "light-sky" && MenuOf("Default")["themeDark"] is null,
+            "General's theme moved onto a layout's main card that sets none; the built-in dark not written");
+        Check(MenuOf("Themed")["themeLight"]?.GetValue<string>() == "Own", "a main card's own theme kept");
+        var menuAfter = DataFolder.ReadSettings()["menu"] as System.Text.Json.Nodes.JsonObject;
+        Check(menuAfter is not null && menuAfter["themeLight"] is null && menuAfter["themeDark"] is null,
+            "settings.json without the theme keys after it");
+        var defaultText = File.ReadAllText(DataFolder.LayoutPath("Default"));
+        DataFolder.MoveThemesToLayouts();
+        Check(File.ReadAllText(DataFolder.LayoutPath("Default")) == defaultText, "run once: a second start changes nothing");
         return lines;
     }
 }

@@ -1180,31 +1180,32 @@ begin
     Own.Free;
     T.Free;
   end;
-  // the theme the settings name, from the user's themes folder
+  // the theme the layout's main card names (plan 15: no longer settings.json), from the user's themes folder
   Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-themes');
   if TDirectory.Exists(Data) then
     TDirectory.Delete(Data, True);
   TDirectory.CreateDirectory(TPath.Combine(Data, 'themes'));
   SetEnvironmentVariable('DEXMENU_DATA', PChar(Data));
   try
-    TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeDark": "Mine" } }');
+    SetLayoutThemes('', 'Mine');
     TFile.WriteAllText(TPath.Combine(TPath.Combine(Data, 'themes'), 'Mine.json'),
       '{ "name": "Mine", "base": "dark", "palette": { "text": "#00ff00" } }');
     Check(Near(CurrentTheme(True).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), 0, 255, 0),
-      'the dark theme the settings name, from the user''s themes folder, on the built-in dark');
+      'the dark theme the main card names, from the user''s themes folder, on the built-in dark');
     Check(Near(CurrentTheme(False).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), $1B, $1B, $1B),
       'light not named: the built-in light');
     for var Shipped in ['light-parchment', 'dark-parchment', 'light-sky', 'dark-ocean', 'light-seafoam', 'dark-forest'] do
     begin
-      TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeLight": "' + Shipped + '" } }');
+      SetLayoutThemes(Shipped, '');
       Check((CurrentTheme(False).Name = Shipped) and (CurrentTheme(False).Problems = '') and
         (CurrentTheme(False).Color('card', 'normal', 'background', RGBA(0, 0, 0, 0)).A = 1),
         'the shipped theme ' + Shipped + ': read without problems, its cards with a background');
     end;
-    TFile.WriteAllText(TPath.Combine(Data, 'settings.json'), '{ "menu": { "themeDark": "Gone" } }');
+    SetLayoutThemes('', 'Gone');
     Check(Near(CurrentTheme(True).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)), 255, 255, 255),
       'a theme that is not there: the built-in dark');
   finally
+    SetLayoutThemes('', '');
     TDirectory.Delete(Data, True);
     SetEnvironmentVariable('DEXMENU_DATA', nil);
   end;
@@ -2040,6 +2041,153 @@ begin
   Expect(InnerTitles('{ "card": "F", "show": "column", "rename": { "regex": "^", "replace": "Fruit " }, ' +
     '"templates": [ { "rename": { "regex": "$", "replace": "!" } } ], "rules": [ { "name": { "wildcard": "*" } } ] }'),
     'Apple!;Banana!;', 'rename: a template''s rename over the card''s');
+end;
+
+// A theme per card (docs/plans/15-PLAN-card-themes.md 3.6): the pair resolved through the parents, one half inherited,
+// the main card's, a template's found cards in their card's theme, an unknown name the built-in one; two themes kept
+// at once, one read again when its file changes; drawn: a card in its own theme, its submenu's window in it.
+procedure TestCardThemes;
+var
+  Data, Themes: string;
+  Layout: ILayout;
+  Error: string;
+  Menu: HMENU;
+  Top: TNodes;
+  P: TPlacement;
+  L, Sub: TViewLevel;
+  G: TGeometry;
+  Pic: TPicture;
+  Box, K: Integer;
+  A, B, C, D, E: TCard;
+  Blue, Green: TTheme;
+  Pixel: COLORREF;
+
+  function Find(Lines: TLines; const Id: string): TCard;
+  var
+    Line: TLine;
+    Card: TCard;
+  begin
+    Result := nil;
+    for Line in Lines do
+      for Card in Line.Cards do
+      begin
+        if Card.Id = Id then
+          Exit(Card);
+        if Card.Menu <> nil then
+        begin
+          Result := Find(Card.Menu, Id);
+          if Result <> nil then
+            Exit;
+        end;
+      end;
+  end;
+
+begin
+  Data := TPath.Combine(TPath.GetTempPath, 'dexmenu-unit-card-themes');
+  if TDirectory.Exists(Data) then
+    TDirectory.Delete(Data, True);
+  Themes := TPath.Combine(Data, 'themes');
+  TDirectory.CreateDirectory(Themes);
+  SetEnvironmentVariable('DEXMENU_DATA', PChar(Data));
+  try
+    TFile.WriteAllText(TPath.Combine(Themes, 'Green.json'), '{ "name": "Green", "base": "light", ' +
+      '"menu": { "normal": { "background": "#00ff00" } }, "card": { "normal": { "background": "#00ff00", "foreground": "#000000" } } }');
+    TFile.WriteAllText(TPath.Combine(Themes, 'Blue.json'), '{ "name": "Blue", "base": "light", ' +
+      '"menu": { "normal": { "background": "#0000ff" } } }');
+    Layout := ParseLayout('{ "format": 2, "menu": { "themeLight": "Blue", "content": [ ' +
+      '{ "id": "a", "card": "A", "themeLight": "Green", "show": "submenu", "content": [ ' +
+      '{ "id": "b", "card": "B", "rules": [ { "name": { "equals": "Cut" } } ] } ] }, ' +
+      '{ "id": "c", "card": "C", "rules": [ { "name": { "equals": "Copy" } } ] }, ' +
+      '{ "id": "d", "card": "D", "themeLight": "Nope", "rules": [ { "name": { "equals": "Delete" } } ] }, ' +
+      '{ "id": "e", "card": "E", "themeLight": "Green", "show": "column", "templates": [ {} ], ' +
+      '"rules": [ { "name": { "endsWith": "in LexPen" } } ] }, ' +
+      '{ "card": "Rest", "rules": [ "remaining" ] } ] } }', 'test', Error);
+    Check(Layout <> nil, 'card themes: the layout read: ' + Error);
+    if Layout = nil then
+      Exit;
+    SetLayoutThemes(Layout.MenuCard.ThemeLight, Layout.MenuCard.ThemeDark);
+    A := Find(Layout.Lines('default'), 'a');
+    B := Find(Layout.Lines('default'), 'b');
+    C := Find(Layout.Lines('default'), 'c');
+    D := Find(Layout.Lines('default'), 'd');
+    E := Find(Layout.Lines('default'), 'e');
+    Check((A <> nil) and (A.ThemeLight = 'Green') and (A.ThemeDark = ''), 'card themes: a card''s pair read, one half left out');
+    Check(SameText(CardTheme(A, False).Name, 'Green') and SameText(CardTheme(B, False).Name, 'Green'),
+      'card themes: a card in its own, a card inside it in its parent''s');
+    Check(SameText(CardTheme(C, False).Name, 'Blue'), 'card themes: a card setting none: the main card''s');
+    Check(SameText(CardTheme(A, True).Name, 'dark'), 'card themes: a half set nowhere: the built-in one');
+    Check(SameText(CardTheme(D, False).Name, 'light'), 'card themes: a theme that cannot be read: the built-in one');
+    // two themes kept at once; one changed on disk read again, the other kept
+    Green := CardTheme(A, False);
+    Blue := CardTheme(C, False);
+    Check((Green <> Blue) and (CardTheme(A, False) = Green) and (CardTheme(C, False) = Blue),
+      'card themes: two themes kept at once, each read once');
+    TFile.WriteAllText(TPath.Combine(Themes, 'Green.json'), '{ "name": "Green", "base": "light", ' +
+      '"menu": { "normal": { "background": "#00ff00" } }, "card": { "normal": { "background": "#00ff00", "foreground": "#ff0000" } } }');
+    TFile.SetLastWriteTime(TPath.Combine(Themes, 'Green.json'), Now + 1 / 24);
+    Check((CardTheme(C, False) = Blue) and (CardTheme(A, False).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)).R > 0.9) and (CardTheme(A, False).Color('card', 'normal', 'foreground', RGBA(0, 0, 0)).G < 0.1),
+      'card themes: one changed on disk read again, the other kept');
+    Menu := TestMenu;
+    Top := ReadLevel(Menu, '');
+    P := TPlacement.Create(Layout, 'default', Top);
+    DexmenuSetTheme(1);   // drawn light, whatever Windows' mode: the light halves are set
+    try
+      // a template's found cards in their card's theme
+      L := P.TopLevel;
+      try
+        K := -1;
+        for Box := 0 to L.Lines.Count - 1 do
+          if (L.Lines[Box].Cards.Count > 0) and (L.Lines[Box].Cards[0].Card = E) then
+            K := Box;
+        Check((K >= 0) and (InnerOf(L.Lines[K].Cards[0])[0].Card = E) and
+          SameText(CardTheme(InnerOf(L.Lines[K].Cards[0])[0].Card, False).Name, 'Green'),
+          'card themes: a template''s found cards in their card''s theme');
+        // drawn: the card in its own theme in a menu in another
+        G := Measure(L);
+        Box := -1;
+        for K := 0 to High(G.Boxes) do
+          if (G.Boxes[K].Card.Card = A) and (G.Boxes[K].Card.Kind = vkMenu) then
+            Box := K;
+        Pic := Render(G, -1, 0, 1, G.Height);
+        try
+          Pixel := GetPixel(Pic.DC, Round(G.Boxes[Box].Rect.left + 4), Round((G.Boxes[Box].Rect.top + G.Boxes[Box].Rect.bottom) / 2));
+          Check((Box >= 0) and (GetRValue(Pixel) < 40) and (GetGValue(Pixel) > 215) and (GetBValue(Pixel) < 40),
+            Format('card themes: a card drawn in its own theme in a menu of another (%.6x)', [Pixel]));
+          Pixel := GetPixel(Pic.DC, Round(G.Width / 2), 2);
+          Check((GetRValue(Pixel) < 40) and (GetGValue(Pixel) < 40) and (GetBValue(Pixel) > 215),
+            Format('card themes: the menu in the main card''s theme (%.6x)', [Pixel]));
+        finally
+          Pic.Free;
+        end;
+        // its submenu's window in its theme
+        Sub := P.LevelOf(G.Boxes[Box].Card);
+        try
+          G := Measure(Sub);
+          Pic := Render(G, -1, 0, 1, G.Height);
+          try
+            Pixel := GetPixel(Pic.DC, Round(G.Width / 2), 2);
+            Check((GetRValue(Pixel) < 40) and (GetGValue(Pixel) > 215) and (GetBValue(Pixel) < 40),
+              Format('card themes: a themed card''s submenu window drawn in its theme (%.6x)', [Pixel]));
+          finally
+            Pic.Free;
+          end;
+        finally
+          Sub.Free;
+        end;
+      finally
+        L.Free;
+      end;
+    finally
+      DexmenuSetTheme(0);
+      P.Free;
+      Top.Free;
+      DestroyMenu(Menu);
+    end;
+  finally
+    SetLayoutThemes('', '');
+    TDirectory.Delete(Data, True);
+    SetEnvironmentVariable('DEXMENU_DATA', nil);
+  end;
 end;
 
 // Cards holding content (docs/plans/executed/11-PLAN-cards-hold-content.md): format 2; holders in a row and a column, with
@@ -2897,6 +3045,7 @@ begin
   TestSearch;
   TestThemes;
   TestLayoutThemes;
+  TestCardThemes;
   TestSubmenuModes;
   TestSeen;
   TestLinesAndCards;

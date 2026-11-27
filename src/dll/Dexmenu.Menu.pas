@@ -612,6 +612,11 @@ begin
     ReadAgain(V.Node);
     FindEmpty(V.Node.Children);
     L.View := FPlacement.SubmenuLevel(V.Node);
+    // in its opener's theme: the opener's card's, else the level it opens from (plan 15 3.3)
+    if V.Card <> nil then
+      L.View.ThemeCard := V.Card
+    else
+      L.View.ThemeCard := FLevels[LevelIndex].View.ThemeCard;
   end;
   Mode := SubmenuModeOf(V, FSettings);
   L.Replaces := Mode = smReplace;
@@ -1064,6 +1069,10 @@ begin
             ReadAgain(Found.Node);
             FindEmpty(Found.Node.Children);
             L.View := NewPlacement.SubmenuLevel(Found.Node);
+            if Found.Card <> nil then
+              L.View.ThemeCard := Found.Card   // in its opener's theme (plan 15 3.3)
+            else
+              L.View.ThemeCard := Parent.View.ThemeCard;
           end;
           if L.Replaces then
             AddBackLine(L.View, Found);

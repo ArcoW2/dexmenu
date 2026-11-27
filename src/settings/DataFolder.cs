@@ -85,9 +85,6 @@ static class DataFolder
             // the menu's size (1 as drawn; Ctrl+scroll in the menu sets it too)
             ["textSize"] = m?["textSize"] is System.Text.Json.Nodes.JsonValue t && t.TryGetValue<double>(out var size)
                 ? Math.Clamp(Math.Round(size, 1), 0.6, 2.5) : 1.0,
-            // the menu's themes for Windows' light and dark mode (plan 03 3.3)
-            ["themeLight"] = m?["themeLight"]?.GetValue<string>() is { Length: > 0 } light ? light : "light",
-            ["themeDark"] = m?["themeDark"]?.GetValue<string>() is { Length: > 0 } dark ? dark : "dark",
             ["submenuMark"] = m?["submenuMark"]?.GetValue<string>() ?? "",
             ["actionMark"] = m?["actionMark"]?.GetValue<string>() ?? "",
             ["states"] = m?["states"]?.GetValue<string>() is "enabled" or "disabled" ? m!["states"]!.GetValue<string>() : "both",
@@ -121,6 +118,40 @@ static class DataFolder
         var m = Menu();
         m[name] = value;
         s["menu"] = m;
+        WriteSettings(s);
+    }
+
+    /// <summary>Once (docs/plans/15-PLAN-card-themes.md 3.5): a theme still chosen in General (settings.json "menu"
+    /// "themeLight", "themeDark", other than the built-in "light" and "dark") is written onto the main card of every
+    /// layout in the layouts folder whose main card sets none of its own, and the keys leave settings.json. The menu
+    /// looks as before; the theme is the layout's from then on.</summary>
+    public static void MoveThemesToLayouts()
+    {
+        var s = ReadSettings();
+        if (s["menu"] is not System.Text.Json.Nodes.JsonObject m || (m["themeLight"] is null && m["themeDark"] is null)) return;
+        string? Named(string key, string builtIn) =>
+            m[key] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<string>(out var n) && n.Length > 0 && n != builtIn ? n : null;
+        var light = Named("themeLight", "light");
+        var dark = Named("themeDark", "dark");
+        var folder = Path.Combine(Root, "layouts");
+        if ((light is not null || dark is not null) && Directory.Exists(folder))
+            foreach (var file in Directory.GetFiles(folder, "*.json"))
+                try
+                {
+                    if (System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file), documentOptions: new JsonDocumentOptions
+                        { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) is not System.Text.Json.Nodes.JsonObject layout
+                        || layout["menu"] is not System.Text.Json.Nodes.JsonObject menu)
+                        continue;
+                    var changed = false;
+                    if (light is not null && menu["themeLight"] is null) { menu["themeLight"] = light; changed = true; }
+                    if (dark is not null && menu["themeDark"] is null) { menu["themeDark"] = dark; changed = true; }
+                    if (changed)
+                        File.WriteAllText(file, layout.ToJsonString(new JsonSerializerOptions
+                            { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + Environment.NewLine);
+                }
+                catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { }
+        m.Remove("themeLight");
+        m.Remove("themeDark");
         WriteSettings(s);
     }
 

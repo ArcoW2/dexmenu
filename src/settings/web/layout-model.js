@@ -701,7 +701,8 @@ const LayoutModel = (() => {
   // colour, border, radius, 3D border, shadow, the hover and pressed look, a note's font) and how it sits and opens
   // (height, square, wrap, fit in line, extra text at, submenus open). Not its name, texts, icon, rules or what it holds.
   const styleKeys = ["background", "foreground", "border", "borderWidth", "radius", "border3d", "dividerTop", "dividerBottom",
-    "shadow", "font", "hover", "pressed", "disabled", "height", "square", "wrap", "cardFit", "extraAt", "submenus"];
+    "shadow", "font", "hover", "pressed", "disabled", "height", "square", "wrap", "cardFit", "extraAt", "submenus",
+    "themeLight", "themeDark"];
   function styleOf(card) {
     const style = {};
     for (const k of styleKeys) if (card[k] !== undefined) style[k] = JSON.parse(JSON.stringify(card[k]));

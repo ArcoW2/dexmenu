@@ -60,6 +60,19 @@ static class Native
     }
 
     [DllImport(Dll, CharSet = CharSet.Unicode)]
+    static extern int DexmenuThemePaletteOf(string light, string dark, StringBuilder? buffer, int chars);
+
+    /// <summary>The palette of a theme pair ("" a built-in one) for the mode the preview draws in, as ThemePalette
+    /// (docs/plans/15-PLAN-card-themes.md 3.4: the colour pickers of a card in that pair).</summary>
+    public static string ThemePaletteOf(string light, string dark)
+    {
+        var chars = DexmenuThemePaletteOf(light, dark, null, 0);
+        var buffer = new StringBuilder(chars);
+        DexmenuThemePaletteOf(light, dark, buffer, chars);
+        return buffer.ToString();
+    }
+
+    [DllImport(Dll, CharSet = CharSet.Unicode)]
     static extern int DexmenuPreviewCounts(IntPtr wnd, StringBuilder? buffer, int chars);
 
     /// <summary>The stored use counts per card of what the preview shows, as JSON { "card id": count }.</summary>

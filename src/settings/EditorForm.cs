@@ -274,7 +274,8 @@ sealed class EditorForm : Form, IThemed
     // the theme's palette for the card panel's colour pickers (plan 03 3.6), with every reload: the theme may have changed
     void PostPalette()
     {
-        try { Post(new { type = "palette", palette = System.Text.Json.Nodes.JsonNode.Parse(Native.ThemePalette()) }); }
+        // the main card's; the page then asks for the palette of the card being edited ("paletteFor", plan 15 3.4)
+        try { Post(new { type = "palette", main = true, palette = System.Text.Json.Nodes.JsonNode.Parse(Native.ThemePalette()) }); }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or System.Text.Json.JsonException) { }
         // what a rule without states of its own takes (the main window's General): the rule panel shows it
         Post(new { type = "ruleStates", states = DataFolder.Menu()["states"]?.GetValue<string>() ?? "both" });
@@ -318,7 +319,11 @@ sealed class EditorForm : Form, IThemed
                 if (!m.TryGetProperty("quiet", out _)) editedText = Str("layout");
                 Post(new { type = "preview", error = Native.SetPreview(preview, Str("layout"), SeenText(), kind) });
                 PostCounts();
-                PostPalette();   // the layout may choose its own theme: the colour pickers follow it
+                break;
+            case "paletteFor":
+                // the colour pickers in the theme of the card being edited (plan 15 3.4)
+                try { Post(new { type = "palette", palette = System.Text.Json.Nodes.JsonNode.Parse(Native.ThemePaletteOf(Str("light"), Str("dark"))) }); }
+                catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or System.Text.Json.JsonException) { }
                 break;
             case "save":
                 Save(Str("name"), Str("layout"));

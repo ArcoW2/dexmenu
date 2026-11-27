@@ -118,6 +118,9 @@ type
     // the top level: the layout's menu card (plan 11 3.9), whose style the menu window is drawn in (not owned); a
     // card's submenu: its "submenuStyle" (nil none: the theme's menu); nil for Windows' own submenus
     MenuCard: TCard;
+    // the card whose theme the level is drawn in (docs/plans/15-PLAN-card-themes.md 3.3): a card's submenu that
+    // card, a Windows submenu its opener's (set by the menu and the preview); nil the top: the main card's
+    ThemeCard: TCard;
     constructor Create;
     destructor Destroy; override;
     function CardCount: Integer;
@@ -1847,6 +1850,7 @@ function TPlacement.MenuLevel(Card: TCard): TViewLevel;
 begin
   Result := PlaceLines(Self, Card.Menu);
   Result.MenuCard := Card.SubmenuStyle;   // its submenu's own style over the theme's menu, as the menu card's
+  Result.ThemeCard := Card;               // and in its theme (plan 15 3.3)
 end;
 
 function TPlacement.LevelOf(V: TViewCard): TViewLevel;
@@ -1878,6 +1882,7 @@ begin
     Cards.Free;
   end;
   Result.MenuCard := V.Card.SubmenuStyle;   // the submenu of its found items, or a "More": its card's submenu style
+  Result.ThemeCard := V.Card;                // and in its theme (plan 15 3.3)
 end;
 
 function TPlacement.SubmenuLevel(Node: TNode): TViewLevel;

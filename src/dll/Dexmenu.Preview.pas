@@ -313,6 +313,11 @@ begin
   begin
     ReadChildren(V.Node);
     L.View := Placement.SubmenuLevel(V.Node);
+    // in its opener's theme: the opener's card's, else the level it opens from (plan 15 3.3)
+    if V.Card <> nil then
+      L.View.ThemeCard := V.Card
+    else
+      L.View.ThemeCard := Parent.View.ThemeCard;
   end;
   // as at a right-click (Dexmenu.Menu): next to its card, under it, or in place of the menu
   Mode := SubmenuModeOf(V, Settings);

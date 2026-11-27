@@ -1,8 +1,9 @@
 # Plan 15: A theme per card
 
-Status: not started; see Status.
+Status: partly executed; see Status.
 
 - 2026-11-24: draft.
+- 2026-11-27: partly executed: everything but the check by hand.
 
 Builds on plan 03 (`03-PLAN-menu-look.md` 3.2, 3.3: themes, the light and dark pair) and the card panel of the
 layout editor (`executed/13-PLAN-card-panel-tabs.md`).
@@ -27,17 +28,18 @@ fields leave General; a choice made there is copied once onto the main card of t
 
 | Part | What | Reference |
 |---|---|---|
+| Layout | `themeLight`, `themeDark` on a card; read, kept, the inherited pair resolved per card | 3.1; 6 |
+| Themes loaded | any number of themes in memory, by name, each read again when its files change | 3.2; 6 |
+| Drawing | every card, holder, note and divider drawn in its own card's theme; a level in its opener's | 3.3; 6 |
+| Editor | a Theme field (light, dark) on the card panel; the colour pickers with the focused card's palette | 3.4; 6 |
+| General | the two theme fields gone; the old choice copied onto the main cards once | 3.5; 6 |
+| Tests | 3.6 | 3.6; 6 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Layout | `themeLight`, `themeDark` on a card; read, kept, the inherited pair resolved per card | -- | 3.1 |
-| Themes loaded | any number of themes in memory, by name, each read again when its files change | -- | 3.2 |
-| Drawing | every card, holder, note and divider drawn in its own card's theme; a level in its opener's | Layout; Themes loaded | 3.3 |
-| Editor | a Theme field (light, dark) on the card panel; the colour pickers with the focused card's palette | Layout | 3.4 |
-| General | the two theme fields gone; the old choice copied onto the main cards once | Layout | 3.5 |
-| Tests | 3.6 | -- | 3.6 |
+| By hand | the user's layouts after the move from General, a card in a theme of its own at a right-click | the user | 3.6 |
 
 ## 3. Details
 
@@ -105,3 +107,32 @@ built-in ones stay in the DLL. A menu with a few themes reads each once.
 ## 4. Open questions
 
 None.
+
+## 6. As built
+
+- Dexmenu.Layout: `TCard.ThemeLight`, `ThemeDark` on every card (and the main card); `MenuSettings` no longer reads
+  the theme from settings.json (its fields keep the built-in names).
+- Dexmenu.Theme: themes kept by name and mode (`ThemeByName`), each read again when its file's time changes; the
+  built-in one for a name that cannot be read, logged. `SetLayoutThemes` holds the main card's pair (set by the menu
+  and the preview from their layout); `CurrentTheme` is the main card's theme, `CardTheme` walks a card's parents to
+  the top (a top card's parent being the main card). `ThemePaletteOf` and the export `DexmenuThemePaletteOf` give a
+  pair's palette for the mode the preview draws in.
+- Dexmenu.Place and Dexmenu.Draw: `TViewLevel.ThemeCard` (a card's submenu: that card; a Windows submenu: its
+  opener's card, else the level it opens from, set by Dexmenu.Menu and Dexmenu.Preview); the level's theme draws its
+  window, background, border, radius, see-through test and shadow, and gives the gaps (Measure holds it for Gaps).
+  Each box is drawn in its layout card's theme, a box without one (a divider, Windows' items) in that of the card
+  holding cards around it, else the level's; the brushes are made again only when the theme changes from one box to
+  the next. The preview's outline is in the marked card's theme.
+- Editor: a Theme field (when Windows is light, when dark; "(the parent's)", on the main card "(built-in)") in a card's
+  Style and the menu's; the page works out the edited card's pair (its own, its parents', the main card's) and asks
+  the app for that palette ("paletteFor") whenever the pair changes, also after a reload and a light/dark switch; the
+  pair is part of a card's style (copy and paste style).
+- General: the two fields gone from the main window and the app; `DataFolder.MoveThemesToLayouts` runs at the app's
+  start: a non-built-in General theme written onto each layout's main card that sets none (the rest of the file as it
+  was, its text kept unescaped), the keys removed from settings.json.
+- Tested: unit tests (TestCardThemes: the pair through the parents, one half inherited, the main card's, the built-in
+  one for a half set nowhere and for a name that cannot be read, a template's found cards in their card's theme; two
+  themes kept, one changed on disk read again, the other kept; drawn: a card in its own theme in a menu of another,
+  the menu in the main card's, a themed card's submenu window in its theme), the theme tests now naming the theme on
+  the main card; the files self-test (the move from General, a main card's own theme kept, settings.json without the
+  keys, a second start changing nothing); the editor's self-test (copy and paste style carry the pair).

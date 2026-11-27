@@ -29,7 +29,7 @@ static class Program
         // the shipped layouts each written once (plan 02 3.10); first start: the kinds setting, every other kind on
         // "Default A" (plan 05 3.1, 3.2); the user's layouts untouched
         if (!args.Contains("--live") && !args.Contains("--selftest") && Environment.GetEnvironmentVariable("DEXMENU_LAYOUT_FILE") is not { Length: > 0 })
-            try { ShippedLayouts.Ensure(); DataFolder.EnsureKinds(); }
+            try { ShippedLayouts.Ensure(); DataFolder.EnsureKinds(); DataFolder.MoveThemesToLayouts(); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         if (args.Length >= 4 && args[0] == "--live")
         {

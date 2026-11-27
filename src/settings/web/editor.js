@@ -1362,18 +1362,8 @@ function renderCardPane() {
     const wayRow = el("label", "field");
     wayRow.title = "How submenus open in this layout, unless a card says otherwise";
     wayRow.append(el("span", "", "Submenus open"), way);
-    // this layout's own themes for Windows' light and dark mode, over the general ones (the main window); its
-    // submenus too
-    const themeRow = (key, label) => {
-      const names = [...themeNames];
-      if (root[key] && !names.includes(root[key])) names.push(root[key]);   // one not (or no longer) there: kept, shown
-      return selectRow(label, [["", "as set for every menu (General)"], ...names.map(n => [n, n])], root[key] || "",
-        v => { if (v) root[key] = v; else delete root[key]; changed(); },
-        "The theme this layout's menu and its submenus are drawn in, in Windows' " + (key === "themeDark" ? "dark" : "light") + " mode");
-    };
     $("card").replaceChildren(el("div", "hint", "The menu itself, holding every card of the layout. It is not moved, copied or deleted."),
-      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: [themeRow("themeLight", "Theme (light)"),
-        themeRow("themeDark", "Theme (dark)"), ...lookFields(root), ...(root.background === "none" ? [el("div", "hint", "No background: the menu is see-through, only its cards, dividers and rows drawn; each card on an opaque base (a card cannot be see-through then).")] : [])] }));
+      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: [...themeFields(root, true), ...lookFields(root), ...(root.background === "none" ? [el("div", "hint", "No background: the menu is see-through, only its cards, dividers and rows drawn; each card on an opaque base (a card cannot be see-through then).")] : [])] }));
     return;
   }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
@@ -1592,7 +1582,7 @@ function cardGroups(card) {
   // Layout and Style: not the remaining card's (its items each take a line of their own, in their own look)
   if (!rest) {
     g.layout = sizeFields(card);
-    g.style = lookFields(card);
+    g.style = [...themeFields(card, false), ...lookFields(card)];
   }
   return g;
 }
@@ -2026,6 +2016,48 @@ function render() {
   placeToggles();
   renderCardPane();
   renderRules();
+  askPalette();
+}
+
+// The theme pair a card (or the menu, a template's or a Menustyle's card) is drawn in (plan 15 3.1): its own halves,
+// else its parents', up to the main card's ("" the built-in one).
+function themePairOf(id) {
+  const base = (id || "").replace(/~t\d+$|~m$/, "");
+  let light = "", dark = "";
+  let card = base && base !== "menu" ? (M.find(linesOf(), base) || {}).card : null;
+  while (card && (!light || !dark)) {
+    if (!light && card.themeLight) light = card.themeLight;
+    if (!dark && card.themeDark) dark = card.themeDark;
+    card = (M.find(linesOf(), card.id) || {}).parent || null;
+  }
+  return { light: light || layout.menu.themeLight || "", dark: dark || layout.menu.themeDark || "" };
+}
+
+// The colour pickers in the palette of the edited card's theme (plan 15 3.4): asked again when that pair changes.
+let paletteAskedFor = "";
+function askPalette() {
+  if (!layout) return;
+  const pair = themePairOf(selectedId);
+  const key = pair.light + "|" + pair.dark;
+  if (key === paletteAskedFor) return;
+  paletteAskedFor = key;
+  post({ type: "paletteFor", light: pair.light, dark: pair.dark });
+}
+
+// A card's theme pair (plan 15 3.4): "when Windows is light" and "when dark", each a theme or none: its parent's (the
+// main card: the built-in one); a theme set that is not (or no longer) there is kept and shown.
+function themeFields(target, isMain) {
+  const none = isMain ? "(built-in)" : "(the parent's)";
+  const row = (key, label) => {
+    const names = [...themeNames];
+    if (target[key] && !names.includes(target[key])) names.push(target[key]);
+    return selectRow(label, [["", none], ...names.map(n => [n, n])], target[key] || "",
+      v => { if (v) target[key] = v; else delete target[key]; changed(); },
+      "The theme it and everything in it are drawn in, its submenus too, in Windows' " + (key === "themeDark" ? "dark" : "light") + " mode");
+  };
+  const head = el("label", "field");
+  head.append(el("span", "", "Theme"), el("span"));
+  return asTree([head, row("themeLight", "when Windows is light"), row("themeDark", "when dark")]);
 }
 
 // The fold toggles in the gutter, each level with its card's title; placed again whenever the cards move (a render,
@@ -2420,7 +2452,6 @@ chrome.webview.addEventListener("message", e => {
   const m = e.data;
   if (m.type === "state") load(m);
   else if (m.type === "previewBar") showPreviewBar(m);
-  else if (m.type === "theme") Theme.show(m.theme);
   else if (m.type === "problem") { $("error").hidden = false; $("error").textContent = m.text; }
   else if (m.type === "preview") { $("error").hidden = !m.error; $("error").textContent = m.error || ""; }
   else if (m.type === "placed" && m.cardId) {
@@ -2435,7 +2466,9 @@ chrome.webview.addEventListener("message", e => {
     const next = Array.isArray(m.names) ? m.names : [];
     if (JSON.stringify(next) !== JSON.stringify(themeNames)) { themeNames = next; if (selectedId === "menu") renderCardPane(); }
   }
+  else if (m.type === "theme") { Theme.show(m.theme); paletteAskedFor = ""; askPalette(); }
   else if (m.type === "palette") {
+    if (m.main) { paletteAskedFor = ""; askPalette(); }   // the main card's after a reload: the edited card's asked for
     const next = m.palette || {};
     if (JSON.stringify(next) !== JSON.stringify(palette)) { palette = next; renderCardPane(); }
   }

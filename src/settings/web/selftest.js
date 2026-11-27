@@ -327,6 +327,14 @@
     const styled = M.paste(withMenu, withMenu.menu.content, M.clip("style", { background: "#102030", radius: 6 }), null, withMenu.menu);
     check(styled === withMenu.menu && withMenu.menu.background === "#102030" && withMenu.menu.radius === 6 &&
       Array.isArray(withMenu.menu.content) && withMenu.menu.content.length === 1, "a style pasted onto the menu: its look, its cards kept");
+    // plan 15 3.4: a card's theme pair is part of its style
+    const themed = M.styleOf({ card: "T", themeLight: "light-sky", themeDark: "dark-ocean", rules: [] });
+    const onto = { card: "U", themeDark: "dark", rules: [] };
+    M.applyStyle(onto, themed);
+    check(themed.themeLight === "light-sky" && onto.themeLight === "light-sky" && onto.themeDark === "dark-ocean",
+      "copy and paste style carry the theme pair");
+    M.applyStyle(onto, M.styleOf({ card: "V", rules: [] }));
+    check(onto.themeLight === undefined && onto.themeDark === undefined, "a style without a theme: the card back to its parent's");
     check(M.useless({ card: "U", rules: [ { used: "most", rank: 0 } ] }) && !M.useless({ card: "U", rules: [ { used: "most", rank: "3-1" } ] }),
       "a card with a wrong rank outlined red, with a reversed range not");
   }

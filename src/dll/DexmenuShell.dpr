@@ -37,7 +37,8 @@ exports
   DexmenuPreviewCounts,
   DexmenuSeenOfMenu,
   DexmenuSetTheme,
-  DexmenuThemePalette;
+  DexmenuThemePalette,
+  DexmenuThemePaletteOf;
 
 begin
 end.

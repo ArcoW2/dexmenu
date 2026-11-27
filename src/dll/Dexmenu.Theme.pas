@@ -11,7 +11,7 @@ unit Dexmenu.Theme;
 interface
 
 uses
-  System.SysUtils, System.JSON;
+  System.SysUtils, System.JSON, Dexmenu.Layout;
 
 type
   TRGBA = record
@@ -53,13 +53,20 @@ function ParseColor(const Text: string; out Color: TRGBA): Boolean;
 function RGBA(R, G, B: Byte; A: Single = 1): TRGBA;
 // The intensity mix (plan 03 3.2): 0 Base, 100 Color, 200 Base inverted; per channel in sRGB; Color's alpha kept.
 function Intensity(const Base, Color: TRGBA; Value: Single): TRGBA;
-// The theme for light or dark, as the global settings name it (menu.themeLight, menu.themeDark; else "light" and
-// "dark"), from %APPDATA%\Dexmenu\themes, then the DLL's themes folder, then the built-in ones. Read again when its
-// files change. The caller does not free it.
+// The theme for light or dark of the layout's main card (SetLayoutThemes; else the built-in "light" and "dark"), from
+// %APPDATA%\Dexmenu\themes, then the DLL's themes folder, then the built-in ones. Read again when its files change.
+// The caller does not free it.
 function CurrentTheme(Dark: Boolean): TTheme;
-// The layout's own themes for light and dark mode (its menu's "themeLight", "themeDark"), over the global settings'
-// for what is drawn next; '' the global one. Set by the menu and the preview from the layout they show.
+// The layout's main card's themes for light and dark ("themeLight", "themeDark"; '' the built-in one) for what is
+// drawn next: the theme of a card that sets none up to the top. Set by the menu and the preview from their layout.
 procedure SetLayoutThemes(const Light, Dark: string);
+// The theme a card draws in (docs/plans/15-PLAN-card-themes.md 3.1): its own half for the mode, else its parent's,
+// up to the main card's (SetLayoutThemes), else the built-in one; a name that cannot be read: the built-in one. The
+// caller does not free it.
+function CardTheme(Card: TCard; Dark: Boolean): TTheme;
+// A theme pair's palette for the mode (the editor's colour pickers for a card in that pair, plan 15 3.4); '' a
+// built-in one.
+function ThemePaletteOf(const Light, Dark: string; IsDark: Boolean): string;
 // A theme from its text and those of its bases (Lookup gives a base theme's text by name); for the tests.
 function ThemeFromText(const Text: string; Lookup: TFunc<string, string>; out Error: string): TTheme;
 // The built-in themes' names.
@@ -71,7 +78,7 @@ implementation
 
 uses
   Winapi.Windows, System.Math, System.Generics.Collections, System.SyncObjs, System.IOUtils,
-  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout;
+  Dexmenu.Json, Dexmenu.Log;
 
 const
   // The built-in themes: everything the engine draws today, in Windows 11's colours.
@@ -576,8 +583,10 @@ end;
 
 var
   Lock: TCriticalSection;
-  Loaded: array[Boolean] of TTheme;
-  LoadedStamp: array[Boolean] of string;
+  // every theme read so far, by name (lower case) and mode, with what its files were then (Stamp): read again when
+  // they change
+  Loaded: TObjectDictionary<string, TTheme>;
+  LoadedStamp: TDictionary<string, string>;
   LayoutThemes: array[Boolean] of string;   // SetLayoutThemes; '' none
 
 procedure SetLayoutThemes(const Light, Dark: string);
@@ -591,50 +600,96 @@ begin
   end;
 end;
 
-function CurrentTheme(Dark: Boolean): TTheme;
+// A theme by name for light or dark mode (Dark: which built-in one stands in when it cannot be read), kept once read
+// and read again when its files change (plan 15 3.2). Called with Lock held.
+function ThemeByName(Name: string; Dark: Boolean): TTheme;
 var
-  Name, Error, S: string;
+  Key, Error, S: string;
   Theme: TTheme;
   Lookup: TFunc<string, string>;
 begin
+  if Name = '' then
+    if Dark then
+      Name := BuiltInDark
+    else
+      Name := BuiltInLight;
+  Key := AnsiLowerCase(Name) + '|' + BoolToStr(Dark, True);
+  S := Stamp(Name);
+  if Loaded.TryGetValue(Key, Result) and (LoadedStamp[Key] = S) then
+    Exit;
   Lookup := function(Base: string): string
     begin
       Result := ThemeText(Base);
     end;
+  Theme := nil;
+  Error := '';
+  try
+    Theme := ThemeFromText(ThemeText(Name), Lookup, Error);
+  except
+    on E: Exception do
+      Error := E.Message;
+  end;
+  if (Theme = nil) or (ThemeText(Name) = '') then
+  begin
+    if Error = '' then
+      Error := 'not there';
+    Log('theme "' + Name + '" not read: ' + Error + '; the built-in one used');
+    FreeAndNil(Theme);
+    if Dark then
+      Theme := ThemeFromText(DarkText, Lookup, Error)
+    else
+      Theme := ThemeFromText(LightText, Lookup, Error);
+  end;
+  Loaded.AddOrSetValue(Key, Theme);   // the one read before freed (the dictionary owns them)
+  LoadedStamp.AddOrSetValue(Key, S);
+  Result := Theme;
+end;
+
+function CurrentTheme(Dark: Boolean): TTheme;
+begin
   Lock.Enter;
   try
-    // the layout's own, else the global settings'
-    Name := LayoutThemes[Dark];
-    if Name = '' then
-      if Dark then
-        Name := MenuSettings.ThemeDark
-      else
-        Name := MenuSettings.ThemeLight;
-    S := Stamp(Name);
-    if (Loaded[Dark] <> nil) and (LoadedStamp[Dark] = S) then
-      Exit(Loaded[Dark]);
-    Theme := nil;
-    try
-      Theme := ThemeFromText(ThemeText(Name), Lookup, Error);
-    except
-      on E: Exception do
-        Error := E.Message;
-    end;
-    if (Theme = nil) or (ThemeText(Name) = '') then
-    begin
-      if Error = '' then
-        Error := 'not there';
-      Log('theme "' + Name + '" not read: ' + Error + '; the built-in one used');
-      FreeAndNil(Theme);
-      if Dark then
-        Theme := ThemeFromText(DarkText, Lookup, Error)
-      else
-        Theme := ThemeFromText(LightText, Lookup, Error);
-    end;
-    Loaded[Dark].Free;
-    Loaded[Dark] := Theme;
-    LoadedStamp[Dark] := S;
-    Result := Theme;
+    // the layout's main card's (SetLayoutThemes), else the built-in one
+    Result := ThemeByName(LayoutThemes[Dark], Dark);
+  finally
+    Lock.Leave;
+  end;
+end;
+
+function CardTheme(Card: TCard; Dark: Boolean): TTheme;
+var
+  C: TCard;
+  Name: string;
+begin
+  // its own half, else its parents' up to the top; a top card's parent is the main card (SetLayoutThemes)
+  Name := '';
+  C := Card;
+  while (C <> nil) and (Name = '') do
+  begin
+    if Dark then
+      Name := C.ThemeDark
+    else
+      Name := C.ThemeLight;
+    C := C.Parent;
+  end;
+  if Name = '' then
+    Exit(CurrentTheme(Dark));
+  Lock.Enter;
+  try
+    Result := ThemeByName(Name, Dark);
+  finally
+    Lock.Leave;
+  end;
+end;
+
+function ThemePaletteOf(const Light, Dark: string; IsDark: Boolean): string;
+begin
+  Lock.Enter;
+  try
+    if IsDark then
+      Result := ThemeByName(Dark, True).PaletteText
+    else
+      Result := ThemeByName(Light, False).PaletteText;
   finally
     Lock.Leave;
   end;
@@ -642,10 +697,12 @@ end;
 
 initialization
   Lock := TCriticalSection.Create;
+  Loaded := TObjectDictionary<string, TTheme>.Create([doOwnsValues]);
+  LoadedStamp := TDictionary<string, string>.Create;
 
 finalization
-  Loaded[False].Free;
-  Loaded[True].Free;
+  Loaded.Free;
+  LoadedStamp.Free;
   Lock.Free;
 
 end.

@@ -143,7 +143,7 @@ $("submenus").addEventListener("change", () => post({ type: "setMenu", name: "su
 for (const id of ["onClickOnly"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).checked }));
 $("textSize").addEventListener("change", () => post({ type: "setMenu", name: "textSize", value: (+$("textSize").value || 100) / 100 }));
-for (const id of ["submenuMark", "actionMark", "states", "themeLight", "themeDark"])
+for (const id of ["submenuMark", "actionMark", "states"])
   $(id).addEventListener("change", () => post({ type: "setMenu", name: id, value: $(id).value }));
 $("widths").addEventListener("change", () => post({ type: "setMenu", name: "widths",
   value: [...$("widths").querySelectorAll("tr")].slice(1).map(tr => {
@@ -526,11 +526,6 @@ chrome.webview.addEventListener("message", e => {
     $("onClickOnly").checked = m.menu.onClickOnly;
     for (const id of ["submenuMark", "actionMark"]) if (document.activeElement !== $(id)) $(id).value = m.menu[id];
     $("states").value = m.menu.states;
-    for (const id of ["themeLight", "themeDark"]) {
-      const sel = $(id);
-      sel.replaceChildren(...m.themes.map(n => { const o = document.createElement("option"); o.value = o.textContent = n; return o; }));
-      sel.value = m.menu[id];
-    }
     if (document.activeElement !== $("textSize")) $("textSize").value = Math.round(m.menu.textSize * 100);
     const rows = [...$("widths").querySelectorAll("tr")].slice(1);
     rows.forEach((tr, i) => {

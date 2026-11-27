@@ -325,10 +325,7 @@ None.
   submenu but LexPen's. Checkbox "exclude" in the rule's Options; drawn reddish with a red handle, "exclude:" in the
   rules view. A card with only exclude rules finds nothing (outlined red). Tested: unit tests (without, with, only
   its own card, only the rules after it, by use invalid); the editor's self-test.
-- A layout's own themes (`"themeLight"`, `"themeDark"` on its menu): its menu and its submenus drawn in them in
-  Windows' light and dark mode, over the global settings' (Dexmenu.Theme.SetLayoutThemes, set by the menu and the
-  preview from the layout they show). Editor: Theme (light) and Theme (dark) in the menu's Style (the app sends
-  the theme names; the palette follows each edit). Tested: unit test (read; used while set; the global one again).
+- A theme per card, the main card's for the whole menu: see plan 15 (`15-PLAN-card-themes.md`).
 - A card's Menustyle (`"submenuStyle": { ... }` on a card opening a submenu: its held cards, its found items, a
   "More"): the submenu drawn in it over the theme's menu, as the menu in the menu card's style (background, also
   none for see-through; border; radius; shadow). Editor: a dashed "Menustyle" item inside such a card, as a
