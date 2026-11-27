@@ -241,6 +241,17 @@ function renderMenuCard() {
   head.append(el("span", "name", "Menu"), el("span", "what", " the layout's menu: its cards " + how + (root.submenus ? ", submenus " + root.submenus : "")));
   head.title = "The menu itself: how its cards show, its submenus' default and its style";
   head.addEventListener("click", e => { e.stopPropagation(); select("menu", -1); });
+  // its right-click menu: its style copied, or a copied style pasted onto it (Ctrl+Shift+C / Ctrl+Shift+V as well)
+  head.addEventListener("contextmenu", async e => {
+    e.preventDefault();
+    e.stopPropagation();
+    select("menu", -1);
+    const x = e.clientX, y = e.clientY;
+    const type = await clipboardType();
+    showContextMenu(x, y, [
+      ["Copy style", "Its background, text colour, border, radius, shadow, hover look and submenus open (Ctrl+Shift+C)", copyStyle, false],
+      ["Paste style", "The copied style onto the menu: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style"]]);
+  });
   frame.append(head, renderLines(linesOf(), null));
   return frame;
 }
@@ -1715,6 +1726,8 @@ function extraAtField(card) {
 
 // The selected card (not the remaining card, which has no style of its own), or null.
 function styledCard() {
+  // the menu selected: the menu card itself (its style over the theme's menu)
+  if (selectedId === "menu") return layout ? layout.menu : null;
   // a template selected (plan 11): the template itself, not its card
   const tm = /^(.*)~t(\d+)$/.exec(selectedId || "");
   if (tm) {

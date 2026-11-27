@@ -315,6 +315,10 @@
     const own = { name: { contains: "a" }, order: "name", descending: true };
     M.setRuleType(own, "editMenu");
     check(own.order === undefined && own.descending === undefined, "to Edit Dexmenu: order taken out");
+    const withMenu = { format: 2, menu: { content: [ { id: "z", card: "Rest", rules: [ "remaining" ] } ] } };
+    const styled = M.paste(withMenu, withMenu.menu.content, M.clip("style", { background: "#102030", radius: 6 }), null, withMenu.menu);
+    check(styled === withMenu.menu && withMenu.menu.background === "#102030" && withMenu.menu.radius === 6 &&
+      Array.isArray(withMenu.menu.content) && withMenu.menu.content.length === 1, "a style pasted onto the menu: its look, its cards kept");
     check(M.useless({ card: "U", rules: [ { used: "most", rank: 0 } ] }) && !M.useless({ card: "U", rules: [ { used: "most", rank: "3-1" } ] }),
       "a card with a wrong rank outlined red, with a reversed range not");
   }
