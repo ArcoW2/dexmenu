@@ -447,7 +447,8 @@ None.
 - The DLL gives the palette of the theme the preview draws with (`DexmenuThemePalette`: `{ "<name>": "#rrggbbaa" }`,
   each palette colour resolved, `basecolor` among them); the settings app posts it to the editor with every reload,
   so a theme switched in the main window or the editor shows in the pickers.
-- A colour field starts with its kind: a colour, a gradient (Background and Hover background only), other (JSON).
+- A colour field starts with its kind: a colour, a gradient (Background and Hover background only); a value these
+  cannot show (a gradient of more colours) as written (JSON), a kind offered only for such a value.
   A gradient of two colours reads as From and To (`fillState`, `fillValue`); one of more colours, or with the theme's
   adjusted colour as a stop (the DLL resolves a stop as a colour only), stays JSON. Its angle is a typed number.
 - A picker per colour (the field's own, or From and To): a swatch (over a checkerboard, so the opacity shows; not for the theme's colour, which
