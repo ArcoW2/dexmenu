@@ -88,7 +88,14 @@ function el(tag, cls, text) {
 // The menu being edited: a layout is one menu (plan 05 3.1), whatever kind of right-click the preview shows.
 function linesOf() { return M.rootOf(layout); }
 
+// A submenu style with nothing set left out (its fields write into it as they are changed).
+function dropEmptyStyles() {
+  if (layout) for (const at of M.cards(linesOf()))
+    if (at.card.submenuStyle && !Object.keys(at.card.submenuStyle).length) delete at.card.submenuStyle;
+}
+
 function changed() {
+  dropEmptyStyles();
   dirty = true;
   $("dirty").hidden = false;
   const text = JSON.stringify(layout, null, 2);
@@ -117,7 +124,7 @@ function restore(text) {
   dirty = true;
   $("dirty").hidden = false;
   post({ type: "edit", layout: text });
-  if (selectedId && !M.find(linesOf(), selectedId.replace(/~t\d+$/, ""))) selectedId = null;
+  if (selectedId && !M.find(linesOf(), selectedId.replace(/~t\d+$|~m$/, ""))) selectedId = null;
   render();
 }
 
@@ -295,6 +302,38 @@ function usesTemplates(card) {
   return !M.isHolder(card) && !M.isNote(card) && !M.isRemaining(card) && ["row", "column", "submenu"].includes(card.show);
 }
 
+// A card opening a submenu: its "Menustyle" as a dashed item inside it, as a template is: the style of the submenu it
+// opens ("submenuStyle"), as the menu's style is the menu's. Selected by "<card id>~m"; "x" takes the style away.
+function renderMenustyle(card) {
+  const box = el("div", "templates");
+  const id = card.id + "~m";
+  const chip = el("div", "template-card" + (selectedId === id ? " selected" : ""), "Menustyle");
+  chip.title = "The style of the submenu this card opens: its background (none: see-through), border, radius and shadow";
+  if (card.submenuStyle && Object.keys(card.submenuStyle).length) {
+    const x = el("button", "", "x");
+    x.title = "Take its style away: the submenu in the theme's look again";
+    x.addEventListener("click", e => {
+      e.stopPropagation();
+      delete card.submenuStyle;
+      changed();
+    });
+    chip.append(x);
+  }
+  chip.addEventListener("click", e => { e.stopPropagation(); select(id, -1); });
+  chip.addEventListener("contextmenu", async e => {
+    e.preventDefault();
+    e.stopPropagation();
+    select(id, -1);
+    const x = e.clientX, y = e.clientY;
+    const type = await clipboardType();
+    showContextMenu(x, y, [
+      ["Copy style", "The submenu's background, border, radius and shadow (Ctrl+Shift+C)", copyStyle],
+      ["Paste style", "The copied style onto the submenu: what the style does not set, the theme's again (Ctrl+Shift+V)", () => pasteStyle(), type !== "style"]]);
+  });
+  box.append(chip);
+  return box;
+}
+
 // Its templates as dashed cards inside it ("Template 1", ...), selected and edited as a card; "+ Template" adds one,
 // "x" on one removes it. Selected by "<card id>~t<n>".
 function renderTemplates(card) {
@@ -364,6 +403,7 @@ function renderCard(card) {
   box.append(cardActions(card), title,
     el("div", "what", describeCard(card) + (folded ? ", " + cardsIn + (cardsIn === 1 ? " card" : " cards") + " folded" : "")));
   if (usesTemplates(card)) box.append(renderTemplates(card));
+  if (card.show === "submenu") box.append(renderMenustyle(card));
   if (M.isHolder(card) && !folded) box.append(card.show === "row" ? renderRow(card) : renderLines(card.content, card.id));
   box.addEventListener("click", e => { e.stopPropagation(); select(card.id, -1); });
   // its right-click menu: the card copied, a copied card pasted inside it (when it can hold one), its style copied, or
@@ -507,7 +547,7 @@ function select(id, ruleIndex) {
   if (ruleIndex >= 0) revealRule = true;
   selectedId = id;
   selectedRule = ruleIndex;
-  post({ type: "mark", cardId: id || "" });
+  post({ type: "mark", cardId: (id || "").replace(/~m$/, "") });   // a Menustyle: its card marked
   render();
 }
 
@@ -1281,6 +1321,16 @@ function renderCardPane() {
         " (upright between columns), wherever it stands among the cards; the first divider in the group counts."));
     return;
   }
+  // a card's Menustyle: the style of the submenu it opens, as the menu's style is the menu's
+  const ms = /^(.*)~m$/.exec(selectedId || "");
+  const menuAt = ms ? M.find(linesOf(), ms[1]) : null;
+  if (menuAt) {
+    const sub = menuAt.card.submenuStyle || (menuAt.card.submenuStyle = {});   // left out again while empty (changed)
+    $("cardHeading").textContent = "Menustyle of " + menuAt.card.card;
+    $("card").replaceChildren(el("div", "hint", "The style of the submenu this card opens, over the theme's menu, as the menu's own style is the menu's."),
+      ...lookFields(sub), ...(sub.background === "none" ? [el("div", "hint", "No background: the submenu is see-through, only its cards drawn.")] : []));
+    return;
+  }
   // a template (plan 11 3.1): its texts that apply to every item, its layout and its style
   const tm = /^(.*)~t(\d+)$/.exec(selectedId || "");
   const holderAt = tm ? M.find(linesOf(), tm[1]) : null;
@@ -1760,6 +1810,12 @@ function extraAtField(card) {
 function styledCard() {
   // the menu selected: the menu card itself (its style over the theme's menu)
   if (selectedId === "menu") return layout ? layout.menu : null;
+  // a card's Menustyle selected: the style of its submenu
+  const ms = /^(.*)~m$/.exec(selectedId || "");
+  if (ms) {
+    const at = M.find(linesOf(), ms[1]);
+    return at ? at.card.submenuStyle || (at.card.submenuStyle = {}) : null;
+  }
   // a template selected (plan 11): the template itself, not its card
   const tm = /^(.*)~t(\d+)$/.exec(selectedId || "");
   if (tm) {
@@ -2094,10 +2150,12 @@ async function askName() {
 $("save").addEventListener("click", async () => {
   let name = $("layoutName").value.trim();
   if (!name) name = await askName();
+  dropEmptyStyles();
   if (name) post({ type: "save", name, layout: JSON.stringify(layout, null, 2) });
 });
 $("saveAs").addEventListener("click", async () => {
   const name = await askName();
+  dropEmptyStyles();
   if (name) post({ type: "saveAs", name, layout: JSON.stringify(layout, null, 2) });
 });
 $("close").addEventListener("click", () => post({ type: "close" }));

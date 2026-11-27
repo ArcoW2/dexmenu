@@ -325,6 +325,12 @@ None.
   submenu but LexPen's. Checkbox "exclude" in the rule's Options; drawn reddish with a red handle, "exclude:" in the
   rules view. A card with only exclude rules finds nothing (outlined red). Tested: unit tests (without, with, only
   its own card, only the rules after it, by use invalid); the editor's self-test.
+- A card's Menustyle (`"submenuStyle": { ... }` on a card opening a submenu: its held cards, its found items, a
+  "More"): the submenu drawn in it over the theme's menu, as the menu in the menu card's style (background, also
+  none for see-through; border; radius; shadow). Editor: a dashed "Menustyle" item inside such a card, as a
+  template is, selected ("<id>~m") into a panel of the menu-style fields; copy and paste style on it; "x" takes
+  the style away; an empty one is not written. Windows' own submenus keep the theme's look. Tested: unit test (the
+  submenu of held cards and of found items carries it).
 - A divider as a spacer (`"spacer": true`): room without a line, its text (when it has one) still shown; no border,
   so it stays after a bordered group and a group's bottom divider before it is drawn. Editor: "Shown as" a line or a
   spacer; a spacer dashed in the cards view. Tested: unit test (kept after a group, the bottom divider drawn).

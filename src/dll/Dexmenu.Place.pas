@@ -115,8 +115,8 @@ type
   TViewLevel = class
   public
     Lines: TObjectList<TViewLine>;
-    // the top level: the layout's menu card (plan 11 3.9), whose style the menu window is drawn in (not owned); nil
-    // for a submenu
+    // the top level: the layout's menu card (plan 11 3.9), whose style the menu window is drawn in (not owned); a
+    // card's submenu: its "submenuStyle" (nil none: the theme's menu); nil for Windows' own submenus
     MenuCard: TCard;
     constructor Create;
     destructor Destroy; override;
@@ -1846,6 +1846,7 @@ end;
 function TPlacement.MenuLevel(Card: TCard): TViewLevel;
 begin
   Result := PlaceLines(Self, Card.Menu);
+  Result.MenuCard := Card.SubmenuStyle;   // its submenu's own style over the theme's menu, as the menu card's
 end;
 
 function TPlacement.LevelOf(V: TViewCard): TViewLevel;
@@ -1876,6 +1877,7 @@ begin
   finally
     Cards.Free;
   end;
+  Result.MenuCard := V.Card.SubmenuStyle;   // the submenu of its found items, or a "More": its card's submenu style
 end;
 
 function TPlacement.SubmenuLevel(Node: TNode): TViewLevel;

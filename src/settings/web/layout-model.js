@@ -583,7 +583,7 @@ const LayoutModel = (() => {
   // divider after a card in a plain row: after the row. Nothing selected, the menu itself or an id not found: it
   // stays where it is (the top's end). Says whether it moved.
   function putAfter(lines, id, afterId) {
-    const base = (afterId || "").replace(/~t\d+$/, "");
+    const base = (afterId || "").replace(/~t\d+$|~m$/, "");
     if (!base || base === id) return false;
     const c = find(lines, id), d = c ? null : findDivider(lines, id);
     const entry = c ? c.card : d ? d.entry : null;

@@ -2289,6 +2289,29 @@ begin
         P.Free;
       end;
     end;
+    // a card's Menustyle ("submenuStyle"): the submenu it opens drawn in it, as the menu in the menu card's style
+    L := Level('{ "card": "Sub", "show": "submenu", "submenuStyle": { "background": "#102030", "radius": 2 }, "content": [ ' +
+      Card('Cut', '{ "name": { "equals": "Cut" } }') + ' ] }, ' +
+      Card('Found', '{ "name": { "equals": "Copy" } }, { "name": { "equals": "Delete" } }', ', "show": "submenu", "submenuStyle": { "radius": 3 }'), P);
+    try
+      Sub := P.LevelOf(L.Lines[0].Cards[0]);
+      try
+        Check((Sub.MenuCard <> nil) and (Sub.MenuCard.Look <> nil) and (Sub.MenuCard.Look.GetValue('background') <> nil),
+          'a card''s Menustyle: the submenu of the cards it holds drawn in it');
+      finally
+        Sub.Free;
+      end;
+      Sub := P.LevelOf(L.Lines[1].Cards[0]);
+      try
+        Check((Sub.MenuCard <> nil) and (Sub.MenuCard.Look <> nil) and (Sub.MenuCard.Look.GetValue('radius') <> nil),
+          'a card''s Menustyle: the submenu of what its rules found drawn in it');
+      finally
+        Sub.Free;
+      end;
+    finally
+      L.Free;
+      P.Free;
+    end;
     // a divider in a grid by columns: upright between every two columns, in each line
     L := Level('{ "card": "Grid", "show": "column", "perColumn": 2, "content": [ { "id": "d1", "divider": "" }, ' +
       Card('Cut', '{ "name": { "equals": "Cut" } }') + ', ' + Card('Copy', '{ "name": { "equals": "Copy" } }') + ', ' +

@@ -146,6 +146,9 @@ type
     TitleAsDivider: Boolean;
     Square: Boolean;
     Templates: TObjectList<TCard>;
+    // "submenuStyle": the style of the submenu it opens (a card holding cards in a submenu, or showing what its rules
+    // find there), as the menu card's style is the menu's: a card of only a look (owned; nil none)
+    SubmenuStyle: TCard;
     TemplatesBy: TTemplatesBy;
     Rules: TObjectList<TRule>;
     // the cards it holds: a format 1 card's "menu", a format 2 card's "content" (a line per card, divider or search
@@ -543,6 +546,7 @@ begin
   Menu.Free;
   Look.Free;
   Templates.Free;
+  SubmenuStyle.Free;
   inherited;
 end;
 
@@ -868,6 +872,11 @@ begin
     Card.Parent := Parent;
     ParseCardSize(Obj, Card);
     ParseCardLook(Obj, Card);
+    if Obj.GetValue('submenuStyle') is TJSONObject then
+    begin
+      Card.SubmenuStyle := TCard.Create;
+      ParseCardLook(TJSONObject(Obj.GetValue('submenuStyle')), Card.SubmenuStyle);
+    end;
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then
       Card.Id := Obj.GetValue('id').Value
