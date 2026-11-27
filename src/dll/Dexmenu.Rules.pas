@@ -14,6 +14,8 @@ unit Dexmenu.Rules;
 //                                                   this many (none: all); the others are taken all the same
 //     "exclude": true,                              finds nothing itself: what it matches, this card's rules after
 //                                                   it (in the card's order) do not take (it stays free)
+//     "order": "recent" | "used" | "name",          the order of what it finds (docs/plans/17-PLAN-order.md):
+//     "descending": true                            most recent, most used first, A to Z; absent: as found
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
 // Or by use instead of by name (docs/plans/executed/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
@@ -47,6 +49,9 @@ type
   TScope = (scTop, scAnywhere, scPath);
   TStates = set of (stEnabled, stDisabled);
   TUsedKind = (ukNone, ukMost, ukRecent);   // a rule by name; by the most used; by the most recently used
+  // The order of found items (docs/plans/17-PLAN-order.md): as found (a card: by rule), most recently used first, most
+  // used first, by the text as shown
+  TOrderBy = (obFound, obRecent, obUsed, obName);
   // one part of a used rule's ranks: a rank (From = To) or a range, From > To in reverse
   TRankRange = record
     From, To_: Integer;
@@ -68,6 +73,9 @@ type
     // "exclude": the rule finds nothing; an item it accepts is not taken by its card's rules after it (in the card's
     // order of its rules, as the editor shows them; a rule by name)
     Exclude: Boolean;
+    // "order", "descending": the order of what it finds (plan 17); obFound: as found
+    Order: TOrderBy;
+    Descending: Boolean;
     Priority: Integer;   // -1: none given
     Used: TUsedKind;     // ukNone: a rule by name
     // the ranks a used rule finds, from 1, in the order written ("1,3,5", "1-2,5-6,8-10"; a range from high to low in
@@ -77,6 +85,8 @@ type
   end;
 
 function ParseRule(Obj: TJSONObject): TRuleSpec;
+// "order" and "descending" of a rule or a card; False with Problem for a wrong value.
+function ParseOrder(Obj: TJSONObject; out Order: TOrderBy; out Descending: Boolean; out Problem: string): Boolean;
 
 var
   // The states a rule takes when it does not say (the global settings' "states", plan 02 3.4; set by
@@ -229,6 +239,36 @@ begin
   Problem := 'rank: numbers from 1 and ranges, as "1-3" or "1,3,5" or "1-2,5-6"';
 end;
 
+function ParseOrder(Obj: TJSONObject; out Order: TOrderBy; out Descending: Boolean; out Problem: string): Boolean;
+var
+  V: TJSONValue;
+begin
+  Result := False;
+  Order := obFound;
+  Descending := False;
+  Problem := '';
+  V := Obj.GetValue('order');
+  if V <> nil then
+    if (V is TJSONString) and (V.Value = 'recent') then Order := obRecent
+    else if (V is TJSONString) and (V.Value = 'used') then Order := obUsed
+    else if (V is TJSONString) and (V.Value = 'name') then Order := obName
+    else
+    begin
+      Problem := '"order" is recent, used or name';
+      Exit;
+    end;
+  V := Obj.GetValue('descending');
+  if V <> nil then
+    if V is TJSONBool then
+      Descending := TJSONBool(V).AsBoolean
+    else
+    begin
+      Problem := '"descending" is true or false';
+      Exit;
+    end;
+  Result := True;
+end;
+
 function ParseRule(Obj: TJSONObject): TRuleSpec;
 var
   V, S: TJSONValue;
@@ -362,6 +402,8 @@ begin
   end;
   if Obj.GetValue('exclude') is TJSONBool then
     Result.Exclude := TJSONBool(Obj.GetValue('exclude')).AsBoolean;
+  if not ParseOrder(Obj, Result.Order, Result.Descending, Result.Problem) then
+    Exit;
   if Result.Exclude and (Result.Used <> ukNone) then
   begin
     Result.Problem := 'an exclude rule is a rule by name';

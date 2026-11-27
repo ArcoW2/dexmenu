@@ -124,6 +124,8 @@ type
     FFound: TObjectDictionary<TCard, TList<TFound>>;
     FEvaluated: Boolean;   // the rules have run: a submenu they emptied can be told
     procedure Evaluate;
+    // Each card's found items in the order its rules and the card ask for (docs/plans/17-PLAN-order.md).
+    procedure SortFound;
   public
     Layout: ILayout;
     Kind: string;
@@ -1028,10 +1030,139 @@ begin
       if not FTaken.ContainsKey(KeyOf(Top[I])) or Top[I].IsSeparator then
         Remaining.Add(Top[I]);
     FEvaluated := True;
+    SortFound;
   finally
     Excludes.Free;
     Order.Free;
     Rules.Free;
+  end;
+end;
+
+// The text a found item shows by default, for the order by name: its name with the rename it gets (TViewCard.Title):
+// inside its card or in a submenu its template's (the one its rule names, else the first; none: no rename), else its
+// card's; Dexmenu's own items their own text.
+function SortName(const F: TFound; Card: TCard): string;
+var
+  Named: TCard;
+begin
+  if F.Node = nil then
+  begin
+    if F.Own = ccWindowsMenu then
+      Exit('Windows'' menu');
+    Exit('Edit menu...');
+  end;
+  Result := F.Node.Name;
+  if (Card.Menu = nil) and (Card.Shows in [csRow, csColumn, csSubmenu]) then
+    Named := Card.TemplateFor(0, F.Rule)
+  else
+    Named := Card;
+  if (Named <> nil) and (Named.RenameFrom <> '') then
+    try
+      Result := TRegEx.Replace(Result, Named.RenameFrom, Named.RenameTo);
+    except
+      // a rename that does not compile: the item's own text
+    end;
+end;
+
+procedure TPlacement.SortFound;
+type
+  TKeyed = record
+    F: TFound;
+    Seq: Integer;     // its place as found: ties keep it
+    Count: Integer;   // its use count, 0 never used
+    Time: string;     // its last use, '' never used
+    Name: string;     // as shown
+  end;
+var
+  Pair: TPair<TCard, TList<TFound>>;
+  Card: TCard;
+  List: TList<TFound>;
+  Items: TList<TKeyed>;
+  Groups: TList<TRule>;
+  K: TKeyed;
+  I, G: Integer;
+  Part: TList<TKeyed>;
+
+  function Keyed(const F: TFound; Seq: Integer; Card: TCard): TKeyed;
+  begin
+    Result.F := F;
+    Result.Seq := Seq;
+    Result.Count := 0;
+    Result.Time := '';
+    if F.Node <> nil then
+    begin
+      if (Usage = nil) or not Usage.TryGetValue(UsageKey(F.Node), Result.Count) then
+        Result.Count := 0;
+      if (LastUse = nil) or not LastUse.TryGetValue(UsageKey(F.Node), Result.Time) then
+        Result.Time := '';
+    end;
+    Result.Name := SortName(F, Card);
+  end;
+
+  // the items sorted by Order (obFound: as they are), the whole order reversed when Descending; ties as found
+  procedure SortBy(L: TList<TKeyed>; Order: TOrderBy; Descending: Boolean);
+  var
+    J: Integer;
+  begin
+    for J := 0 to L.Count - 1 do
+    begin
+      K := L[J];
+      K.Seq := J;   // the order it has now: ties keep it
+      L[J] := K;
+    end;
+    if Order <> obFound then
+      L.Sort(TComparer<TKeyed>.Construct(
+        function(const A, B: TKeyed): Integer
+        begin
+          case Order of
+            obRecent: Result := -CompareStr(A.Time, B.Time);
+            obUsed: Result := B.Count - A.Count;
+          else
+            Result := AnsiCompareText(A.Name, B.Name);
+          end;
+          if Result = 0 then
+            Result := A.Seq - B.Seq;
+        end));
+    if Descending then
+      L.Reverse;
+  end;
+
+begin
+  for Pair in FFound do
+  begin
+    Card := Pair.Key;
+    List := Pair.Value;
+    if (List.Count < 2) or Card.IsRemaining then
+      Continue;
+    Items := TList<TKeyed>.Create;
+    Groups := TList<TRule>.Create;
+    Part := TList<TKeyed>.Create;
+    try
+      // each rule's items together, in the order the rules ran, each sorted by its rule's order
+      for I := 0 to List.Count - 1 do
+        if not Groups.Contains(List[I].Rule) then
+          Groups.Add(List[I].Rule);
+      for G := 0 to Groups.Count - 1 do
+      begin
+        Part.Clear;
+        for I := 0 to List.Count - 1 do
+          if List[I].Rule = Groups[G] then
+            Part.Add(Keyed(List[I], I, Card));
+        if Groups[G] <> nil then
+          SortBy(Part, Groups[G].Spec.Order, Groups[G].Spec.Descending);
+        Items.AddRange(Part);
+      end;
+      // then the card's own order over all of them
+      if Card.Order <> obFound then
+        SortBy(Items, Card.Order, Card.Descending);
+      List.Clear;
+      for K in Items do
+        List.Add(K.F);
+    finally
+      Part.Free;
+      Groups.Free;
+      Items.Free;
+    end;
   end;
 end;
 

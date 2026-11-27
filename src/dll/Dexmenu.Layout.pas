@@ -105,6 +105,10 @@ type
     // "skipDuplicates": of the items its rules found, one per name (Windows 11 shows some programs' items twice: a
     // newer and an older copy); the others are taken all the same, so they show nowhere
     SkipDuplicates: Boolean;
+    // "order", "descending": the order of everything its rules found together (docs/plans/17-PLAN-order.md); obFound:
+    // by rule (each rule's items in that rule's order, the rules in turn)
+    Order: TOrderBy;
+    Descending: Boolean;
     // A note card ({ "note": "<text>" }, plan 02 3.3): no button, no rules or menu; an empty space or a text of
     // several lines
     IsNote: Boolean;
@@ -678,6 +682,11 @@ var
   V: TJSONValue;
 begin
   Result := False;
+  if not ParseOrder(Obj, Card.Order, Card.Descending, Error) then
+  begin
+    Error := Where + ' "' + Card.Title + '": ' + Error;
+    Exit;
+  end;
   V := Obj.GetValue('show');
   if V is TJSONString then
     if V.Value = 'item' then Card.Show := csItem

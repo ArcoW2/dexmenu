@@ -253,7 +253,7 @@ const LayoutModel = (() => {
     for (const k of ["name", "caseSensitive", "scope", "path", "used", "rank", "own", "latest", "exclude"]) delete rule[k];   // latest, exclude: by name only
     if (type === "usage") rule.used = "most";
     else if (type === "editMenu" || type === "windowsMenu") {
-      for (const k of ["states", "also", "consume", "skipDuplicates"]) delete rule[k];
+      for (const k of ["states", "also", "consume", "skipDuplicates", "order", "descending"]) delete rule[k];
       rule.own = type;
     }
     else rule.name = { contains: "" };
@@ -293,6 +293,8 @@ const LayoutModel = (() => {
   // What a rule of either type may get wrong
   function commonProblem(rule) {
     if (rule.consume !== undefined && typeof rule.consume !== "boolean") return "consume is true or false";
+    if (rule.order !== undefined && !["recent", "used", "name"].includes(rule.order)) return "order is recent, used or name";
+    if (rule.descending !== undefined && typeof rule.descending !== "boolean") return "descending is true or false";
     if (rule.states !== undefined && (!Array.isArray(rule.states) || rule.states.some(s => s !== "enabled" && s !== "disabled")))
       return "states: enabled and/or disabled";
     return "";

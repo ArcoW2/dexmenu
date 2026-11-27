@@ -1021,7 +1021,7 @@ function ruleEditor(card, rule, index) {
     ex.addEventListener("change", () => {
       if (ex.checked) {
         rule.exclude = true;
-        for (const k of ["also", "skipDuplicates", "consume", "latest", "template"]) delete rule[k];
+        for (const k of ["also", "skipDuplicates", "consume", "latest", "template", "order", "descending"]) delete rule[k];
       } else delete rule.exclude;
       changed();
     });
@@ -1101,6 +1101,9 @@ function ruleEditor(card, rule, index) {
     });
     row("Latest", latest);
   }
+  // the order of what it finds (plan 17): rules by name or by use
+  if ((M.ruleType(rule) === "name" && !excluding) || M.ruleType(rule) === "usage")
+    row("Order", ...orderFields(rule, "as found", false));
   // the template the items it finds follow, when its card picks templates by rule (plan 11 3.1)
   if (!excluding && card.templatesBy === "rule" && Array.isArray(card.templates) && card.templates.length > 0) {
     const tsel = el("select");
@@ -1594,6 +1597,34 @@ function renderPanels(card, groups) {
   return box;
 }
 
+// The order of what is found (docs/plans/17-PLAN-order.md), of a rule or a card (target): a select of the orders
+// ("" the default: as found, or for a card by rule) and "descending" (with a card's default: no function, disabled).
+function orderFields(target, firstLabel, forCard) {
+  const sel = el("select");
+  for (const [v, text] of [["", firstLabel], ["recent", "most recent"], ["used", "most used"], ["name", "name"]]) {
+    const o = el("option", "", text);
+    o.value = v;
+    sel.append(o);
+  }
+  sel.value = target.order || "";
+  sel.title = "Most recent: the last used first; most used: the most used first; name: A to Z by the text as shown; " +
+    "never used ones last";
+  sel.addEventListener("change", () => {
+    if (sel.value) target.order = sel.value; else delete target.order;
+    if (forCard && !sel.value) delete target.descending;
+    changed();
+  });
+  const cb = el("input");
+  cb.type = "checkbox";
+  cb.checked = !!target.descending;
+  cb.disabled = forCard && !target.order;
+  cb.addEventListener("change", () => { if (cb.checked) target.descending = true; else delete target.descending; changed(); });
+  const l = el("label");
+  l.title = "The whole order reversed";
+  l.append(cb, " descending");
+  return [sel, l];
+}
+
 // How a card shows what it found or holds (plan 11 3.1): Shows; a row's per row and rows, a column's per column and
 // columns; the rest beyond them; a holder's shown when; with templates, how they are picked.
 function showFields(card, withRules, isMenu = false) {
@@ -1636,6 +1667,13 @@ function showFields(card, withRules, isMenu = false) {
   }
   // what depends on Shows under it, with a tree line
   asTree(fields);
+  // the order of everything its rules found (plan 17)
+  if (withRules && !M.isRemaining(card)) {
+    const row = el("div", "field");
+    row.title = "The order of everything its rules found together; by rule: each rule's items in that rule's order, the rules in turn";
+    row.append(el("span", "", "Order"), ...orderFields(card, "by rule", true));
+    fields.push(row);
+  }
   if (M.isHolder(card) && !isMenu)
     fields.push(select("Shown when", "When this card shows: something in it can be chosen, anything in it shows, or always",
       [["", "something in it can be chosen"], ["anyItem", "anything in it shows"], ["always", "always"]], card.shownWhen || "",
@@ -1799,6 +1837,8 @@ function summary(rule) {
   if (rule.consume === false) s += ", not consumed";
   if (rule.skipDuplicates) s += ", skip duplicates";
   if (rule.latest !== undefined) s += ", latest " + rule.latest;
+  if (rule.order) s += ", order " + ({ recent: "most recent", used: "most used", name: "name" }[rule.order] || rule.order);
+  if (rule.descending) s += ", descending";
   if (rule.exclude) s = "exclude: " + s;
   return s;
 }

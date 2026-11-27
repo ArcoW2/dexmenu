@@ -44,6 +44,25 @@ begin
   Result := ParseLayout(Text, 'test', Error) <> nil;
 end;
 
+// Whether a rule (its JSON text) is valid by itself (a wrong rule does not make a layout invalid: it finds nothing).
+function RuleValid(const Text: string): Boolean;
+var
+  Obj: TJSONObject;
+begin
+  Obj := TJSONObject.ParseJSONValue(Text) as TJSONObject;
+  try
+    Result := ParseRule(Obj).Valid;
+  finally
+    Obj.Free;
+  end;
+end;
+
+// A layout of one card (its JSON text) beside the remaining card: valid as a whole.
+function CardValid(const CardText: string): Boolean;
+begin
+  Result := Valid('{ "default": [ ' + CardText + ', { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }');
+end;
+
 function ErrorOf(const Text: string): string;
 begin
   if ParseLayout(Text, 'test', Result) <> nil then
@@ -1523,10 +1542,9 @@ var
   A, M: TJSONArray;
   Short, Long: Single;
 begin
-  Check(not Valid('{ "default": [ ' + Card('C', Rule + ', "latest": 0 }') + ' ] }') and
-    not Valid('{ "default": [ ' + Card('C', Rule + ', "latest": 1.5 }') + ' ] }') and
-    not Valid('{ "default": [ ' + Card('C', Rule + ', "latest": "1" }') + ' ] }'),
-    'latest: a whole number from 1');
+  Check(RuleValid(Rule + ', "latest": 1 }') and RuleValid(Rule + ', "latest": 3 }') and
+    not RuleValid(Rule + ', "latest": 0 }') and not RuleValid(Rule + ', "latest": 1.5 }') and
+    not RuleValid(Rule + ', "latest": "1" }'), 'latest: a whole number from 1');
   Expect(ShowsLatest(Rule + ' }', nil), 'I:Compare to a.txt / I:Compare to b.txt / I:Compare to c.txt / I:Other',
     'without latest: all of them');
   Expect(ShowsLatest(Rule + ', "latest": 1 }', nil), 'I:Compare to a.txt / I:Other',
@@ -1669,8 +1687,8 @@ begin
   Expect(ShowsExcluded(Card('Apps', NoLex + ', ' + Apps) + ', ' +
     Card('Lex', '{ "name": { "contains": "LexPen" }, "scope": "anywhere", "priority": 3 }')),
     'I:Notepad / I:Paint / I:LexPen / I:Edit in LexPen', 'exclude only for its own card: another card takes it');
-  Check(not Valid('{ "default": [ ' + Card('U', '{ "used": "most", "exclude": true }') + ' ] }'),
-    'an exclude rule by use: invalid');
+  Check(RuleValid('{ "name": { "contains": "a" }, "exclude": true }') and
+    not RuleValid('{ "used": "most", "exclude": true }'), 'an exclude rule by name: valid; by use: invalid');
   Expect(ShowsExcluded(Card('Apps', '{ "name": { "equals": "LexPen" }, "scope": "anywhere", "priority": 1 }, ' +
     '{ "name": { "contains": "LexPen" }, "path": { "startsWith": "Open with" }, "exclude": true, "priority": 2 }, ' +
     '{ "name": { "wildcard": "*" }, "path": { "startsWith": "Open with" }, "priority": 3 }')),
@@ -1681,6 +1699,86 @@ begin
     '{ "name": { "wildcard": "*" }, "path": { "startsWith": "Open with" }, "priority": 3 }')),
     'I:Notepad / I:Paint / I:Open with / I:Edit in LexPen',
     'exclude first in the card''s order, whatever the priorities: every rule after it filtered');
+end;
+
+// The order of what rules find (docs/plans/17-PLAN-order.md): Cherry, Apple, Banana, Damson, Elder in the menu; used
+// Cherry 9 (last 01), Apple 5 (03), Banana 2 (09), Damson and Elder never.
+function ShowsOrdered(const Cards: string): string;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+  U: TDictionary<string, Integer>;
+  T: TDictionary<string, string>;
+begin
+  Layout := ParseLayout('{ "default": [ ' + Cards + ', { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }',
+    'test', Error);
+  if Layout = nil then
+    Exit('LAYOUT: ' + Error);
+  Menu := CreatePopupMenu;
+  Add(Menu, 'Cherry');
+  Add(Menu, 'Apple');
+  Add(Menu, 'Banana');
+  Add(Menu, 'Damson');
+  Add(Menu, 'Elder');
+  Top := ReadLevel(Menu, '');
+  U := TDictionary<string, Integer>.Create;
+  T := TDictionary<string, string>.Create;
+  U.Add('Cherry', 9); T.Add('Cherry', '2026-11-01T00:00:00.000Z');
+  U.Add('Apple', 5);  T.Add('Apple', '2026-11-03T00:00:00.000Z');
+  U.Add('Banana', 2); T.Add('Banana', '2026-11-09T00:00:00.000Z');
+  P := TPlacement.Create(Layout, 'default', Top, U, T);
+  try
+    Level := P.TopLevel;
+    try
+      Result := StringReplace(Describe(Level), 'I:', '', [rfReplaceAll]);
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    U.Free;
+    T.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+procedure TestOrder;
+const
+  All = '{ "name": { "wildcard": "*" }';
+begin
+  Expect(ShowsOrdered(Card('F', All + ' }')), 'Cherry / Apple / Banana / Damson / Elder', 'order: as found (the menu''s)');
+  Expect(ShowsOrdered(Card('F', All + ', "descending": true }')), 'Elder / Damson / Banana / Apple / Cherry',
+    'order: as found, descending');
+  Expect(ShowsOrdered(Card('F', All + ', "order": "used" }')), 'Cherry / Apple / Banana / Damson / Elder',
+    'order: most used first, never used last (a tie as found)');
+  Expect(ShowsOrdered(Card('F', All + ', "order": "used", "descending": true }')),
+    'Elder / Damson / Banana / Apple / Cherry', 'order: most used, descending: simply reversed');
+  Expect(ShowsOrdered(Card('F', All + ', "order": "recent" }')), 'Banana / Apple / Cherry / Damson / Elder',
+    'order: most recent first');
+  Expect(ShowsOrdered(Card('F', All + ', "order": "name" }')), 'Apple / Banana / Cherry / Damson / Elder', 'order: by name');
+  Expect(ShowsOrdered(Card('F', All + ', "order": "name", "descending": true }')),
+    'Elder / Damson / Cherry / Banana / Apple', 'order: by name, descending');
+  Expect(ShowsOrdered(Card('F', '{ "used": "most", "rank": "1-3", "order": "name" }')), 'Apple / Banana / Cherry / Damson / Elder',
+    'order: the three most used, by name');
+  Expect(ShowsOrdered(Card('F', '{ "name": { "any": ["Cherry", "Apple"] }, "order": "name", "priority": 1 }, ' +
+    '{ "name": { "any": ["Banana", "Damson"] }, "order": "name", "descending": true, "priority": 2 }')),
+    'Apple / Cherry / Damson / Banana / Elder', 'order: by rule, each rule''s items in its own order');
+  Expect(ShowsOrdered(Card('F', '{ "name": { "any": ["Cherry", "Apple"] }, "order": "name", "priority": 1 }, ' +
+    '{ "name": { "any": ["Banana", "Damson"] }, "order": "name", "descending": true, "priority": 2 }', ', "order": "name"')),
+    'Apple / Banana / Cherry / Damson / Elder', 'order: the card''s order over all its rules');
+  Expect(ShowsOrdered(Card('F', All + ', "order": "name" }', ', "rename": { "regex": "^C", "replace": "Z" }')),
+    'Apple / Banana / Damson / Elder / Zherry', 'order: by name as shown (renamed)');
+  Check(RuleValid(All + ', "order": "used", "descending": true }') and RuleValid('{ "used": "most", "order": "name" }') and
+    not RuleValid(All + ', "order": "size" }') and not RuleValid(All + ', "descending": 1 }'),
+    'order: a wrong value makes a rule invalid (it finds nothing)');
+  Check(CardValid('{ "line": [ { "card": "F", "order": "name", "descending": true, "rules": [ ' + All + ' } ] } ] }') and
+    not CardValid('{ "line": [ { "card": "F", "order": "size", "rules": [ ' + All + ' } ] } ] }'),
+    'order: a wrong value on a card makes the layout invalid');
 end;
 
 // A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
@@ -2489,6 +2587,7 @@ begin
   TestLatest;
   TestEmptiedSubmenu;
   TestExclude;
+  TestOrder;
   TestUsage;
   TestUsedRules;
   TestIcons;

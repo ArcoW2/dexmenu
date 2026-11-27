@@ -307,6 +307,14 @@
     const sw = { name: { contains: "a" }, latest: 2, exclude: true };
     M.setRuleType(sw, "usage");
     check(sw.latest === undefined && sw.exclude === undefined, "to Usage: latest and exclude taken out");
+    const ord = (order, descending) => M.ruleProblem({ name: { contains: "a" }, order, descending });
+    check(ord(undefined) === "" && ["recent", "used", "name"].every(o => ord(o) === "" && ord(o, true) === "") &&
+      M.ruleProblem({ used: "most", rank: "1-3", order: "name" }) === "",
+      "order: recent, used or name, descending or not; also on a rule by use");
+    check(ord("size") !== "" && ord("name", 1) !== "", "order: another value outlined red");
+    const own = { name: { contains: "a" }, order: "name", descending: true };
+    M.setRuleType(own, "editMenu");
+    check(own.order === undefined && own.descending === undefined, "to Edit Dexmenu: order taken out");
     check(M.useless({ card: "U", rules: [ { used: "most", rank: 0 } ] }) && !M.useless({ card: "U", rules: [ { used: "most", rank: "3-1" } ] }),
       "a card with a wrong rank outlined red, with a reversed range not");
   }
