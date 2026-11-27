@@ -176,6 +176,8 @@ type
     // "spacer": true: room without a line (its text, when it has one, still shown); no border either, so a group's
     // bottom divider before it stays and it stays after a bordered group (Dexmenu.Draw)
     DividerSpacer: Boolean;
+    // "thickness": its line's width in DIP (docs/plans/18-PLAN-vertical-dividers.md 3.1); 0: the default, 1
+    DividerThickness: Single;
     DividerLook: TJSONObject;
     DividerFont: TFontSpec;
     IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
@@ -752,6 +754,8 @@ begin
   if (Obj.GetValue('height') is TJSONNumber) and (TJSONNumber(Obj.GetValue('height')).AsDouble > 0) then
     Line.DividerHeight := Min(200, TJSONNumber(Obj.GetValue('height')).AsDouble);
   Line.DividerSpacer := (Obj.GetValue('spacer') is TJSONBool) and TJSONBool(Obj.GetValue('spacer')).AsBoolean;
+  if (Obj.GetValue('thickness') is TJSONNumber) and (TJSONNumber(Obj.GetValue('thickness')).AsDouble > 0) then
+    Line.DividerThickness := Min(50, TJSONNumber(Obj.GetValue('thickness')).AsDouble);
   for P in Props do
     if Obj.GetValue(P) <> nil then
     begin

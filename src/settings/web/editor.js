@@ -487,8 +487,14 @@ function startRuleDrag(e, card, index) {
 function dropZoneOf(box, e, divider = false) {
   const r = box.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
-  if (divider) return y < r.height / 2 ? "above" : "below";   // a divider goes between lines only
   const edgeY = Math.min(10, r.height / 4), edgeX = Math.max(14, r.width / 5);
+  // a divider: beside a card that stands in a row (upright there, plan 18), else between lines (above or below)
+  if (divider) {
+    const inRow = !!box.parentElement && box.parentElement.classList.contains("line") && !!box.parentElement.dataset.holder;
+    if (inRow && x < edgeX) return "before";
+    if (inRow && x > r.width - edgeX) return "after";
+    return y < r.height / 2 ? "above" : "below";
+  }
   if (y < edgeY) return "above";
   if (y > r.height - edgeY) return "below";
   if (x < edgeX) return "before";
@@ -1251,8 +1257,20 @@ function renderCardPane() {
       }, "(the theme's) in DIP"),
       colorField("Background", own("background").get, own("background").set, true, true),
       colorField("Line colour", own("border").get, own("border").set, false, true),
+      textField("Thickness", e.thickness === undefined ? "" : String(e.thickness), v => {
+        const n = Number(v.trim());
+        if (v.trim() && n > 0) e.thickness = n; else delete e.thickness;
+        changed();
+      }, "1 (DIP): the line's width"),
       colorField("Text colour", own("foreground").get, own("foreground").set),
       ...fontFields(e));
+    // where it stands decides how it shows (plan 18): upright between cards side by side; a grid's between its columns
+    const parent = div.parent;
+    if (parent && M.isRow(parent) && !parent.perRow)
+      box.append(el("div", "hint", "Between cards side by side: drawn upright, as high as the row; its text is not shown, its Height is its width."));
+    else if (parent && ((parent.show === "row" && parent.perRow) || (parent.show !== "row" && parent.show !== "submenu" && parent.perColumn)))
+      box.append(el("div", "hint", "In a group laid out as a grid: drawn between every two " + (parent.show === "row" ? "rows" : "columns") +
+        " (upright between columns), wherever it stands among the cards; the first divider in the group counts."));
     return;
   }
   // a template (plan 11 3.1): its texts that apply to every item, its layout and its style

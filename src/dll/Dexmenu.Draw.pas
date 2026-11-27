@@ -369,13 +369,31 @@ begin
   Result := FontFormat(D.DividerFont, False);
 end;
 
+// A divider's line width (plan 18 3.1): its "thickness", else 1.
+function LineThickness(D: TLine): Single;
+begin
+  if (D <> nil) and (D.DividerThickness > 0) then
+    Result := D.DividerThickness
+  else
+    Result := 1;
+end;
+
+// An upright divider's width (plan 18 3.2): its own "height" (read as its width there), else a plain divider's height.
+function UprightWidth(D: TLine): Single;
+begin
+  if (D <> nil) and (D.DividerHeight > 0) then
+    Result := D.DividerHeight
+  else
+    Result := Max(SeparatorHeight, LineThickness(D) + 8);
+end;
+
 // A divider's height: its own, else one with a label (as high as its font needs) or a plain line's.
 function DividerHeightOf(D: TLine): Single;
 begin
   if (D <> nil) and (D.DividerHeight > 0) then
     Exit(D.DividerHeight);
   if (D = nil) or (D.DividerText = '') then
-    Exit(SeparatorHeight);
+    Exit(Max(SeparatorHeight, LineThickness(D) + 8));
   Result := DividerTextHeight;
   if D.DividerFont.Own and (D.DividerFont.Size > 0) then
     Result := Max(Result, D.DividerFont.Size * 1.4 + 8);
@@ -550,6 +568,8 @@ begin
   Result := 0;
   if V.Kind = vkGroup then
     Result := GroupNeed(V)
+  else if (V.Kind = vkSeparator) and V.Vertical then
+    Result := UprightWidth(V.Divider)
   else if (V.Kind = vkSeparator) and (V.Divider <> nil) and (V.Divider.DividerText <> '') then
     Result := TextWidth(V.Divider.DividerText, DividerFormat(V.Divider)) + 48
   else if V.Kind = vkNote then
@@ -629,7 +649,7 @@ begin
     Exit;
   C := Line.Cards[0];
   if C.Kind = vkSeparator then
-    Exit((C.Divider = nil) or not C.Divider.DividerSpacer);   // a spacer is room, no border
+    Exit(not C.Vertical and ((C.Divider = nil) or not C.Divider.DividerSpacer));   // a spacer is room, no border
   if C.Kind <> vkGroup then
     Exit;
   if DividerBorder(C) then
@@ -841,6 +861,8 @@ var
   M: TDWriteTextMetrics;
   None: TArray<TBox>;
 begin
+  if (V.Kind = vkSeparator) and V.Vertical then
+    Exit(0);   // upright: as high as the cards beside it
   Result := ItemHeight;
   if V.Kind = vkGroup then
   begin
@@ -929,7 +951,7 @@ begin
     end;
     for V in Line.Cards do
     begin
-      if Line.Inner then
+      if Line.Inner or ((V.Kind = vkSeparator) and V.Vertical) then
         Size := Max(CardNeed(V), CardMin(V))
       else
         Size := CardMin(V);
@@ -1011,7 +1033,7 @@ begin
         for J := 0 to N - 1 do
         begin
           Floors[J] := CardMin(Row[J]);
-          if Wraps(Row[J]) then
+          if Wraps(Row[J]) or ((Row[J].Kind = vkSeparator) and Row[J].Vertical) then
             Floors[J] := Max(Floors[J], CardNeed(Row[J]));
           Sum := Sum + Floors[J];
         end;
@@ -1019,7 +1041,12 @@ begin
           for J := 0 to N - 1 do
             Floors[J] := CardMin(Row[J]);
         for J := 0 to N - 1 do
-          Fixed[J] := False;
+        begin
+          // an upright divider takes its own width; the cards share the rest
+          Fixed[J] := (Row[J].Kind = vkSeparator) and Row[J].Vertical;
+          if Fixed[J] then
+            Widths[J] := UprightWidth(Row[J].Divider);
+        end;
         repeat
           Changed := False;
           Avail := Width - CardGap * (N - 1);
@@ -1076,6 +1103,14 @@ begin
         begin
           Box.Card := V;
           Box.Rect := D2D1RectF(X, CardTop, X + Widths[J], CardTop + OwnH);
+          // an upright divider reaches over the gaps to the rows above and below, so a grid's read as one line
+          if (V.Kind = vkSeparator) and V.Vertical then
+          begin
+            if I > 0 then
+              Box.Rect.top := Box.Rect.top - LineGap / 2;
+            if I < Rows.Count - 1 then
+              Box.Rect.bottom := Box.Rect.bottom + LineGap / 2;
+          end;
           Box.Alone := N = 1;
           Boxes := Boxes + [Box];
           // a card holding cards: the boxes inside it follow its own
@@ -1575,9 +1610,9 @@ begin
     X := R.left + Pad;
   end;
   if (Line <> nil) and (X - Gap > R.left + Pad) then
-    T.DrawLine(D2D1PointF(R.left + Pad, Y), D2D1PointF(X - Gap, Y), Line, 1);
+    T.DrawLine(D2D1PointF(R.left + Pad, Y), D2D1PointF(X - Gap, Y), Line, LineThickness(D));
   if (Line <> nil) and (X + W + Gap < R.right - Pad) then
-    T.DrawLine(D2D1PointF(X + W + Gap, Y), D2D1PointF(R.right - Pad, Y), Line, 1);
+    T.DrawLine(D2D1PointF(X + W + Gap, Y), D2D1PointF(R.right - Pad, Y), Line, LineThickness(D));
   T.DrawText(PWideChar(Label_), Length(Label_), Fmt, D2D1RectF(X, R.top, X + W + 1, R.bottom), Text,
     D2D1_DRAW_TEXT_OPTIONS_CLIP);
 end;
@@ -1727,10 +1762,17 @@ begin
       end;
       if (V.Divider <> nil) and V.Divider.DividerSpacer then
         DivLine := nil;   // a spacer: room (and its text), no line
-      if (V.Divider = nil) or (V.Divider.DividerText = '') then
+      if V.Vertical then
+      begin
+        // upright (plan 18 3.2): a line from its top to its bottom in the middle of its width, no text
+        if DivLine <> nil then
+          T.DrawLine(D2D1PointF(Round((R.left + R.right) / 2) + 0.5, R.top),
+            D2D1PointF(Round((R.left + R.right) / 2) + 0.5, R.bottom), DivLine, LineThickness(V.Divider));
+      end
+      else if (V.Divider = nil) or (V.Divider.DividerText = '') then
       begin
         if DivLine <> nil then
-          T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), DivLine, 1);
+          T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), DivLine, LineThickness(V.Divider));
       end
       else
         DrawDividerText(T, V.Divider, R, Y, DivLine, DivText, DividerFormat(V.Divider));

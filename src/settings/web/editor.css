@@ -91,6 +91,12 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .divider.spacer .rule-line { border-top-style: dashed; opacity: .6; }
 .divider.align-left .rule-line:first-child, .divider.align-right .rule-line:nth-child(3) { flex: 0 0 8px; }
 .divider.plain .text { display: none; }
+/* a divider among a row's cards: upright, as the menu draws it (plan 18); no text */
+.line > .divider { flex: 0 0 14px; flex-direction: column; min-height: 30px; padding: 4px 0; gap: 0; }
+.line > .divider .rule-line { border-top: none; border-left: 1px solid var(--line); flex: 1; width: 0; align-self: center; }
+.line > .divider.spacer .rule-line { border-left-style: dashed; }
+.line > .divider .text { display: none; }
+.line > .divider.align-left .rule-line:first-child, .line > .divider.align-right .rule-line:nth-child(3) { flex: 1; }
 .divider.mostused { border: 1px dashed var(--line); border-radius: 4px; padding: 4px 8px; color: var(--dim); }
 .divider.selected { box-shadow: 0 0 0 1px var(--accent); }
 .divider.hot { background: var(--hover); }

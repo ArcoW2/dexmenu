@@ -515,10 +515,23 @@ const LayoutModel = (() => {
     return true;
   }
 
-  // A divider dropped on a card's top or bottom edge: just above or below it (a card in a plain row: that row).
+  // A divider dropped on a card's edge: on its left or right edge, when the card stands in a row (side by side), beside
+  // it in that row, where it is drawn upright (plan 18); otherwise, and on its top or bottom edge, just above or below
+  // it (a card in a plain row: that row).
   function moveDividerNext(lines, id, targetCardId, side) {
     let target = find(lines, targetCardId);
     if (!target) return false;
+    if (side === "before" || side === "after") {
+      if (target.parent && isRow(target.parent) && !target.parent.perRow) {
+        const d = findDivider(lines, id);
+        if (!d) return false;
+        d.lines.splice(d.index, 1);
+        const t = find(lines, targetCardId);   // its place again: taking the divider out may have moved it
+        t.lines.splice(t.lineIndex + (side === "after" ? 1 : 0), 0, d.entry);
+        return true;
+      }
+      side = side === "before" ? "above" : "below";
+    }
     if (target.parent && isPlainRow(target.parent)) target = find(lines, target.parent.id);
     return moveDivider(lines, id, target.parent ? target.parent.id : null, target.lineIndex + (side === "below" ? 1 : 0));
   }

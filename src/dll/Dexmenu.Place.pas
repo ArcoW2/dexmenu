@@ -51,6 +51,9 @@ type
     Several: Boolean;   // vkItem: one of several items its card found (the card's title is not its)
     EmptyMenu: Boolean; // vkMenu: its menu shows nothing here (the preview only; a right-click leaves it out)
     Divider: TLine;     // vkSeparator from the layout (a divider, its text and alignment); nil for Windows' separators
+    // vkSeparator standing upright between cards side by side (in a row, or between a grid's columns; plan 18 3.2,
+    // 3.3): as high as its line, no text
+    Vertical: Boolean;
     BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand, vkSearch, vkGroup: its text
     Inner: TViewLevel;  // vkGroup: what shows inside it, lines of cards measured as a level's (owned)
     Framed: Boolean;    // vkGroup: its box and title drawn (a style or a title of its own, or found items inside it)
@@ -1268,7 +1271,7 @@ end;
 
 // The cards a card holds (its content, placed) as one list in their order, for a row or a column with limits:
 // dividers, the search box and the separators placing leaves dropped. The caller owns the list and its cards.
-function HeldCards(P: TPlacement; Card: TCard): TObjectList<TViewCard>;
+function HeldCards(P: TPlacement; Card: TCard; KeepDividers: Boolean = False): TObjectList<TViewCard>;
 var
   Level: TViewLevel;
   Line: TViewLine;
@@ -1276,9 +1279,11 @@ begin
   Result := TObjectList<TViewCard>.Create(False);
   Level := PlaceLines(P, Card.Menu);
   try
+    // KeepDividers (Arrange): the layout's dividers kept in their place among the cards (plan 18)
     for Line in Level.Lines do
       while Line.Cards.Count > 0 do
-        if Line.Cards[0].Kind in [vkSeparator, vkSearch] then
+        if (Line.Cards[0].Kind = vkSearch) or ((Line.Cards[0].Kind = vkSeparator) and
+          (not KeepDividers or (Line.Cards[0].Divider = nil))) then
           Line.Cards.Delete(0)
         else
           Result.Add(Line.Cards.Extract(Line.Cards[0]));
@@ -1303,14 +1308,52 @@ end;
 // the width as a line's cards do); a column one to a line, or with perColumn a grid filled column
 // by column (the columns sharing the width). Beyond the capacity: the last place a "More" card holding the rest as its
 // submenu, or (rest "none") the rest left out. Takes the cards over (the list is freed, its cards owned by the level).
+// A divider's view card: for each place a grid's divider is drawn (plan 18 3.3).
+function DividerCopy(Of_: TLine; Vertical: Boolean): TViewCard;
+begin
+  Result := TViewCard.Create;
+  Result.Kind := vkSeparator;
+  Result.Divider := Of_;
+  Result.Vertical := Vertical;
+end;
+
+// The first divider among a holder's cards (not the search box), from the layout: a grid's (plan 18 3.3). Read from
+// the layout, as placing them drops a divider at the start or the end; nil none.
+function FirstDivider(Card: TCard): TLine;
+var
+  Line: TLine;
+begin
+  Result := nil;
+  if Card.Menu <> nil then
+    for Line in Card.Menu do
+      if Line.IsDivider and not Line.IsSearchBox then
+        Exit(Line);
+end;
+
 function Arrange(Card: TCard; Cards: TObjectList<TViewCard>; Found: Boolean): TViewLevel;
 var
-  Cap, I, Per, Lines, L: Integer;
+  Cap, I, Per, Lines, L, J: Integer;
   More: TViewCard;
-  Line: TViewLine;
+  Line, Sep: TViewLine;
+  Dividers: TObjectList<TViewCard>;   // the layout's dividers among the cards, taken out (owned until placed)
+  Places: TList<Integer>;             // each one's place: how many cards stood before it
+  Grid: TLine;                        // a grid's divider (the first): drawn between its columns or rows
 begin
   Result := TViewLevel.Create;
+  Dividers := TObjectList<TViewCard>.Create(True);
+  Places := TList<Integer>.Create;
+  Grid := nil;
   try
+    // the dividers out first: the counts, the capacity and "More" are the cards' (plan 18 3.2, 3.3)
+    I := 0;
+    while I < Cards.Count do
+      if Cards[I].Kind = vkSeparator then
+      begin
+        Places.Add(I);
+        Dividers.Add(Cards.Extract(Cards[I]));
+      end
+      else
+        Inc(I);
     Cap := Capacity(Card);
     More := nil;
     if (Cap > 0) and (Cards.Count > Cap) then
@@ -1350,6 +1393,27 @@ begin
         end;
         Result.Lines.Last.Cards.Add(Cards[I]);
       end;
+      if (Card.PerRow <= 0) and (Result.Lines.Count = 1) then
+      begin
+        // one row: each divider upright in its place among the cards (not before the first or after the last)
+        for J := Dividers.Count - 1 downto 0 do
+          if (Places[J] > 0) and (Places[J] < Result.Lines[0].Cards.Count) then
+          begin
+            Dividers[J].Vertical := True;
+            Result.Lines[0].Cards.Insert(Places[J], Dividers.Extract(Dividers[J]));
+          end;
+      end
+      else if FirstDivider(Card) <> nil then
+      begin
+        // a grid by rows: its first divider between every two rows
+        Grid := FirstDivider(Card);
+        for L := Result.Lines.Count - 1 downto 1 do
+        begin
+          Sep := TViewLine.Create;
+          Sep.Cards.Add(DividerCopy(Grid, False));
+          Result.Lines.Insert(L, Sep);
+        end;
+      end;
     end
     else
     begin
@@ -1368,8 +1432,29 @@ begin
       // column by column: line L holds the L-th card of each column
       for I := 0 to Cards.Count - 1 do
         Result.Lines[I mod Lines].Cards.Add(Cards[I]);
+      if (Lines < Cards.Count) and (FirstDivider(Card) <> nil) then
+      begin
+        // a grid by columns: its first divider upright between every two columns, in each line
+        Grid := FirstDivider(Card);
+        for Line in Result.Lines do
+          for J := Line.Cards.Count - 1 downto 1 do
+            Line.Cards.Insert(J, DividerCopy(Grid, True));
+      end
+      else if Lines = Cards.Count then
+      begin
+        // one column: each divider a line of its own in its place
+        for J := Dividers.Count - 1 downto 0 do
+          if (Places[J] > 0) and (Places[J] < Result.Lines.Count) then
+          begin
+            Sep := TViewLine.Create;
+            Sep.Cards.Add(Dividers.Extract(Dividers[J]));
+            Result.Lines.Insert(Places[J], Sep);
+          end;
+      end;
     end;
   finally
+    Places.Free;
+    Dividers.Free;   // those not placed
     Cards.Free;
   end;
 end;
@@ -1427,7 +1512,7 @@ begin
   if (Card.Shows = csColumn) and (Card.PerColumn = 0) and (Capacity(Card) = 0) then
     Inner := PlaceLines(P, Card.Menu)   // under each other as placed: its dividers kept
   else
-    Inner := Arrange(Card, HeldCards(P, Card), False);
+    Inner := Arrange(Card, HeldCards(P, Card, True), False);
   // nothing in it but dividers (its cards found nothing): left out, also in the preview, as a line of such cards was
   if not HasCards(Inner) then
   begin
@@ -1752,7 +1837,7 @@ begin
   // columns of a set number)
   Root := Layout.MenuCard;
   if (Root.Shows = csRow) or (Root.PerColumn > 0) or (Capacity(Root) > 0) then
-    Result := Arrange(Root, HeldCards(Self, Root), False)
+    Result := Arrange(Root, HeldCards(Self, Root, True), False)
   else
     Result := PlaceLines(Self, Layout.Lines(Kind));
   Result.MenuCard := Root;

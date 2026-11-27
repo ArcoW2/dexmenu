@@ -269,6 +269,14 @@
     const n5 = M.addCard(L3, top, null);
     check(!M.putAfter(top, n5.id, null) && !M.putAfter(top, n5.id, "menu") && top[top.length - 1] === n5, "nothing selected, or the menu: at the end");
     check(M.putAfter(top, n5.id, "b~t1") && ids(top[2].content).startsWith("b," + n5.id), "a template selected: after its card");
+    // plan 18: a divider dropped beside a card in a row goes into the row (upright there); beside one not in a row,
+    // above or below it
+    const v1 = M.addDivider(L3, top, null);
+    check(M.moveDividerNext(top, v1.id, "e", "before") && ids(top[3].content) === "d," + v1.id + ",e",
+      "a divider dropped on the left edge of a card in a row: between the row's cards");
+    const v2 = M.addDivider(L3, top, null);
+    check(M.moveDividerNext(top, v2.id, "a", "after") && top[top.indexOf(top.find(x => x.id === "a")) + 1] === v2,
+      "a divider dropped on the right edge of a card not in a row: below it");
   }
 
   // the current form (plan 11): format 2 opened as it is; an older form not converted here, not opened

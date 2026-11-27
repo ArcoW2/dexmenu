@@ -2233,6 +2233,54 @@ begin
       L.Free;
       P.Free;
     end;
+    // plan 18: a divider among a row's cards stands upright between them, in its own width
+    L := Level('{ "card": "Row", "show": "row", "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" } }') +
+      ', { "id": "d1", "divider": "", "thickness": 3 }, ' + Card('Copy', '{ "name": { "equals": "Copy" } }') + ' ] }', P);
+    try
+      V := L.Lines[0].Cards[0];
+      Check((V.Inner <> nil) and (V.Inner.Lines.Count = 1) and (V.Inner.Lines[0].Cards.Count = 3) and
+        (V.Inner.Lines[0].Cards[1].Kind = vkSeparator) and V.Inner.Lines[0].Cards[1].Vertical and
+        (V.Inner.Lines[0].Cards[1].Divider.DividerThickness = 3), 'a divider in a row: kept between the cards, upright, its thickness read');
+      G := Measure(L);
+      Box := -1;
+      for K := 0 to High(G.Boxes) do
+        if G.Boxes[K].Card = V.Inner.Lines[0].Cards[1] then
+          Box := K;
+      Check((Box > 0) and (Abs(G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left - 11) < 0.5) and
+        (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box].Rect.top - (G.Boxes[Box - 1].Rect.bottom - G.Boxes[Box - 1].Rect.top)) < 0.5) and
+        (G.Boxes[Box + 1].Rect.left >= G.Boxes[Box].Rect.right),
+        Format('an upright divider: its width (a 3 DIP line: 11), as high as the cards beside it (%.1f)',
+        [G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left]));
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // a divider in a grid by columns: upright between every two columns, in each line
+    L := Level('{ "card": "Grid", "show": "column", "perColumn": 2, "content": [ { "id": "d1", "divider": "" }, ' +
+      Card('Cut', '{ "name": { "equals": "Cut" } }') + ', ' + Card('Copy', '{ "name": { "equals": "Copy" } }') + ', ' +
+      Card('Delete', '{ "name": { "equals": "Delete" } }') + ', ' + Card('Props', '{ "name": { "equals": "Properties" } }') + ' ] }', P);
+    try
+      V := L.Lines[0].Cards[0];
+      Check((V.Inner <> nil) and (V.Inner.Lines.Count = 2) and (V.Inner.Lines[0].Cards.Count = 3) and
+        (V.Inner.Lines[1].Cards.Count = 3) and V.Inner.Lines[0].Cards[1].Vertical and V.Inner.Lines[1].Cards[1].Vertical,
+        'a divider in a grid by columns: upright between the two columns, in each line');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    // a divider in a grid by rows: a line between every two rows
+    L := Level('{ "card": "Grid", "show": "row", "perRow": 2, "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" } }') +
+      ', ' + Card('Copy', '{ "name": { "equals": "Copy" } }') + ', { "id": "d1", "divider": "" }, ' +
+      Card('Delete', '{ "name": { "equals": "Delete" } }') + ', ' + Card('Props', '{ "name": { "equals": "Properties" } }') + ' ] }', P);
+    try
+      V := L.Lines[0].Cards[0];
+      Check((V.Inner <> nil) and (V.Inner.Lines.Count = 3) and (V.Inner.Lines[1].Cards.Count = 1) and
+        (V.Inner.Lines[1].Cards[0].Kind = vkSeparator) and not V.Inner.Lines[1].Cards[0].Vertical,
+        'a divider in a grid by rows: a line between the two rows');
+    finally
+      L.Free;
+      P.Free;
+    end;
     // found items inside a card in a row: templates by position, cycling
     L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "templates": [ ' +
       '{ "background": "#ff0000" }, { "background": "#00ff00", "rename": { "regex": " in LexPen", "replace": "" } } ]'), P);
