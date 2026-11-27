@@ -117,6 +117,9 @@ type
     NoteHideEmpty: Boolean;  // "empty": "hide": left out when its filled text is empty (plan 14 3.1)
     Font: TFontSpec;   // a note's "font" (plan 03 3.6)
     SubmenuMode: TSubmenuMode;   // "submenus": how what opens from this card opens; smDefault: the global setting
+    // the menu card's "themeLight", "themeDark": the layout's own themes for Windows' light and dark mode, over the
+    // global settings' (Dexmenu.Theme.SetLayoutThemes); '' none
+    ThemeLight, ThemeDark: string;
     // Its size on a line (plan 03 3.5): "weight", its share of the line's width (1 when not set); "minWidth" (DIP; 0
     // none); "height", in lines of text (0: auto, from its content); "cardFit", how it fits a taller line.
     Weight: Single;
@@ -1198,6 +1201,10 @@ begin
         Layout.FMenu.Title := TJSONObject(Menu).GetValue('card').Value;
       if not ParseShow(TJSONObject(Menu), Layout.FMenu, Source, Error) then
         Exit;
+      if TJSONObject(Menu).GetValue('themeLight') is TJSONString then
+        Layout.FMenu.ThemeLight := TJSONObject(Menu).GetValue('themeLight').Value;
+      if TJSONObject(Menu).GetValue('themeDark') is TJSONString then
+        Layout.FMenu.ThemeDark := TJSONObject(Menu).GetValue('themeDark').Value;
       if Layout.FMenu.Show in [csDefault, csItem, csSubmenu] then
         Layout.FMenu.Show := csColumn;
       ParseCardLook(TJSONObject(Menu), Layout.FMenu);

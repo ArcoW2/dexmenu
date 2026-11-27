@@ -137,7 +137,7 @@ threadvar
 implementation
 
 uses
-  System.SysUtils, System.Math, System.Classes, System.Diagnostics, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage, Dexmenu.Icons;
+  System.SysUtils, System.Math, System.Classes, System.Diagnostics, Winapi.D2D1, Winapi.MultiMon, Dexmenu.Log, Dexmenu.Seen, Dexmenu.Usage, Dexmenu.Icons, Dexmenu.Theme;
 
 const
   MenuClassName = 'DexmenuMenu';
@@ -386,6 +386,7 @@ begin
   if FLayout.MenuCard.SubmenuMode <> smDefault then
     FSettings.Submenus := FLayout.MenuCard.SubmenuMode;   // the layout's own (its menu card's) over the general one
   FTextSize := FSettings.TextSize;
+  SetLayoutThemes(FLayout.MenuCard.ThemeLight, FLayout.MenuCard.ThemeDark);   // the layout's own themes, if any
   SetMenuLook(FSettings);
   FHints := HintsOf(ReadSeenText(FKind));
   FUsage := ReadUsage(FKind);

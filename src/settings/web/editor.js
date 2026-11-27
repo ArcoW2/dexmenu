@@ -24,6 +24,7 @@ let hoverId = null;
 const collapsed = new Set();   // cards with a menu shown folded (this session only)
 let generalStates = "both";   // what a rule without states of its own takes (the main window's General)
 let palette = {};  // the theme's palette, { name: "#rrggbbaa" } (the app, DexmenuThemePalette): the colour pickers
+let themeNames = [];   // the themes there are (the app, DataFolder.ThemeNames): the menu's own theme
 let counts = {};   // the stored use counts per card id of what the preview shows (the app, DexmenuPreviewCounts)
 let dirty = false;
 let lastSent = "";
@@ -1361,8 +1362,18 @@ function renderCardPane() {
     const wayRow = el("label", "field");
     wayRow.title = "How submenus open in this layout, unless a card says otherwise";
     wayRow.append(el("span", "", "Submenus open"), way);
+    // this layout's own themes for Windows' light and dark mode, over the general ones (the main window); its
+    // submenus too
+    const themeRow = (key, label) => {
+      const names = [...themeNames];
+      if (root[key] && !names.includes(root[key])) names.push(root[key]);   // one not (or no longer) there: kept, shown
+      return selectRow(label, [["", "as set for every menu (General)"], ...names.map(n => [n, n])], root[key] || "",
+        v => { if (v) root[key] = v; else delete root[key]; changed(); },
+        "The theme this layout's menu and its submenus are drawn in, in Windows' " + (key === "themeDark" ? "dark" : "light") + " mode");
+    };
     $("card").replaceChildren(el("div", "hint", "The menu itself, holding every card of the layout. It is not moved, copied or deleted."),
-      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: [...lookFields(root), ...(root.background === "none" ? [el("div", "hint", "No background: the menu is see-through, only its cards, dividers and rows drawn; each card on an opaque base (a card cannot be see-through then).")] : [])] }));
+      renderPanels(root, { inside: [...showFields(root, false, true), wayRow], style: [themeRow("themeLight", "Theme (light)"),
+        themeRow("themeDark", "Theme (dark)"), ...lookFields(root), ...(root.background === "none" ? [el("div", "hint", "No background: the menu is see-through, only its cards, dividers and rows drawn; each card on an opaque base (a card cannot be see-through then).")] : [])] }));
     return;
   }
   const at = selectedId ? M.find(linesOf(), selectedId) : null;
@@ -2418,6 +2429,10 @@ chrome.webview.addEventListener("message", e => {
   else if (m.type === "counts") { counts = m.counts || {}; placeToggles(); }
   else if (m.type === "ruleStates") {
     if (m.states !== generalStates) { generalStates = m.states; renderCardPane(); }
+  }
+  else if (m.type === "themes") {
+    const next = Array.isArray(m.names) ? m.names : [];
+    if (JSON.stringify(next) !== JSON.stringify(themeNames)) { themeNames = next; if (selectedId === "menu") renderCardPane(); }
   }
   else if (m.type === "palette") {
     const next = m.palette || {};

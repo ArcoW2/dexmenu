@@ -45,7 +45,7 @@ implementation
 
 uses
   Winapi.Messages, Winapi.D2D1, System.SysUtils, System.Math, System.Classes, System.Generics.Collections, System.JSON,
-  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip, Dexmenu.Usage, Dexmenu.Icons;
+  Dexmenu.Json, Dexmenu.Log, Dexmenu.Layout, Dexmenu.Tree, Dexmenu.Place, Dexmenu.Draw, Dexmenu.Seen, Dexmenu.Tip, Dexmenu.Usage, Dexmenu.Icons, Dexmenu.Theme;
 
 const
   PreviewClassName = 'DexmenuPreview';
@@ -235,6 +235,10 @@ begin
   FreeAndNil(Placement);
   FreeAndNil(Top);
   Settings := MenuSettings;
+  if Layout <> nil then
+    SetLayoutThemes(Layout.MenuCard.ThemeLight, Layout.MenuCard.ThemeDark)   // the layout's own themes, if any
+  else
+    SetLayoutThemes('', '');
   SetMenuLook(Settings);
   if (Menu = 0) or (Layout = nil) then
     Exit;

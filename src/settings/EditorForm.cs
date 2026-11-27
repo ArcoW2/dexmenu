@@ -278,6 +278,8 @@ sealed class EditorForm : Form, IThemed
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or System.Text.Json.JsonException) { }
         // what a rule without states of its own takes (the main window's General): the rule panel shows it
         Post(new { type = "ruleStates", states = DataFolder.Menu()["states"]?.GetValue<string>() ?? "both" });
+        // the themes there are, for the menu's own theme (its panel)
+        Post(new { type = "themes", names = DataFolder.ThemeNames() });
     }
 
     // The installed font families (as LexPen lists them), for a note's font (plan 03 3.6): once per window.
@@ -316,6 +318,7 @@ sealed class EditorForm : Form, IThemed
                 if (!m.TryGetProperty("quiet", out _)) editedText = Str("layout");
                 Post(new { type = "preview", error = Native.SetPreview(preview, Str("layout"), SeenText(), kind) });
                 PostCounts();
+                PostPalette();   // the layout may choose its own theme: the colour pickers follow it
                 break;
             case "save":
                 Save(Str("name"), Str("layout"));

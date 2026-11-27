@@ -1043,6 +1043,26 @@ begin
 end;
 
 // Themes (plan 03 3.2, 3.3): colours, the intensity mix, a theme on a base, the theme chosen in the settings.
+// A layout's own themes (its menu's "themeLight", "themeDark"): read, and over the global ones while set.
+procedure TestLayoutThemes;
+var
+  Layout: ILayout;
+  Error: string;
+begin
+  Layout := ParseLayout('{ "format": 2, "menu": { "themeLight": "light-sky", "themeDark": "dark-ocean", "content": [ ' +
+    '{ "card": "Rest", "rules": [ "remaining" ] } ] } }', 'test', Error);
+  Check((Layout <> nil) and (Layout.MenuCard.ThemeLight = 'light-sky') and (Layout.MenuCard.ThemeDark = 'dark-ocean'),
+    'a layout''s own themes read: ' + Error);
+  SetLayoutThemes('light-sky', 'dark-ocean');
+  try
+    Check(SameText(CurrentTheme(False).Name, 'light-sky') and SameText(CurrentTheme(True).Name, 'dark-ocean'),
+      'a layout''s own themes used while set: ' + CurrentTheme(False).Name + ', ' + CurrentTheme(True).Name);
+  finally
+    SetLayoutThemes('', '');
+  end;
+  Check(SameText(CurrentTheme(False).Name, MenuSettings.ThemeLight), 'none set: the global theme again');
+end;
+
 procedure TestThemes;
 var
   C: TRGBA;
@@ -2876,6 +2896,7 @@ begin
   TestAccessAndShortcut;
   TestSearch;
   TestThemes;
+  TestLayoutThemes;
   TestSubmenuModes;
   TestSeen;
   TestLinesAndCards;

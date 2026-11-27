@@ -57,6 +57,9 @@ function Intensity(const Base, Color: TRGBA; Value: Single): TRGBA;
 // "dark"), from %APPDATA%\Dexmenu\themes, then the DLL's themes folder, then the built-in ones. Read again when its
 // files change. The caller does not free it.
 function CurrentTheme(Dark: Boolean): TTheme;
+// The layout's own themes for light and dark mode (its menu's "themeLight", "themeDark"), over the global settings'
+// for what is drawn next; '' the global one. Set by the menu and the preview from the layout they show.
+procedure SetLayoutThemes(const Light, Dark: string);
 // A theme from its text and those of its bases (Lookup gives a base theme's text by name); for the tests.
 function ThemeFromText(const Text: string; Lookup: TFunc<string, string>; out Error: string): TTheme;
 // The built-in themes' names.
@@ -575,6 +578,18 @@ var
   Lock: TCriticalSection;
   Loaded: array[Boolean] of TTheme;
   LoadedStamp: array[Boolean] of string;
+  LayoutThemes: array[Boolean] of string;   // SetLayoutThemes; '' none
+
+procedure SetLayoutThemes(const Light, Dark: string);
+begin
+  Lock.Enter;
+  try
+    LayoutThemes[False] := Light;
+    LayoutThemes[True] := Dark;
+  finally
+    Lock.Leave;
+  end;
+end;
 
 function CurrentTheme(Dark: Boolean): TTheme;
 var
@@ -586,12 +601,15 @@ begin
     begin
       Result := ThemeText(Base);
     end;
-  if Dark then
-    Name := MenuSettings.ThemeDark
-  else
-    Name := MenuSettings.ThemeLight;
   Lock.Enter;
   try
+    // the layout's own, else the global settings'
+    Name := LayoutThemes[Dark];
+    if Name = '' then
+      if Dark then
+        Name := MenuSettings.ThemeDark
+      else
+        Name := MenuSettings.ThemeLight;
     S := Stamp(Name);
     if (Loaded[Dark] <> nil) and (LoadedStamp[Dark] = S) then
       Exit(Loaded[Dark]);
