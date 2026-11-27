@@ -1,5 +1,7 @@
 First public release of **Dexmenu**: your own right-click menu for Windows 10/11 (x64). Instead of Windows' long list, Explorer shows a menu you build yourself from layouts: cards, submenus, notes and your own themes, with the items of Windows and other programs placed where you want them.
 
+For the full feature overview, see the [README](https://github.com/ArcoW2/dexmenu#readme).
+
 ## Highlights
 
 - **Your own layouts**: cards and submenus you arrange by dragging, rules that collect Windows' and other programs' items into them, notes, dividers, icons and images; a layout per kind of right-click (a file, a folder, a folder's empty part, a drive, ...).
@@ -35,5 +37,5 @@ PowerShell: `Get-FileHash .\Dexmenu-1.0.227-win-x64.zip -Algorithm SHA256`
 
 Includes [DDetours](https://github.com/MahdiSafsafi/DDetours) by Mahdi Safsafi (MPL 2.0, unchanged).
 
-Copyright (c) 2026 Arco Witter.
+Copyright (c) 2026 Arco Witter. Released under the [MIT License](https://github.com/ArcoW2/dexmenu/blob/main/LICENSE).
 Like Dexmenu? [Support me on Ko-fi](https://ko-fi.com/arcowitter).
