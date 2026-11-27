@@ -54,6 +54,9 @@ type
     BackTitle: string;  // vkBack: "<<" and what it goes back from; vkCommand, vkSearch, vkGroup: its text
     Inner: TViewLevel;  // vkGroup: what shows inside it, lines of cards measured as a level's (owned)
     Framed: Boolean;    // vkGroup: its box and title drawn (a style or a title of its own, or found items inside it)
+    // vkGroup with dividers as its border: its bottom divider left out, as nothing follows it or what follows has a
+    // border of its own (set by Dexmenu.Draw before measuring)
+    NoBottomDivider: Boolean;
     // an inner card made for an item its card (a vkGroup's, or a card showing them in a submenu) found: in the look
     // of its template (Template; nil: the theme's card), not the card's own
     InGroup: Boolean;

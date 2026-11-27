@@ -602,10 +602,80 @@ begin
     not TJSONBool(V.Card.Look.GetValue('dividerTop')).AsBoolean);
 end;
 
-function DividerBottom(V: TViewCard): Boolean;
+// Its bottom divider as set, whether or not it is drawn.
+function DividerBottomSet(V: TViewCard): Boolean;
 begin
   Result := DividerBorder(V) and (V.Card.Look.GetValue('dividerBottom') is TJSONBool) and
     TJSONBool(V.Card.Look.GetValue('dividerBottom')).AsBoolean;
+end;
+
+// Its bottom divider drawn: set, and not left out (MarkBottoms).
+function DividerBottom(V: TViewCard): Boolean;
+begin
+  Result := DividerBottomSet(V) and not V.NoBottomDivider;
+end;
+
+function InnerFramed(V: TViewCard): Boolean; forward;
+
+// Whether a line starts with a border of its own: a divider, a framed card holding cards whose border is drawn (flat,
+// 3D, or dividers with a top one), or a plain holder whose first line does.
+function StartsBordered(Line: TViewLine): Boolean;
+var
+  C: TViewCard;
+  Look: TJSONObject;
+begin
+  Result := False;
+  if (Line = nil) or (Line.Cards.Count = 0) then
+    Exit;
+  C := Line.Cards[0];
+  if C.Kind = vkSeparator then
+    Exit(True);
+  if C.Kind <> vkGroup then
+    Exit;
+  if DividerBorder(C) then
+    Exit(DividerTop(C));
+  if C.Framed then
+  begin
+    Look := nil;
+    if C.Card <> nil then
+      Look := C.Card.Look;
+    // "border": "none" and no 3D border: no line
+    Result := not ((Look <> nil) and (Look.GetValue('border') is TJSONString) and (Look.GetValue('border').Value = 'none')
+      and not (Look.GetValue('border3d') is TJSONObject));
+    Exit;
+  end;
+  Result := (C.Inner <> nil) and (C.Inner.Lines.Count > 0) and StartsBordered(C.Inner.Lines[0]);
+end;
+
+// Each group's bottom divider left out where it would double a border or end the menu (NoBottomDivider): when nothing
+// follows it or what follows starts with a border. EndBordered: what follows the end of this level counts so (the
+// menu's end; a frame's bottom; a drawn bottom divider; else what follows the holder).
+procedure MarkBottoms(Level: TViewLevel; EndBordered: Boolean);
+var
+  I: Integer;
+  C: TViewCard;
+  AfterIt, InnerEnd: Boolean;
+begin
+  if Level = nil then
+    Exit;
+  for I := 0 to Level.Lines.Count - 1 do
+  begin
+    if I = Level.Lines.Count - 1 then
+      AfterIt := EndBordered
+    else
+      AfterIt := StartsBordered(Level.Lines[I + 1]);
+    for C in Level.Lines[I].Cards do
+    begin
+      if C.Kind <> vkGroup then
+        Continue;
+      C.NoBottomDivider := DividerBottomSet(C) and AfterIt;
+      if InnerFramed(C) or DividerBottom(C) then
+        InnerEnd := True
+      else
+        InnerEnd := AfterIt;
+      MarkBottoms(C.Inner, InnerEnd);
+    end;
+  end;
 end;
 
 // The gaps inside it are a frame's (at least ButtonGap) only with a frame line around them.
@@ -985,6 +1055,7 @@ var
   V: TViewCard;
 begin
   EnsureFactories;
+  MarkBottoms(Level, True);   // nothing follows the level's end
   LevelMin := MinWidth;
   LevelMax := MaxWidth;
   if Length(LevelWidths) > 0 then

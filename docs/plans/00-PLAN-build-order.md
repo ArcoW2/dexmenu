@@ -327,9 +327,11 @@ None.
   its own card, only the rules after it, by use invalid); the editor's self-test.
 - Dividers as a border (`"border": "divider"` on a card holding or showing cards inside it; `"dividerTop": false`,
   `"dividerBottom": true`): no frame line and no padding, its items in line with the menu's; a divider at the top
-  with its title as the text (a plain line without one), one at the bottom when set; its background and hover look
-  stay. Editor: Border "dividers (top, bottom)" with the two checkboxes; "Title shown as" not offered then. Tested:
-  unit tests (the boxes: no side padding, the titled divider above, the plain one below; neither); the user's layout
+  with its title as the text (a plain line without one), one at the bottom when set, left out where nothing follows
+  or what follows starts with a border of its own (a divider, a framed group, a group's top divider); its
+  background and hover look stay. Editor: Border "dividers (top, bottom)" with the two checkboxes; "Title shown as" not offered then. Tested:
+  unit tests (the boxes: no side padding, the titled divider above, the plain one below; neither; the bottom one with
+  nothing after, before a framed group, before an item); the user's layout
   drawn by a probe.
 - The test host's `--hold <ms>` with Dexmenu off: Windows' menu kept open that long, then printed as it is (the
   shell's late changes in).

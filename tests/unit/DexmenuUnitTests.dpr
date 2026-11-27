@@ -2017,7 +2017,7 @@ var
   L, Sub: TViewLevel;
   V: TViewCard;
   G: TGeometry;
-  I, Box: Integer;
+  I, K, Box: Integer;
   Inside: Boolean;
   Pic: TPicture;
   Plain, Ring: COLORREF;
@@ -2090,6 +2090,38 @@ begin
     finally
       L.Free;
       P.Free;
+    end;
+    // a bottom divider left out when nothing follows, or what follows has a border; drawn before a plain item
+    for I := 0 to 2 do
+    begin
+      case I of
+        0: Titles_ := '';
+        1: Titles_ := ', { "card": "Framed", "title": "F", "content": [ ' + Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }') + ' ] }';
+      else
+        Titles_ := ', ' + Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }');
+      end;
+      L := Level('{ "card": "Box", "border": "divider", "dividerTop": false, "dividerBottom": true, "content": [ ' +
+        Card('Cut', '{ "name": { "equals": "Cut" }, "priority": 1 }') + ' ] }' + Titles_ +
+        ', { "card": "All", "hidden": true, "rules": [ { "name": { "wildcard": "*" }, "scope": "anywhere", "priority": 3 } ] }', P);
+      try
+        G := Measure(L);
+        Box := -1;
+        for K := 0 to High(G.Boxes) do
+          if G.Boxes[K].Card = L.Lines[0].Cards[0] then
+            Box := K;
+        case I of
+          0: Check((Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom) < 0.5),
+               'a bottom divider with nothing after it: left out');
+          1: Check((Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom) < 0.5),
+               'a bottom divider before a framed group: left out');
+        else
+          Check((Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom - SeparatorHeight) < 0.5),
+            'a bottom divider before a plain item: drawn');
+        end;
+      finally
+        L.Free;
+        P.Free;
+      end;
     end;
     // found items inside a card in a row: templates by position, cycling
     L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "templates": [ ' +
