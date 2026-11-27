@@ -668,15 +668,17 @@ function colorField(label, get, set, gradients = false, withNone = false) {
     : { mode: "pick", base: Object.keys(palette).find(n => n !== "basecolor") || "#808080", intensity: 100, opacity: 100, overrule: false };
   const build = () => {
     const kind = el("select");
+    // "as written (JSON)" only for a value the other choices cannot show (a gradient of more colours): not a choice to
+    // make, the colour picker is "a colour"
     for (const [v, text] of [["colour", "a colour"], ...(gradients ? [["gradient", "a gradient"], ["image", "an image"]] : []),
-      ...(withNone ? [["none", "none (not drawn)"]] : []), ["json", "other (JSON)"]]) {
+      ...(withNone ? [["none", "none (not drawn)"]] : []), ...(state.kind === "json" ? [["json", "as written (JSON)"]] : [])]) {
       const o = el("option", "", text);
       o.value = v;
       kind.append(o);
     }
     kind.value = state.kind;
-    kind.title = "A colour; a gradient from one colour to another; or anything else written as JSON (" +
-      (gradients ? "a gradient of more colours, " : "") + "\"none\")";
+    kind.title = "A colour (a theme colour or one picked); " + (gradients ? "a gradient from one colour to another; an image; " : "") +
+      "a value the fields cannot show stays as written";
     kind.addEventListener("change", () => {
       const current = M.fillValue(state);
       if (kind.value === "colour")
