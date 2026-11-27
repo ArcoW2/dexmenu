@@ -1260,8 +1260,8 @@ function renderCardPane() {
       changed();
     }, placeholder);
     box.append(row,
-      ...(upright ? [size("width", "Width", "(9) in DIP: as wide as it gets while the cards fit"),
-        size("minWidth", "Min width", "(its line and a little) in DIP: as narrow as it gets when the cards need the room")]
+      ...(upright ? [size("minWidth", "Min width", "(its line and a little) in DIP: as narrow as it gets when the cards need the room"),
+        size("width", "Max width", "(9) in DIP: as wide as it gets while the cards fit")]
         : [size("height", "Height", "(the theme's) in DIP")]),
       colorField("Background", own("background").get, own("background").set, true, true),
       colorField("Line colour", own("border").get, own("border").set, false, true),
@@ -1275,7 +1275,7 @@ function renderCardPane() {
     // where it stands decides how it shows (plan 18): upright between cards side by side; a grid's between its columns
     if (inRow)
       box.append(el("div", "hint", "Between cards side by side: drawn upright, as high as the row; its text is not shown. " +
-        "It is as wide as Width while the cards fit, and narrows down to Min width when they need the room (the same for a fixed width)."));
+        "It is as wide as Max width while the cards fit, and narrows down to Min width when they need the room (the same for a fixed width)."));
     else if (inGrid)
       box.append(el("div", "hint", "In a group laid out as a grid: drawn between every two " + (parent.show === "row" ? "rows" : "columns") +
         " (upright between columns), wherever it stands among the cards; the first divider in the group counts."));

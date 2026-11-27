@@ -73,7 +73,7 @@ edge in a row lands beside it, and the divider's panel has a Thickness field.
 ### 3.4 The editor
 
 - The divider's panel: Thickness (a number, empty: 1), under Line colour; an upright divider (in a row, or a grid's
-  between columns) Width and Min width in place of Height.
+  between columns) Min width and Max width in place of Height.
 - A divider dragged onto a card's left or right edge: when that card stands in a row, the divider goes beside it in
   that row; elsewhere above or below it, as now.
 - In the cards view a divider in a row is drawn as a thin upright bar; it is selected, dragged and deleted as any.
@@ -109,7 +109,7 @@ None.
 - Upright widths: `TLine.DividerWidth`, `DividerMinWidth`; `UprightWidth` (widest) and `UprightMin` (narrowest: its
   min width, at most its widest, else its line and 4). In the row's width split the dividers start at their widest;
   what the cards' minimums lack is taken from them in proportion to what each can give. SplitRows counts a divider at
-  its narrowest, so a row wraps only when the cards do not fit even then. Editor: Width and Min width for an upright
+  its narrowest, so a row wraps only when the cards do not fit even then. Editor: Min width and Max width for an upright
   divider.
 - Tested: unit tests (a divider in a row: kept, upright, its thickness, its width and height; its widest while the
   cards fit, narrower as they need, not below its narrowest; a grid by columns: an
