@@ -378,13 +378,26 @@ begin
     Result := 1;
 end;
 
-// An upright divider's width (plan 18 3.2): its own "height" (read as its width there), else a plain divider's height.
+// An upright divider's widest (plan 18 3.2): its "width", else its "height" (an earlier layout's way), else a plain
+// divider's height.
 function UprightWidth(D: TLine): Single;
 begin
-  if (D <> nil) and (D.DividerHeight > 0) then
+  if (D <> nil) and (D.DividerWidth > 0) then
+    Result := D.DividerWidth
+  else if (D <> nil) and (D.DividerHeight > 0) then
     Result := D.DividerHeight
   else
     Result := Max(SeparatorHeight, LineThickness(D) + 8);
+end;
+
+// Its narrowest, when the cards beside it need the room: its "minWidth" (at most its widest), else its line and a
+// little room.
+function UprightMin(D: TLine): Single;
+begin
+  if (D <> nil) and (D.DividerMinWidth > 0) then
+    Result := Min(D.DividerMinWidth, UprightWidth(D))
+  else
+    Result := Min(UprightWidth(D), LineThickness(D) + 4);
 end;
 
 // A divider's height: its own, else one with a label (as high as its font needs) or a plain line's.
@@ -951,7 +964,9 @@ begin
     end;
     for V in Line.Cards do
     begin
-      if Line.Inner or ((V.Kind = vkSeparator) and V.Vertical) then
+      if (V.Kind = vkSeparator) and V.Vertical then
+        Size := UprightMin(V.Divider)   // an upright divider gives way before the row wraps
+      else if Line.Inner then
         Size := Max(CardNeed(V), CardMin(V))
       else
         Size := CardMin(V);
@@ -989,7 +1004,7 @@ var
   Widths, Floors: TArray<Single>;
   Fixed: TArray<Boolean>;
   V: TViewCard;
-  Y, H, X, Avail, FreeWeight, OwnH, CardTop, Sum: Single;
+  Y, H, X, Avail, FreeWeight, OwnH, CardTop, Sum, DivSum, Give, Need: Single;
   N, I, J, Per: Integer;
   Changed, First: Boolean;
   Box: TBox;
@@ -1040,13 +1055,28 @@ begin
         if Sum > Width then
           for J := 0 to N - 1 do
             Floors[J] := CardMin(Row[J]);
+        // an upright divider takes its widest while the cards fit beside it, else shrinks toward its narrowest as far
+        // as their minimums need (the dividers in proportion to what each can give); the cards share the rest
+        DivSum := 0;
+        Give := 0;
+        Sum := 0;
         for J := 0 to N - 1 do
         begin
-          // an upright divider takes its own width; the cards share the rest
           Fixed[J] := (Row[J].Kind = vkSeparator) and Row[J].Vertical;
           if Fixed[J] then
+          begin
             Widths[J] := UprightWidth(Row[J].Divider);
+            DivSum := DivSum + Widths[J];
+            Give := Give + Widths[J] - UprightMin(Row[J].Divider);
+          end
+          else
+            Sum := Sum + Floors[J];
         end;
+        Need := Sum - (Width - CardGap * (N - 1) - DivSum);   // what the cards' minimums lack
+        if (Need > 0) and (Give > 0) then
+          for J := 0 to N - 1 do
+            if Fixed[J] then
+              Widths[J] := Widths[J] - Min(Need, Give) * (Widths[J] - UprightMin(Row[J].Divider)) / Give;
         repeat
           Changed := False;
           Avail := Width - CardGap * (N - 1);

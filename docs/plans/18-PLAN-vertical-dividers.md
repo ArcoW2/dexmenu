@@ -52,9 +52,13 @@ edge in a row lands beside it, and the divider's panel has a Thickness field.
 - A row (a card holding cards side by side, `show: row`, without a number per row) keeps the dividers among its
   cards; today they are dropped. Each is drawn upright between its neighbours: as high as the row, its line in the
   middle of its width, from the top to the bottom.
-- Its width: its own `height` when set (the setting reads as its width there), else a plain divider's height.
+- Its width between a widest and a narrowest: `"width"` (absent: its `height` when set, else a plain divider's
+  height) and `"minWidth"` (absent: its line and a little room). It takes its widest while the cards beside it fit
+  (their minimum widths, a wrapping card's longest word); when they do not, the upright dividers of that row give
+  room, each in proportion to what it can give, down to their narrowest. The cards share the rest by their weights,
+  as now. The same width and min width make a fixed width. A row wraps only when its cards do not fit even with the
+  dividers at their narrowest.
 - It has no text: a text set on it is not shown upright. A spacer leaves the room without a line.
-- In the row's width it takes its width; the cards share the rest by their weights, as now.
 - The group divider rules (a bottom divider left out before a divider; a plain divider left out after a bordered
   group) look only at dividers on a line of their own, not at upright ones.
 
@@ -68,7 +72,8 @@ edge in a row lands beside it, and the divider's panel has a Thickness field.
 
 ### 3.4 The editor
 
-- The divider's panel: Thickness (a number, empty: 1), under Line colour.
+- The divider's panel: Thickness (a number, empty: 1), under Line colour; an upright divider (in a row, or a grid's
+  between columns) Width and Min width in place of Height.
 - A divider dragged onto a card's left or right edge: when that card stands in a row, the divider goes beside it in
   that row; elsewhere above or below it, as now.
 - In the cards view a divider in a row is drawn as a thin upright bar; it is selected, dragged and deleted as any.
@@ -101,7 +106,13 @@ None.
 - Editor: a divider's drop zone on a card has left and right edges when the card stands in a row (`moveDividerNext`
   puts it into the row there; elsewhere before and after mean above and below); a divider in a row is drawn upright in
   the cards view; Thickness in the divider's panel; a hint for a divider in a row and one in a grid.
-- Tested: unit tests (a divider in a row: kept, upright, its thickness, its width and height; a grid by columns: an
+- Upright widths: `TLine.DividerWidth`, `DividerMinWidth`; `UprightWidth` (widest) and `UprightMin` (narrowest: its
+  min width, at most its widest, else its line and 4). In the row's width split the dividers start at their widest;
+  what the cards' minimums lack is taken from them in proportion to what each can give. SplitRows counts a divider at
+  its narrowest, so a row wraps only when the cards do not fit even then. Editor: Width and Min width for an upright
+  divider.
+- Tested: unit tests (a divider in a row: kept, upright, its thickness, its width and height; its widest while the
+  cards fit, narrower as they need, not below its narrowest; a grid by columns: an
   upright divider between the columns in each line; a grid by rows: a line between the rows); the editor's self-test
   (a divider beside a card in a row, and beside one not in a row); the user's layout drawn by a probe with a divider
   between two cards of a row.

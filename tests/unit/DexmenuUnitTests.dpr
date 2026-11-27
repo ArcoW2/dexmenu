@@ -2255,6 +2255,40 @@ begin
       L.Free;
       P.Free;
     end;
+    // an upright divider at its width while the cards fit; narrower, down to its min width, when they need the room
+    // (the menu at most 480 wide, 472 inside: cards of at least 200 and 250, 262, 266)
+    for I := 0 to 2 do
+    begin
+      case I of
+        0: K := 250;
+        1: K := 262;
+      else
+        K := 266;   // 466 + 6 = 472: fits with the divider at its narrowest; more would wrap the row
+      end;
+      L := Level('{ "card": "Row", "show": "row", "content": [ ' + Card('Cut', '{ "name": { "equals": "Cut" } }', ', "minWidth": 200') +
+        ', { "id": "d1", "divider": "", "width": 20, "minWidth": 6 }, ' +
+        Card('Copy', '{ "name": { "equals": "Copy" } }', ', "minWidth": ' + IntToStr(K)) + ' ] }', P);
+      try
+        V := L.Lines[0].Cards[0];
+        G := Measure(L);
+        Box := -1;
+        for K := 0 to High(G.Boxes) do
+          if G.Boxes[K].Card = V.Inner.Lines[0].Cards[1] then
+            Box := K;
+        case I of
+          0: Check((Box > 0) and (Abs(G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left - 20) < 0.5),
+               'an upright divider: its width while the cards fit');
+          1: Check((Box > 0) and (Abs(G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left - 10) < 0.5),
+               Format('an upright divider: narrower as the cards need (10: %.1f)', [G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left]));
+        else
+          Check((Box > 0) and (Abs(G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left - 6) < 0.5),
+            Format('an upright divider: not below its min width (6: %.1f)', [G.Boxes[Box].Rect.right - G.Boxes[Box].Rect.left]));
+        end;
+      finally
+        L.Free;
+        P.Free;
+      end;
+    end;
     // a divider in a grid by columns: upright between every two columns, in each line
     L := Level('{ "card": "Grid", "show": "column", "perColumn": 2, "content": [ { "id": "d1", "divider": "" }, ' +
       Card('Cut', '{ "name": { "equals": "Cut" } }') + ', ' + Card('Copy', '{ "name": { "equals": "Copy" } }') + ', ' +

@@ -178,6 +178,9 @@ type
     DividerSpacer: Boolean;
     // "thickness": its line's width in DIP (docs/plans/18-PLAN-vertical-dividers.md 3.1); 0: the default, 1
     DividerThickness: Single;
+    // upright (plan 18 3.2): "width" its widest, "minWidth" its narrowest when the cards beside it need the room; 0:
+    // not set
+    DividerWidth, DividerMinWidth: Single;
     DividerLook: TJSONObject;
     DividerFont: TFontSpec;
     IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
@@ -756,6 +759,10 @@ begin
   Line.DividerSpacer := (Obj.GetValue('spacer') is TJSONBool) and TJSONBool(Obj.GetValue('spacer')).AsBoolean;
   if (Obj.GetValue('thickness') is TJSONNumber) and (TJSONNumber(Obj.GetValue('thickness')).AsDouble > 0) then
     Line.DividerThickness := Min(50, TJSONNumber(Obj.GetValue('thickness')).AsDouble);
+  if (Obj.GetValue('width') is TJSONNumber) and (TJSONNumber(Obj.GetValue('width')).AsDouble > 0) then
+    Line.DividerWidth := Min(200, TJSONNumber(Obj.GetValue('width')).AsDouble);
+  if (Obj.GetValue('minWidth') is TJSONNumber) and (TJSONNumber(Obj.GetValue('minWidth')).AsDouble > 0) then
+    Line.DividerMinWidth := Min(200, TJSONNumber(Obj.GetValue('minWidth')).AsDouble);
   for P in Props do
     if Obj.GetValue(P) <> nil then
     begin

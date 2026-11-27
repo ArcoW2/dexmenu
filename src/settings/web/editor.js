@@ -1249,12 +1249,20 @@ function renderCardPane() {
       "A spacer is room between cards: no line, its text (if any) still shown; it is no border, so a group's bottom divider before it stays");
     box.append(shownAs);
     const own = name => ({ get: () => e[name], set: v => { if (v === undefined) delete e[name]; else e[name] = v; } });
+    // upright (between cards side by side, or a grid's between its columns): its widest and narrowest; else its height
+    const parent = div.parent;
+    const inRow = !!parent && M.isRow(parent) && !parent.perRow;
+    const inGrid = !!parent && ((parent.show === "row" && parent.perRow) || (parent.show !== "row" && parent.show !== "submenu" && parent.perColumn));
+    const upright = inRow || (inGrid && parent.show !== "row");
+    const size = (key, label, placeholder) => textField(label, e[key] === undefined ? "" : String(e[key]), v => {
+      const n = Number(v.trim());
+      if (v.trim() && n > 0) e[key] = n; else delete e[key];
+      changed();
+    }, placeholder);
     box.append(row,
-      textField("Height", e.height === undefined ? "" : String(e.height), v => {
-        const n = Number(v.trim());
-        if (v.trim() && n > 0) e.height = n; else delete e.height;
-        changed();
-      }, "(the theme's) in DIP"),
+      ...(upright ? [size("width", "Width", "(9) in DIP: as wide as it gets while the cards fit"),
+        size("minWidth", "Min width", "(its line and a little) in DIP: as narrow as it gets when the cards need the room")]
+        : [size("height", "Height", "(the theme's) in DIP")]),
       colorField("Background", own("background").get, own("background").set, true, true),
       colorField("Line colour", own("border").get, own("border").set, false, true),
       textField("Thickness", e.thickness === undefined ? "" : String(e.thickness), v => {
@@ -1265,10 +1273,10 @@ function renderCardPane() {
       colorField("Text colour", own("foreground").get, own("foreground").set),
       ...fontFields(e));
     // where it stands decides how it shows (plan 18): upright between cards side by side; a grid's between its columns
-    const parent = div.parent;
-    if (parent && M.isRow(parent) && !parent.perRow)
-      box.append(el("div", "hint", "Between cards side by side: drawn upright, as high as the row; its text is not shown, its Height is its width."));
-    else if (parent && ((parent.show === "row" && parent.perRow) || (parent.show !== "row" && parent.show !== "submenu" && parent.perColumn)))
+    if (inRow)
+      box.append(el("div", "hint", "Between cards side by side: drawn upright, as high as the row; its text is not shown. " +
+        "It is as wide as Width while the cards fit, and narrows down to Min width when they need the room (the same for a fixed width)."));
+    else if (inGrid)
       box.append(el("div", "hint", "In a group laid out as a grid: drawn between every two " + (parent.show === "row" ? "rows" : "columns") +
         " (upright between columns), wherever it stands among the cards; the first divider in the group counts."));
     return;
