@@ -449,11 +449,11 @@ begin
   LevelWidths := Settings.Widths;
 end;
 
-// The room kept at a card's right for its mark; a button in a card with buttons that shows no mark keeps none, so
-// more buttons fit side by side.
+// The room kept at a card's right for its mark (a submenu's chevron, the action mark when one is set); a card that
+// shows no mark keeps only a little, so its text has the room.
 function MarkSpace(V: TViewCard): Single;
 begin
-  if V.InGroup and not V.HasSubmenu and ((ActionMark = '') or not (V.Kind in [vkItem, vkCommand])) then
+  if not V.HasSubmenu and ((ActionMark = '') or not (V.Kind in [vkItem, vkCommand])) then
     Result := 8
   else
     Result := MarkWidth;
