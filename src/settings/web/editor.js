@@ -975,7 +975,7 @@ function matchEditor(match, onChange) {
 // (delete) at the top right of that line, its whole left edge the handle to drag it by; inside, its settings in two
 // columns, a label and its fields.
 function ruleEditor(card, rule, index) {
-  const box = el("div", "rule" + (index === selectedRule ? " selected" : ""));
+  const box = el("div", "rule" + (index === selectedRule ? " selected" : "") + (rule.exclude ? " exclude" : ""));
   // Reordered by dragging its handle (the card's rules keep their places in the priority list, swapped among
   // themselves); numbered within the card, with its number in the priority list beside it.
   const handle = el("div", "rule-handle");
@@ -1129,13 +1129,16 @@ function ruleEditor(card, rule, index) {
   }
   if (!ownType) body.append(el("span", "rule-label"), statesBox);
   const opts = ownType ? el("div") : row("Options");
-  for (const [flag, label] of [["also", "also when taken"],
-    ["skipDuplicates", "skip duplicates (one per name)"]]) {
+  for (const [flag, label, tip] of [["also", "also when taken"],
+    ["skipDuplicates", "skip duplicates (one per name)"],
+    ["exclude", "exclude", "It finds nothing: what it matches, this card's rules after it do not take (it stays free for other cards)"]]) {
+    if (flag === "exclude" && M.ruleType(rule) !== "name") continue;   // a rule by name only
     const cb = el("input");
     cb.type = "checkbox";
     cb.checked = !!rule[flag];
     cb.addEventListener("change", () => { if (cb.checked) rule[flag] = true; else delete rule[flag]; changed(); });
     const l = el("label");
+    if (tip) l.title = tip;
     l.append(cb, " " + label);
     opts.append(l);
   }
@@ -1780,6 +1783,7 @@ function summary(rule) {
   if (rule.consume === false) s += ", not consumed";
   if (rule.skipDuplicates) s += ", skip duplicates";
   if (rule.latest !== undefined) s += ", latest " + rule.latest;
+  if (rule.exclude) s = "exclude: " + s;
   return s;
 }
 
@@ -1790,6 +1794,7 @@ function renderRules() {
     const classes = [];
     if (r.card.id === selectedId) classes.push("mine");   // the selected card's rules
     if (r.card.id === selectedId && r.index === selectedRule) classes.push("selected");
+    if (r.rule.exclude) classes.push("exclude");
     const li = el("li", classes.join(" "));
     li.title = "Drag to change its place in the list, or onto a card: move (Shift: copy)";
     li.draggable = true;

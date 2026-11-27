@@ -651,7 +651,7 @@ begin
   try
     CollectRules(Layout.Lines(Kind), Rules);
     for R in Rules do
-      if R.Spec.Scope <> scTop then
+      if (R.Spec.Scope <> scTop) and not R.Spec.Exclude then
         Exit(True);
   finally
     Rules.Free;
@@ -717,6 +717,7 @@ procedure TPlacement.Evaluate;
 var
   Names: TDictionary<string, Boolean>;
   Rules: TList<TRule>;
+  Excludes: TObjectDictionary<TCard, TList<TRule>>;   // a card's exclude rules
   Order: TDictionary<TRule, Integer>;
   R: TRule;
   I: Integer;
@@ -735,14 +736,38 @@ var
       end;
   end;
 
+  // Whether X comes before R on their card: by priority (as the editor keeps a card's rules), else by place.
+  function Before(X, R: TRule): Boolean;
+  begin
+    if (X.Spec.Priority >= 0) and (R.Spec.Priority >= 0) and (X.Spec.Priority <> R.Spec.Priority) then
+      Result := X.Spec.Priority < R.Spec.Priority
+    else
+      Result := X.Index < R.Index;
+  end;
+
+  // Whether an exclude rule of R's card before R accepts N: then R does not take it.
+  function Excluded(R: TRule; N: TNode): Boolean;
+  var
+    List: TList<TRule>;
+    X: TRule;
+  begin
+    Result := False;
+    if Excludes.TryGetValue(R.Card, List) then
+      for X in List do
+        if Before(X, R) and Accepts(X, N) then
+          Exit(True);
+  end;
+
   // N found by R: shown in R's card (unless a duplicate, or Show False: one "latest" leaves out), taken with its
-  // subitems when R consumes
+  // subitems when R consumes; one an exclude rule before R on its card accepts: neither (it stays free)
   procedure Take(N: TNode; R: TRule; Names: TDictionary<string, Boolean>; Show: Boolean = True);
   var
     List: TList<TFound>;
     F: TFound;
     Twice: Boolean;
   begin
+    if Excluded(R, N) then
+      Exit;
     if not FFound.TryGetValue(R.Card, List) then
     begin
       List := TList<TFound>.Create;
@@ -797,7 +822,7 @@ var
     begin
       for N in Nodes do
       begin
-        if Accepts(R, N) and (not FTaken.ContainsKey(KeyOf(N)) or R.Spec.Also) then
+        if Accepts(R, N) and (not FTaken.ContainsKey(KeyOf(N)) or R.Spec.Also) and not Excluded(R, N) then
           Found.Add(N);
         if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
           Collect(N.Children);
@@ -951,8 +976,18 @@ var
 begin
   Rules := TList<TRule>.Create;
   Order := TDictionary<TRule, Integer>.Create;
+  Excludes := TObjectDictionary<TCard, TList<TRule>>.Create([doOwnsValues]);
   try
     CollectRules(Layout.Lines(Kind), Rules);
+    // exclude rules find nothing: kept per card, out of the priority list
+    for I := Rules.Count - 1 downto 0 do
+      if Rules[I].Spec.Exclude then
+      begin
+        if not Excludes.ContainsKey(Rules[I].Card) then
+          Excludes.Add(Rules[I].Card, TList<TRule>.Create);
+        Excludes[Rules[I].Card].Add(Rules[I]);
+        Rules.Delete(I);
+      end;
     for I := 0 to Rules.Count - 1 do
       Order.Add(Rules[I], I);
     // the priority list: a rule's priority first (lower first), then the layout's order
@@ -1002,6 +1037,7 @@ begin
         Remaining.Add(Top[I]);
     FEvaluated := True;
   finally
+    Excludes.Free;
     Order.Free;
     Rules.Free;
   end;

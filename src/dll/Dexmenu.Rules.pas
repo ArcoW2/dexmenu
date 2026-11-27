@@ -12,6 +12,8 @@ unit Dexmenu.Rules;
 //     "skipDuplicates": false,                      true: of items of one name it finds, only the first shows
 //     "latest": 1,                                  of the items it finds only the ones seen most recently show,
 //                                                   this many (none: all); the others are taken all the same
+//     "exclude": true,                              finds nothing itself: what it matches, this card's rules after
+//                                                   it (by priority) do not take (it stays free for other cards)
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
 // Or by use instead of by name (docs/plans/executed/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
@@ -63,6 +65,9 @@ type
     // "latest": of the items found only this many show, the ones seen most recently (Dexmenu.Seen: the preview's
     // seen items; at a right-click all are there now: the first in the menu's order); 0: all
     Latest: Integer;
+    // "exclude": the rule finds nothing; an item it accepts is not taken by its card's rules after it (by priority;
+    // a rule by name)
+    Exclude: Boolean;
     Priority: Integer;   // -1: none given
     Used: TUsedKind;     // ukNone: a rule by name
     // the ranks a used rule finds, from 1, in the order written ("1,3,5", "1-2,5-6,8-10"; a range from high to low in
@@ -354,6 +359,13 @@ begin
       Exit;
     end;
     Result.Latest := TJSONNumber(V).AsInt;
+  end;
+  if Obj.GetValue('exclude') is TJSONBool then
+    Result.Exclude := TJSONBool(Obj.GetValue('exclude')).AsBoolean;
+  if Result.Exclude and (Result.Used <> ukNone) then
+  begin
+    Result.Problem := 'an exclude rule is a rule by name';
+    Exit;
   end;
   if Obj.GetValue('priority') is TJSONNumber then
     Result.Priority := TJSONNumber(Obj.GetValue('priority')).AsInt;

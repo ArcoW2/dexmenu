@@ -250,7 +250,7 @@ const LayoutModel = (() => {
   // has no other fields: the shared ones go too.
   function setRuleType(rule, type) {
     if (ruleType(rule) === type) return;
-    for (const k of ["name", "caseSensitive", "scope", "path", "used", "rank", "own"]) delete rule[k];
+    for (const k of ["name", "caseSensitive", "scope", "path", "used", "rank", "own", "latest", "exclude"]) delete rule[k];   // latest, exclude: by name only
     if (type === "usage") rule.used = "most";
     else if (type === "editMenu" || type === "windowsMenu") {
       for (const k of ["states", "also", "consume", "skipDuplicates"]) delete rule[k];
@@ -269,6 +269,7 @@ const LayoutModel = (() => {
     }
     if (rule.used !== undefined) {
       if (rule.name !== undefined) return "a rule has a name or a use, not both";
+      if (rule.exclude) return "an exclude rule is a rule by name";
       if (rule.used !== "most" && rule.used !== "recent") return "used is most or recent";
       const rank = rankProblem(rule.rank);
       if (rank) return rank;
@@ -301,7 +302,7 @@ const LayoutModel = (() => {
   function useless(card) {
     if (isHolder(card) || isNote(card) || isOwn(card)) return false;
     const rules = card.rules || [];
-    return rules.length === 0 || rules.some(r => ruleProblem(r) !== "");
+    return rules.length === 0 || rules.every(r => r !== "remaining" && r.exclude === true) || rules.some(r => ruleProblem(r) !== "");
   }
 
   // The priority list: every rule but the remaining card's, lower priority first, then the layout's order (as the DLL).

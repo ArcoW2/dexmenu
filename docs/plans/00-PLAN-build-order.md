@@ -320,6 +320,11 @@ None.
   item (`seen`, UTC); at a right-click every item is there now, so the first in the menu's order show. Field
   "Latest" in the rule panel (Name rules). Tested: unit tests (valid values; without times, with times, more than
   found; seen times stamped, merged and read back); the editor's self-test (its check).
+- Exclude (`exclude: true` on a rule by name): the rule finds nothing; what it matches, the card's rules after it (by
+  priority) do not take, so it stays free for other cards or in its Windows submenu. Why: every item of Open with's
+  submenu but LexPen's. Checkbox "exclude" in the rule's Options; drawn reddish with a red handle, "exclude:" in the
+  rules view. A card with only exclude rules finds nothing (outlined red). Tested: unit tests (without, with, only
+  its own card, only the rules after it, by use invalid); the editor's self-test.
 - The test host's `--hold <ms>` with Dexmenu off: Windows' menu kept open that long, then printed as it is (the
   shell's late changes in).
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the

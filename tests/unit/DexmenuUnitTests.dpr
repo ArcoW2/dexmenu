@@ -1620,6 +1620,64 @@ begin
     'I:Notepad / I:Open with / I:Open with Code / I:Other', 'a submenu with an item left: shown');
 end;
 
+// An exclude rule: what it matches, its card's other rules do not take; it stays free for other cards.
+function ShowsExcluded(const Lines: string): string;
+var
+  Menu, Sub: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+begin
+  Layout := ParseLayout('{ "default": [ ' + Lines + ', { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }',
+    'test', Error);
+  if Layout = nil then
+    Exit('LAYOUT: ' + Error);
+  Sub := CreatePopupMenu;
+  Add(Sub, 'Notepad');
+  Add(Sub, 'LexPen');
+  Add(Sub, 'Paint');
+  Menu := CreatePopupMenu;
+  Add(Menu, 'Open with', False, Sub);
+  Add(Menu, 'Edit in LexPen');
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      Result := Describe(Level);
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+procedure TestExclude;
+const
+  Apps = '{ "name": { "wildcard": "*" }, "path": { "startsWith": "Open with" }, "priority": 2 }';
+  NoLex = '{ "name": { "contains": "LexPen" }, "path": { "startsWith": "Open with" }, "exclude": true, "priority": 1 }';
+begin
+  Expect(ShowsExcluded(Card('Apps', Apps)), 'I:Notepad / I:LexPen / I:Paint / I:Edit in LexPen',
+    'without exclude: every item of the submenu; the submenu emptied, its item not shown');
+  Expect(ShowsExcluded(Card('Apps', Apps + ', ' + NoLex)), 'I:Notepad / I:Paint / I:Open with / I:Edit in LexPen',
+    'exclude: LexPen not taken; it stays in its submenu, which shows again');
+  Expect(ShowsExcluded(Card('Apps', Apps + ', ' + NoLex) + ', ' +
+    Card('Lex', '{ "name": { "contains": "LexPen" }, "scope": "anywhere", "priority": 3 }')),
+    'I:Notepad / I:Paint / I:LexPen / I:Edit in LexPen', 'exclude only for its own card: another card takes it');
+  Check(not Valid('{ "default": [ ' + Card('U', '{ "used": "most", "exclude": true }') + ' ] }'),
+    'an exclude rule by use: invalid');
+  Expect(ShowsExcluded(Card('Apps', '{ "name": { "contains": "LexPen" }, "path": { "startsWith": "Open with" }, ' +
+    '"exclude": true, "priority": 2 }, { "name": { "equals": "LexPen" }, "scope": "anywhere", "priority": 1 }, ' +
+    '{ "name": { "wildcard": "*" }, "path": { "startsWith": "Open with" }, "priority": 3 }')),
+    'I:LexPen / I:Notepad / I:Paint / I:Edit in LexPen',
+    'exclude only for the card''s rules after it: one before it still takes LexPen');
+end;
+
 // A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
 procedure TestHints;
 var
@@ -2425,6 +2483,7 @@ begin
   TestDuplicates;
   TestLatest;
   TestEmptiedSubmenu;
+  TestExclude;
   TestUsage;
   TestUsedRules;
   TestIcons;

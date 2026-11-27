@@ -299,6 +299,14 @@
     const latest = n => M.ruleProblem({ name: { contains: "Compare to" }, latest: n });
     check([undefined, 1, 3].every(n => latest(n) === "") && [0, -1, 1.5, "1", "x"].every(n => latest(n) !== ""),
       "latest: none or a whole number from 1; else outlined red");
+    const ex = { name: { contains: "LexPen" }, exclude: true };
+    check(M.ruleProblem(ex) === "" && M.ruleProblem({ used: "most", exclude: true }) !== "",
+      "exclude: on a rule by name; by use outlined red");
+    check(M.useless({ card: "X", rules: [ex] }) && !M.useless({ card: "X", rules: [{ name: { contains: "a" } }, ex] }),
+      "a card with only exclude rules finds nothing: outlined red; with another rule not");
+    const sw = { name: { contains: "a" }, latest: 2, exclude: true };
+    M.setRuleType(sw, "usage");
+    check(sw.latest === undefined && sw.exclude === undefined, "to Usage: latest and exclude taken out");
     check(M.useless({ card: "U", rules: [ { used: "most", rank: 0 } ] }) && !M.useless({ card: "U", rules: [ { used: "most", rank: "3-1" } ] }),
       "a card with a wrong rank outlined red, with a reversed range not");
   }
