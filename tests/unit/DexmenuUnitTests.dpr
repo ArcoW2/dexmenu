@@ -1969,6 +1969,59 @@ begin
         Result := Result + [C];
 end;
 
+// A rename's regex: "^" puts the text before, "$" after (TRegEx alone finds no empty match); others as TRegEx.
+procedure TestRename;
+
+  // the titles of the inner cards of the first card (found items shown inside it), with a menu of Apple and Banana
+  function InnerTitles(const CardText: string): string;
+  var
+    Menu: HMENU;
+    Top: TNodes;
+    Layout: ILayout;
+    Error: string;
+    P: TPlacement;
+    Level: TViewLevel;
+    C: TViewCard;
+  begin
+    Result := '';
+    Layout := ParseLayout('{ "format": 2, "menu": { "content": [ ' + CardText +
+      ', { "card": "Rest", "rules": [ "remaining" ] } ] } }', 'test', Error);
+    if Layout = nil then
+      Exit('LAYOUT: ' + Error);
+    Menu := CreatePopupMenu;
+    Add(Menu, 'Apple');
+    Add(Menu, 'Banana');
+    Top := ReadLevel(Menu, '');
+    P := TPlacement.Create(Layout, 'default', Top);
+    try
+      Level := P.TopLevel;
+      try
+        for C in InnerOf(Level.Lines[0].Cards[0]) do
+          Result := Result + C.Title + ';';
+      finally
+        Level.Free;
+      end;
+    finally
+      P.Free;
+      Top.Free;
+      DestroyMenu(Menu);
+    end;
+  end;
+
+begin
+  Check(RegexReplace('Notepad', '^', 'Open: ') = 'Open: Notepad', 'rename: ^ puts the replacement before');
+  Check(RegexReplace('Notepad', '$', ' (text)') = 'Notepad (text)', 'rename: $ puts the replacement after');
+  Check((RegexReplace('Open with Code', '^Open with\s+', '') = 'Code') and
+    (RegexReplace('Notepad', '^(.*)$', 'Open: $1') = 'Open: Notepad'), 'rename: other regexes as before');
+  // an inner card (found items inside their card): its template's rename, else its card's own
+  Expect(InnerTitles('{ "card": "F", "show": "column", "rename": { "regex": "^", "replace": "Fruit " }, ' +
+    '"rules": [ { "name": { "wildcard": "*" } } ] }'), 'Fruit Apple;Fruit Banana;',
+    'rename: inner cards without a template take their card''s rename');
+  Expect(InnerTitles('{ "card": "F", "show": "column", "rename": { "regex": "^", "replace": "Fruit " }, ' +
+    '"templates": [ { "rename": { "regex": "$", "replace": "!" } } ], "rules": [ { "name": { "wildcard": "*" } } ] }'),
+    'Apple!;Banana!;', 'rename: a template''s rename over the card''s');
+end;
+
 // Cards holding content (docs/plans/executed/11-PLAN-cards-hold-content.md): format 2; holders in a row and a column, with
 // limits and the rest in "More" or left out; shownWhen; templates by position and by rule; found items in a submenu;
 // square; the holder's boxes inside.
@@ -2653,6 +2706,7 @@ begin
   TestEmptiedSubmenu;
   TestExclude;
   TestOrder;
+  TestRename;
   TestUsage;
   TestUsedRules;
   TestIcons;

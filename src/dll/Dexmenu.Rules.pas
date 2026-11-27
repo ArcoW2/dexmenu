@@ -85,6 +85,10 @@ type
   end;
 
 function ParseRule(Obj: TJSONObject): TRuleSpec;
+// A rename's or a hint's regex replace (a card's "rename", "hint"): as TRegEx.Replace, and "^" alone puts the
+// replacement before the text, "$" alone after it. TRegEx never finds an empty match, so those two would do nothing.
+// A regex that does not compile raises, as TRegEx.Replace does.
+function RegexReplace(const Text, Pattern, Replacement: string): string;
 // "order" and "descending" of a rule or a card; False with Problem for a wrong value.
 function ParseOrder(Obj: TJSONObject; out Order: TOrderBy; out Descending: Boolean; out Problem: string): Boolean;
 
@@ -237,6 +241,16 @@ begin
       Exit(True);
   end;
   Problem := 'rank: numbers from 1 and ranges, as "1-3" or "1,3,5" or "1-2,5-6"';
+end;
+
+function RegexReplace(const Text, Pattern, Replacement: string): string;
+begin
+  if Pattern = '^' then
+    Result := Replacement + Text
+  else if Pattern = '$' then
+    Result := Text + Replacement
+  else
+    Result := TRegEx.Replace(Text, Pattern, Replacement);
 end;
 
 function ParseOrder(Obj: TJSONObject; out Order: TOrderBy; out Descending: Boolean; out Problem: string): Boolean;

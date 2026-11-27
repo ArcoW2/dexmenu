@@ -369,13 +369,14 @@ begin
         if (Card <> nil) and (Card.ShownTitle <> '') and not Card.IsRemaining and not Several then
           Exit(Card.ShownTitle);
         Result := Node.Name;
-        // the card's rename on it; an inner card its card's template's
+        // the card's rename on it; an inner card its card's template's, else (no template, or one without a rename)
+        // its card's own
         Named := Card;
-        if InGroup then
+        if InGroup and (Template <> nil) and (Template.RenameFrom <> '') then
           Named := Template;
         if (Named <> nil) and (Named.RenameFrom <> '') then
           try
-            Result := TRegEx.Replace(Result, Named.RenameFrom, Named.RenameTo);
+            Result := RegexReplace(Result, Named.RenameFrom, Named.RenameTo);
           except
             // a rename that does not compile: the item's own text
           end;
@@ -398,7 +399,7 @@ begin
         Result := BackTitle;
         if (Card <> nil) and (Card.RenameFrom <> '') then
           try
-            Result := TRegEx.Replace(Result, Card.RenameFrom, Card.RenameTo);
+            Result := RegexReplace(Result, Card.RenameFrom, Card.RenameTo);
           except
             // a rename that does not compile: its own text
           end;
@@ -621,7 +622,7 @@ begin
     Exit;
   if V.Card.HintIsRegex then
     try
-      Result := TRegEx.Replace(Regular, V.Card.HintFrom, V.Card.HintTo);
+      Result := RegexReplace(Regular, V.Card.HintFrom, V.Card.HintTo);
     except
       // a regex that does not compile: the item's own hint
     end
@@ -1042,8 +1043,8 @@ begin
 end;
 
 // The text a found item shows by default, for the order by name: its name with the rename it gets (TViewCard.Title):
-// inside its card or in a submenu its template's (the one its rule names, else the first; none: no rename), else its
-// card's; Dexmenu's own items their own text.
+// inside its card or in a submenu its template's (the one its rule names, else the first), else (no template, or one
+// without a rename) its card's; Dexmenu's own items their own text.
 function SortName(const F: TFound; Card: TCard): string;
 var
   Named: TCard;
@@ -1055,13 +1056,13 @@ begin
     Exit('Edit menu...');
   end;
   Result := F.Node.Name;
-  if (Card.Menu = nil) and (Card.Shows in [csRow, csColumn, csSubmenu]) then
-    Named := Card.TemplateFor(0, F.Rule)
-  else
-    Named := Card;
+  Named := Card;
+  if (Card.Menu = nil) and (Card.Shows in [csRow, csColumn, csSubmenu]) and (Card.TemplateFor(0, F.Rule) <> nil) and
+    (Card.TemplateFor(0, F.Rule).RenameFrom <> '') then
+    Named := Card.TemplateFor(0, F.Rule);
   if (Named <> nil) and (Named.RenameFrom <> '') then
     try
-      Result := TRegEx.Replace(Result, Named.RenameFrom, Named.RenameTo);
+      Result := RegexReplace(Result, Named.RenameFrom, Named.RenameTo);
     except
       // a rename that does not compile: the item's own text
     end;

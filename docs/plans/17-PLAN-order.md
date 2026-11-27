@@ -67,8 +67,9 @@ editor has an Order row in a rule's panel and in the card's Inside panel.
   highest first. Items never used have no time and a count of 0: last. Descending reverses the whole order, so those
   come first then.
 - By name: the text as shown: the item's name with the rename it gets (as TViewCard.Title): a card showing its items
-  inside it or in a submenu its template's rename (the template its rule names, else the first; no template: no
-  rename), any other card its own rename; Dexmenu's own items their own text. Compared without case.
+  inside it or in a submenu its template's rename (the template its rule names, else the first), else (no template,
+  or one without a rename) the card's own; any other card its own rename; Dexmenu's own items their own text.
+  Compared without case.
 - Ties (the same time, count or name): the order found. The sort is stable.
 - The remaining card is not sorted: Windows' order stays.
 
