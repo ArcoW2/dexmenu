@@ -35,6 +35,9 @@ type
     VisibleHeight: Single;
     Opener: TViewCard;   // the card in the level above that opened it; nil at the top
     Replaces: Boolean;   // opened in place of the level above (that one hidden until this one closes; "<<" back)
+    // opened (or kept open) by a click on its card: a next click on that card closes it; one the hover opened stays
+    // open on that click (it often opens just before the click lands)
+    ByClick: Boolean;
     ShadowWnd: HWND;     // the menu's own shadow (plan 03 3.4): a window behind it taking no mouse; 0 until needed
     destructor Destroy; override;
     procedure Redraw;
@@ -1267,12 +1270,27 @@ begin
         if Box >= 0 then
         begin
           V := L.Geometry.Boxes[Box].Card;
+          if V.HasSubmenu then
+          begin
+            KillTimer(Wnd, HoverTimer);   // the click decides; a hover change waiting is off
+            S.FHoverTimerLevel := -1;
+          end;
           if V.Kind = vkBack then
             S.CloseFrom(L.Index)   // "<<": back to the menu this one replaced
           else if V.HasSubmenu and (S.FLevels.Count > L.Index + 1) and (S.FLevels[L.Index + 1].Opener = V) then
-            S.CloseFrom(L.Index + 1)   // a click on the card of an open submenu closes it
+          begin
+            // a click on the card of an open submenu: closes it when a click opened it; one the hover opened stays
+            if S.FLevels[L.Index + 1].ByClick then
+              S.CloseFrom(L.Index + 1)
+            else
+              S.FLevels[L.Index + 1].ByClick := True;
+          end
           else if V.HasSubmenu then
-            S.Open(L.Index, Box, False)
+          begin
+            S.Open(L.Index, Box, False);
+            if (S.FLevels.Count > L.Index + 1) and (S.FLevels[L.Index + 1].Opener = V) then
+              S.FLevels[L.Index + 1].ByClick := True;
+          end
           else
             S.Choose(V);
         end;

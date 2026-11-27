@@ -67,6 +67,7 @@ type
     Selected: Integer;
     Opener: TViewCard;
     Replaces: Boolean;     // opened in place of the level before it (that one not shown; "<<" back)
+    ByClick: Boolean;      // opened (or kept open) by a click on its card: a next click closes it (as Dexmenu.Menu)
     destructor Destroy; override;
     function BoxOfCard(V: TViewCard): Integer;
   end;
@@ -645,14 +646,22 @@ begin
           end
           else if (Index >= 0) and (Box >= 0) and P.Levels[Index].Geometry.Boxes[Box].Card.HasSubmenu then
           begin
-            // a click on the card of an open submenu closes it
+            // a click on the card of an open submenu: closes it when a click opened it; one the hover opened stays
+            KillTimer(Wnd, HoverTimer);
+            P.HoverLevel := -1;
             if (P.Levels.Count > Index + 1) and (P.Levels[Index + 1].Opener = P.Levels[Index].Geometry.Boxes[Box].Card) then
             begin
-              KillTimer(Wnd, HoverTimer);
-              P.CloseFrom(Index + 1);
+              if P.Levels[Index + 1].ByClick then
+                P.CloseFrom(Index + 1)
+              else
+                P.Levels[Index + 1].ByClick := True;
             end
             else
+            begin
               P.Open(Index, Box);
+              if (P.Levels.Count > Index + 1) and (P.Levels[Index + 1].Opener = P.Levels[Index].Geometry.Boxes[Box].Card) then
+                P.Levels[Index + 1].ByClick := True;
+            end;
             Redraw(P);
           end;
         end;
