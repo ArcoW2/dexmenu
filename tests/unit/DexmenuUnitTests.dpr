@@ -2215,6 +2215,24 @@ begin
         P.Free;
       end;
     end;
+    // a spacer (a divider without a line) is room, no border: kept after a framed group; a bottom divider before it drawn
+    L := Level('{ "card": "Box", "border": "divider", "dividerTop": false, "dividerBottom": true, "content": [ ' +
+      Card('Cut', '{ "name": { "equals": "Cut" }, "priority": 1 }') + ' ] }, { "id": "d1", "divider": "", "spacer": true }, ' +
+      Card('Copy', '{ "name": { "equals": "Copy" }, "priority": 2 }') +
+      ', { "card": "All", "hidden": true, "rules": [ { "name": { "wildcard": "*" }, "scope": "anywhere", "priority": 3 } ] }', P);
+    try
+      G := Measure(L);
+      Box := -1;
+      for K := 0 to High(G.Boxes) do
+        if G.Boxes[K].Card = L.Lines[0].Cards[0] then
+          Box := K;
+      Check((L.Lines.Count = 3) and (L.Lines[1].Cards[0].Kind = vkSeparator) and L.Lines[1].Cards[0].Divider.DividerSpacer and
+        (Box >= 0) and (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom - SeparatorHeight) < 0.5),
+        'a spacer after a group: kept, and the group''s bottom divider before it drawn');
+    finally
+      L.Free;
+      P.Free;
+    end;
     // found items inside a card in a row: templates by position, cycling
     L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "templates": [ ' +
       '{ "background": "#ff0000" }, { "background": "#00ff00", "rename": { "regex": " in LexPen", "replace": "" } } ]'), P);

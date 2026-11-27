@@ -173,6 +173,9 @@ type
     // a divider's own look (plan 03 3.8): its height (DIP; 0 the default), its background, line colour ("border") and
     // label colour ("foreground") as a card's look (owned; nil none), its label's font
     DividerHeight: Single;
+    // "spacer": true: room without a line (its text, when it has one, still shown); no border either, so a group's
+    // bottom divider before it stays and it stays after a bordered group (Dexmenu.Draw)
+    DividerSpacer: Boolean;
     DividerLook: TJSONObject;
     DividerFont: TFontSpec;
     IsSearchBox: Boolean;  // { "search": true }: the search box, before typing starts (plan 02 3.6)
@@ -748,6 +751,7 @@ var
 begin
   if (Obj.GetValue('height') is TJSONNumber) and (TJSONNumber(Obj.GetValue('height')).AsDouble > 0) then
     Line.DividerHeight := Min(200, TJSONNumber(Obj.GetValue('height')).AsDouble);
+  Line.DividerSpacer := (Obj.GetValue('spacer') is TJSONBool) and TJSONBool(Obj.GetValue('spacer')).AsBoolean;
   for P in Props do
     if Obj.GetValue(P) <> nil then
     begin

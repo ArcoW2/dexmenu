@@ -198,6 +198,7 @@ function renderDivider(entry) {
   } else {
     box.append(el("span", "rule-line"), el("span", "text", entry.divider || ""), el("span", "rule-line"));
     if (!entry.divider) box.classList.add("plain");
+    if (entry.spacer) box.classList.add("spacer");
   }
   const actions = el("div", "card-actions");
   const x = el("button", "", "x");
@@ -1236,6 +1237,11 @@ function renderCardPane() {
     align.addEventListener("change", () => { if (align.value === "left") delete div.entry.align; else div.entry.align = align.value; changed(); });
     row.append(el("span", "", "Text aligned"), align);
     const e = div.entry;
+    // a line (the default) or a spacer: room without a line, its text still shown
+    const shownAs = selectRow("Shown as", [["", "a line"], ["spacer", "a spacer (no line)"]], e.spacer ? "spacer" : "",
+      v => { if (v) e.spacer = true; else delete e.spacer; changed(); },
+      "A spacer is room between cards: no line, its text (if any) still shown; it is no border, so a group's bottom divider before it stays");
+    box.append(shownAs);
     const own = name => ({ get: () => e[name], set: v => { if (v === undefined) delete e[name]; else e[name] = v; } });
     box.append(row,
       textField("Height", e.height === undefined ? "" : String(e.height), v => {

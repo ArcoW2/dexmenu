@@ -325,6 +325,9 @@ None.
   submenu but LexPen's. Checkbox "exclude" in the rule's Options; drawn reddish with a red handle, "exclude:" in the
   rules view. A card with only exclude rules finds nothing (outlined red). Tested: unit tests (without, with, only
   its own card, only the rules after it, by use invalid); the editor's self-test.
+- A divider as a spacer (`"spacer": true`): room without a line, its text (when it has one) still shown; no border,
+  so it stays after a bordered group and a group's bottom divider before it is drawn. Editor: "Shown as" a line or a
+  spacer; a spacer dashed in the cards view. Tested: unit test (kept after a group, the bottom divider drawn).
 - Rename: `^` alone puts the replacement before the item's text, `$` alone after it (Delphi's TRegEx finds no empty
   match, so these did nothing; Dexmenu.Rules.RegexReplace, for renames and hints). An inner card (found items shown
   inside their card or in its submenu) whose template has no rename, or that has no template, takes its card's

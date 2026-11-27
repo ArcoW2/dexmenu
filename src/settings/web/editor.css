@@ -87,6 +87,8 @@ h2 { font-size: 13px; margin: 6px 0; display: flex; gap: 8px; align-items: cente
 .divider { position: relative; display: flex; align-items: center; gap: 6px; min-height: 18px; padding: 0 6px; cursor: grab;
   border-radius: 4px; color: var(--dim); font-size: 12px; }
 .divider .rule-line { flex: 1; border-top: 1px solid var(--line); }
+/* a spacer: room without a line in the menu; dashed here so it can still be seen and selected */
+.divider.spacer .rule-line { border-top-style: dashed; opacity: .6; }
 .divider.align-left .rule-line:first-child, .divider.align-right .rule-line:nth-child(3) { flex: 0 0 8px; }
 .divider.plain .text { display: none; }
 .divider.mostused { border: 1px dashed var(--line); border-radius: 4px; padding: 4px 8px; color: var(--dim); }

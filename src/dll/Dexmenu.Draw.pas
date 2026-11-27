@@ -629,7 +629,7 @@ begin
     Exit;
   C := Line.Cards[0];
   if C.Kind = vkSeparator then
-    Exit(True);
+    Exit((C.Divider = nil) or not C.Divider.DividerSpacer);   // a spacer is room, no border
   if C.Kind <> vkGroup then
     Exit;
   if DividerBorder(C) then
@@ -685,7 +685,8 @@ begin
     Exit;
   for I := Level.Lines.Count - 1 downto 1 do
     if (Level.Lines[I].Cards.Count = 1) and (Level.Lines[I].Cards[0].Kind = vkSeparator) and
-      ((Level.Lines[I].Cards[0].Divider = nil) or (Level.Lines[I].Cards[0].Divider.DividerText = '')) and
+      ((Level.Lines[I].Cards[0].Divider = nil) or ((Level.Lines[I].Cards[0].Divider.DividerText = '') and
+      not Level.Lines[I].Cards[0].Divider.DividerSpacer)) and
       EndsBordered(Level.Lines[I - 1]) then
       Level.Lines.Delete(I);
   for I := 0 to Level.Lines.Count - 1 do
@@ -1724,6 +1725,8 @@ begin
         if Own.GetValue('foreground') <> nil then
           T.CreateSolidColorBrush(ToD2D(Theme.Color('divider', 'normal', 'foreground', RGBA($A0, $A0, $A0), Own)), nil, DivText);
       end;
+      if (V.Divider <> nil) and V.Divider.DividerSpacer then
+        DivLine := nil;   // a spacer: room (and its text), no line
       if (V.Divider = nil) or (V.Divider.DividerText = '') then
       begin
         if DivLine <> nil then
