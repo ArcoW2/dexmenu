@@ -1850,7 +1850,11 @@ function TPlacement.MenuLevel(Card: TCard): TViewLevel;
 begin
   Result := PlaceLines(Self, Card.Menu);
   Result.MenuCard := Card.SubmenuStyle;   // its submenu's own style over the theme's menu, as the menu card's
-  Result.ThemeCard := Card;               // and in its theme (plan 15 3.3)
+  // and in its theme (plan 15 3.3): its Menustyle's when it has one (which, setting none, is the card's)
+  if Card.SubmenuStyle <> nil then
+    Result.ThemeCard := Card.SubmenuStyle
+  else
+    Result.ThemeCard := Card;
 end;
 
 function TPlacement.LevelOf(V: TViewCard): TViewLevel;
@@ -1882,7 +1886,11 @@ begin
     Cards.Free;
   end;
   Result.MenuCard := V.Card.SubmenuStyle;   // the submenu of its found items, or a "More": its card's submenu style
-  Result.ThemeCard := V.Card;                // and in its theme (plan 15 3.3)
+  // and in its theme (plan 15 3.3): its Menustyle's when it has one (which, setting none, is the card's)
+  if V.Card.SubmenuStyle <> nil then
+    Result.ThemeCard := V.Card.SubmenuStyle
+  else
+    Result.ThemeCard := V.Card;
 end;
 
 function TPlacement.SubmenuLevel(Node: TNode): TViewLevel;

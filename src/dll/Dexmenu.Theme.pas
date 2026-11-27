@@ -661,7 +661,9 @@ var
   C: TCard;
   Name: string;
 begin
-  // its own half, else its parents' up to the top; a top card's parent is the main card (SetLayoutThemes)
+  // its own half, else its parents' up to the top; a top card's parent is the main card (SetLayoutThemes). A card in
+  // a submenu takes that submenu's theme (its card's Menustyle's) before its card's own: the card opening it is in its
+  // own theme, what opens from it in the submenu's.
   Name := '';
   C := Card;
   while (C <> nil) and (Name = '') do
@@ -670,6 +672,12 @@ begin
       Name := C.ThemeDark
     else
       Name := C.ThemeLight;
+    if (Name = '') and (C.Parent <> nil) and (C.Parent.SubmenuStyle <> nil) and (C.Parent.Shows = csSubmenu) and
+      (C <> C.Parent.SubmenuStyle) then
+      if Dark then
+        Name := C.Parent.SubmenuStyle.ThemeDark
+      else
+        Name := C.Parent.SubmenuStyle.ThemeLight;
     C := C.Parent;
   end;
   if Name = '' then

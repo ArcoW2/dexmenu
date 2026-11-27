@@ -1803,7 +1803,9 @@ begin
       SetLength(GroupRects, Length(GroupRects) - 1);
       SetLength(GroupThemes, Length(GroupThemes) - 1);
     end;
-    if V.Card <> nil then
+    if (V.Card <> nil) and (G.ThemeCard <> nil) and (V.Card.SubmenuStyle = G.ThemeCard) then
+      BoxTheme := LevelTheme   // what a card found, in its submenu: the submenu's theme (its Menustyle's), not the card's
+    else if V.Card <> nil then
       BoxTheme := CardTheme(V.Card, Look.Dark)
     else if Length(GroupThemes) > 0 then
       BoxTheme := GroupThemes[High(GroupThemes)]

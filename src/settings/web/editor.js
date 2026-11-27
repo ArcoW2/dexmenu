@@ -1328,8 +1328,9 @@ function renderCardPane() {
   if (menuAt) {
     const sub = menuAt.card.submenuStyle || (menuAt.card.submenuStyle = {});   // left out again while empty (changed)
     $("cardHeading").textContent = "Menustyle of " + menuAt.card.card;
-    $("card").replaceChildren(el("div", "hint", "The style of the submenu this card opens, over the theme's menu, as the menu's own style is the menu's."),
-      ...lookFields(sub), ...(sub.background === "none" ? [el("div", "hint", "No background: the submenu is see-through, only its cards drawn.")] : []));
+    $("card").replaceChildren(el("div", "hint", "The style of the submenu this card opens, over the theme's menu, as the menu's own style is the menu's. " +
+      "Its theme draws the submenu and all in it; the card itself keeps its own."),
+      ...themeFields(sub, false), ...lookFields(sub), ...(sub.background === "none" ? [el("div", "hint", "No background: the submenu is see-through, only its cards drawn.")] : []));
     return;
   }
   // a template (plan 11 3.1): its texts that apply to every item, its layout and its style
@@ -2025,10 +2026,21 @@ function themePairOf(id) {
   const base = (id || "").replace(/~t\d+$|~m$/, "");
   let light = "", dark = "";
   let card = base && base !== "menu" ? (M.find(linesOf(), base) || {}).card : null;
+  // a Menustyle: the submenu's own theme first, then its card's
+  if (card && /~m$/.test(id || "") && card.submenuStyle) {
+    light = card.submenuStyle.themeLight || "";
+    dark = card.submenuStyle.themeDark || "";
+  }
   while (card && (!light || !dark)) {
     if (!light && card.themeLight) light = card.themeLight;
     if (!dark && card.themeDark) dark = card.themeDark;
-    card = (M.find(linesOf(), card.id) || {}).parent || null;
+    const parent = (M.find(linesOf(), card.id) || {}).parent || null;
+    // a card in a submenu: that submenu's theme (its card's Menustyle's) before its card's own, as the DLL
+    if (parent && parent.show === "submenu" && parent.submenuStyle) {
+      if (!light && parent.submenuStyle.themeLight) light = parent.submenuStyle.themeLight;
+      if (!dark && parent.submenuStyle.themeDark) dark = parent.submenuStyle.themeDark;
+    }
+    card = parent;
   }
   return { light: light || layout.menu.themeLight || "", dark: dark || layout.menu.themeDark || "" };
 }

@@ -884,7 +884,13 @@ begin
     if Obj.GetValue('submenuStyle') is TJSONObject then
     begin
       Card.SubmenuStyle := TCard.Create;
+      Card.SubmenuStyle.Parent := Card;   // its theme, when it sets none, is its card's (Dexmenu.Theme.CardTheme)
       ParseCardLook(TJSONObject(Obj.GetValue('submenuStyle')), Card.SubmenuStyle);
+      // the submenu's own theme (plan 15): its window and all in it, not the card that opens it
+      if TJSONObject(Obj.GetValue('submenuStyle')).GetValue('themeLight') is TJSONString then
+        Card.SubmenuStyle.ThemeLight := TJSONObject(Obj.GetValue('submenuStyle')).GetValue('themeLight').Value;
+      if TJSONObject(Obj.GetValue('submenuStyle')).GetValue('themeDark') is TJSONString then
+        Card.SubmenuStyle.ThemeDark := TJSONObject(Obj.GetValue('submenuStyle')).GetValue('themeDark').Value;
     end;
     Inc(NextCardId);
     if Obj.GetValue('id') is TJSONString then

@@ -2098,6 +2098,8 @@ begin
       '{ "id": "a", "card": "A", "themeLight": "Green", "show": "submenu", "content": [ ' +
       '{ "id": "b", "card": "B", "rules": [ { "name": { "equals": "Cut" } } ] } ] }, ' +
       '{ "id": "c", "card": "C", "rules": [ { "name": { "equals": "Copy" } } ] }, ' +
+      '{ "id": "f", "card": "F", "themeLight": "Green", "show": "submenu", "submenuStyle": { "themeLight": "Blue" }, "content": [ ' +
+      '{ "id": "g", "card": "G", "rules": [ { "name": { "equals": "Properties" } } ] } ] }, ' +
       '{ "id": "d", "card": "D", "themeLight": "Nope", "rules": [ { "name": { "equals": "Delete" } } ] }, ' +
       '{ "id": "e", "card": "E", "themeLight": "Green", "show": "column", "templates": [ {} ], ' +
       '"rules": [ { "name": { "endsWith": "in LexPen" } } ] }, ' +
@@ -2117,6 +2119,11 @@ begin
     Check(SameText(CardTheme(C, False).Name, 'Blue'), 'card themes: a card setting none: the main card''s');
     Check(SameText(CardTheme(A, True).Name, 'dark'), 'card themes: a half set nowhere: the built-in one');
     Check(SameText(CardTheme(D, False).Name, 'light'), 'card themes: a theme that cannot be read: the built-in one');
+    // a Menustyle's theme: the submenu and all in it, the card opening it in its own
+    Check(SameText(CardTheme(Find(Layout.Lines('default'), 'f'), False).Name, 'Green') and
+      SameText(CardTheme(Find(Layout.Lines('default'), 'g'), False).Name, 'Blue') and
+      SameText(CardTheme(Find(Layout.Lines('default'), 'f').SubmenuStyle, False).Name, 'Blue'),
+      'card themes: a Menustyle''s theme for its submenu and what is in it, the card in its own'); 
     // two themes kept at once; one changed on disk read again, the other kept
     Green := CardTheme(A, False);
     Blue := CardTheme(C, False);

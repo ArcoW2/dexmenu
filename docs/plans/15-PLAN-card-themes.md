@@ -127,6 +127,11 @@ None.
   Style and the menu's; the page works out the edited card's pair (its own, its parents', the main card's) and asks
   the app for that palette ("paletteFor") whenever the pair changes, also after a reload and a light/dark switch; the
   pair is part of a card's style (copy and paste style).
+- A card's Menustyle (its submenu's style) has a theme pair of its own: the submenu, its window and what is in it
+  (the cards it holds, the items found into it) are drawn in it; the card opening it keeps its own. A card in a
+  submenu takes the Menustyle's theme before its card's; a Menustyle setting none is its card's. Editor: a Theme
+  field in the Menustyle's panel; the palette lookup follows the same order. Tested: unit test (the card in its own
+  theme, the submenu and a card in it in the Menustyle's).
 - General: the two fields gone from the main window and the app; `DataFolder.MoveThemesToLayouts` runs at the app's
   start: a non-built-in General theme written onto each layout's main card that sets none (the rest of the file as it
   was, its text kept unescaped), the keys removed from settings.json.
