@@ -13,7 +13,7 @@ unit Dexmenu.Rules;
 //     "latest": 1,                                  of the items it finds only the ones seen most recently show,
 //                                                   this many (none: all); the others are taken all the same
 //     "exclude": true,                              finds nothing itself: what it matches, this card's rules after
-//                                                   it (by priority) do not take (it stays free for other cards)
+//                                                   it (in the card's order) do not take (it stays free)
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
 // Or by use instead of by name (docs/plans/executed/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
@@ -65,8 +65,8 @@ type
     // "latest": of the items found only this many show, the ones seen most recently (Dexmenu.Seen: the preview's
     // seen items; at a right-click all are there now: the first in the menu's order); 0: all
     Latest: Integer;
-    // "exclude": the rule finds nothing; an item it accepts is not taken by its card's rules after it (by priority;
-    // a rule by name)
+    // "exclude": the rule finds nothing; an item it accepts is not taken by its card's rules after it (in the card's
+    // order of its rules, as the editor shows them; a rule by name)
     Exclude: Boolean;
     Priority: Integer;   // -1: none given
     Used: TUsedKind;     // ukNone: a rule by name

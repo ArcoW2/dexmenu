@@ -736,16 +736,8 @@ var
       end;
   end;
 
-  // Whether X comes before R on their card: by priority (as the editor keeps a card's rules), else by place.
-  function Before(X, R: TRule): Boolean;
-  begin
-    if (X.Spec.Priority >= 0) and (R.Spec.Priority >= 0) and (X.Spec.Priority <> R.Spec.Priority) then
-      Result := X.Spec.Priority < R.Spec.Priority
-    else
-      Result := X.Index < R.Index;
-  end;
-
-  // Whether an exclude rule of R's card before R accepts N: then R does not take it.
+  // Whether an exclude rule of R's card before R (in the card's own order of its rules, as the editor shows them)
+  // accepts N: then R does not take it.
   function Excluded(R: TRule; N: TNode): Boolean;
   var
     List: TList<TRule>;
@@ -754,7 +746,7 @@ var
     Result := False;
     if Excludes.TryGetValue(R.Card, List) then
       for X in List do
-        if Before(X, R) and Accepts(X, N) then
+        if (X.Index < R.Index) and Accepts(X, N) then
           Exit(True);
   end;
 

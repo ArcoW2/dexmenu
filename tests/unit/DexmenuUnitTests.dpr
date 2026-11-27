@@ -1664,18 +1664,23 @@ const
 begin
   Expect(ShowsExcluded(Card('Apps', Apps)), 'I:Notepad / I:LexPen / I:Paint / I:Edit in LexPen',
     'without exclude: every item of the submenu; the submenu emptied, its item not shown');
-  Expect(ShowsExcluded(Card('Apps', Apps + ', ' + NoLex)), 'I:Notepad / I:Paint / I:Open with / I:Edit in LexPen',
+  Expect(ShowsExcluded(Card('Apps', NoLex + ', ' + Apps)), 'I:Notepad / I:Paint / I:Open with / I:Edit in LexPen',
     'exclude: LexPen not taken; it stays in its submenu, which shows again');
-  Expect(ShowsExcluded(Card('Apps', Apps + ', ' + NoLex) + ', ' +
+  Expect(ShowsExcluded(Card('Apps', NoLex + ', ' + Apps) + ', ' +
     Card('Lex', '{ "name": { "contains": "LexPen" }, "scope": "anywhere", "priority": 3 }')),
     'I:Notepad / I:Paint / I:LexPen / I:Edit in LexPen', 'exclude only for its own card: another card takes it');
   Check(not Valid('{ "default": [ ' + Card('U', '{ "used": "most", "exclude": true }') + ' ] }'),
     'an exclude rule by use: invalid');
+  Expect(ShowsExcluded(Card('Apps', '{ "name": { "equals": "LexPen" }, "scope": "anywhere", "priority": 1 }, ' +
+    '{ "name": { "contains": "LexPen" }, "path": { "startsWith": "Open with" }, "exclude": true, "priority": 2 }, ' +
+    '{ "name": { "wildcard": "*" }, "path": { "startsWith": "Open with" }, "priority": 3 }')),
+    'I:LexPen / I:Notepad / I:Paint / I:Edit in LexPen',
+    'exclude only for the card''s rules after it (its order): one before it still takes LexPen');
   Expect(ShowsExcluded(Card('Apps', '{ "name": { "contains": "LexPen" }, "path": { "startsWith": "Open with" }, ' +
     '"exclude": true, "priority": 2 }, { "name": { "equals": "LexPen" }, "scope": "anywhere", "priority": 1 }, ' +
     '{ "name": { "wildcard": "*" }, "path": { "startsWith": "Open with" }, "priority": 3 }')),
-    'I:LexPen / I:Notepad / I:Paint / I:Edit in LexPen',
-    'exclude only for the card''s rules after it: one before it still takes LexPen');
+    'I:Notepad / I:Paint / I:Open with / I:Edit in LexPen',
+    'exclude first in the card''s order, whatever the priorities: every rule after it filtered');
 end;
 
 // A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
