@@ -11,6 +11,10 @@ unit Dexmenu.Seen;
 // ones, and one Windows' menu lost while it was shown (Explorer deletes the items it hides after the show). Items are
 // matched per level by name; a submenu not opened this time keeps what was seen in it before. The preview draws the
 // "sometimes" items striped (Dexmenu.Draw, the preview only).
+//
+// Each item holds "seen": the last time a right-click showed it (UTC, as Dexmenu.Usage's times: a text that sorts as
+// the time does), set when the file is written; an item that was not there keeps its time. A rule's "latest"
+// (Dexmenu.Rules) shows the items seen most recently. An item written before times were kept has none: the oldest.
 
 interface
 
@@ -22,13 +26,17 @@ uses
 function SeenJson(Top: TNodes; Hints: TDictionary<UINT, string> = nil): TJSONArray;
 // The items' own hints in a seen file's text, by HintKey; the caller frees it.
 function HintsOf(const SeenText: string): TDictionary<string, string>;
+// The items' last-seen times in a seen file's text, by HintKey; the caller frees it.
+function SeenTimesOf(const SeenText: string): TDictionary<string, string>;
+// Every item of Items, at any depth, marked seen at Time ("seen").
+procedure StampSeen(Items: TJSONArray; const Time: string);
 // An item's key among the hints: its submenu path and its name.
 function HintKey(Node: TNode): string;
 // Old and New merged into a new array (neither freed): New's items in New's order, Old's items missing from New
 // inserted after the item they followed in Old, marked "sometimes"; MarkNew: New's items missing from Old marked too
 // (only where Old had items at that level).
 function MergeSeen(Old, New: TJSONArray; MarkNew: Boolean): TJSONArray;
-// Items merged into <SeenFolder>\<kind>.json (the caller frees Items).
+// Items merged into <SeenFolder>\<kind>.json, marked seen now (the caller frees Items).
 procedure WriteSeen(const Kind: string; Items: TJSONArray);
 // A popup menu built from a seen file's text (its own ids, from 1); 0 and Error set when the text is not valid.
 // "sometimes" items get SometimesData as their item data (TNode.Sometimes).
@@ -44,7 +52,7 @@ procedure WriteLastRightClick(const Json: string);
 implementation
 
 uses
-  System.SysUtils, System.Classes, System.IOUtils, Dexmenu.Log, Dexmenu.Json, Dexmenu.Menus;
+  System.SysUtils, System.Classes, System.IOUtils, Dexmenu.Log, Dexmenu.Json, Dexmenu.Menus, Dexmenu.Usage;
 
 // DEXMENU_SEEN_FOLDER (the tests), else %APPDATA%\Dexmenu\seen.
 function SeenFolder: string;
@@ -139,13 +147,15 @@ begin
 end;
 
 function BoolOf(O: TJSONObject; const Name: string; Default: Boolean): Boolean; forward;
+function IsSeparatorJson(V: TJSONValue): Boolean; forward;
 
 function HintKey(Node: TNode): string;
 begin
   Result := Node.Path + #9 + Node.Name;
 end;
 
-function HintsOf(const SeenText: string): TDictionary<string, string>;
+// A text field of the items in a seen file's text, by HintKey (the first item of a key).
+function FieldsOf(const SeenText, Field: string): TDictionary<string, string>;
 var
   Root: TJSONValue;
   Error: string;
@@ -164,8 +174,8 @@ var
       if not (O.GetValue('name') is TJSONString) then
         Continue;
       Name := O.GetValue('name').Value;
-      if (O.GetValue('hint') is TJSONString) and not Result.ContainsKey(Path + #9 + Name) then
-        Result.Add(Path + #9 + Name, O.GetValue('hint').Value);
+      if (O.GetValue(Field) is TJSONString) and not Result.ContainsKey(Path + #9 + Name) then
+        Result.Add(Path + #9 + Name, O.GetValue(Field).Value);
       if O.GetValue('items') is TJSONArray then
         if Path = '' then
           Walk(TJSONArray(O.GetValue('items')), Name)
@@ -184,6 +194,35 @@ begin
       Walk(TJSONArray(TJSONObject(Root).GetValue('items')), '');
   finally
     Root.Free;
+  end;
+end;
+
+function HintsOf(const SeenText: string): TDictionary<string, string>;
+begin
+  Result := FieldsOf(SeenText, 'hint');
+end;
+
+function SeenTimesOf(const SeenText: string): TDictionary<string, string>;
+begin
+  Result := FieldsOf(SeenText, 'seen');
+end;
+
+procedure StampSeen(Items: TJSONArray; const Time: string);
+var
+  V: TJSONValue;
+  O: TJSONObject;
+begin
+  if Items = nil then
+    Exit;
+  for V in Items do
+  begin
+    if not (V is TJSONObject) or IsSeparatorJson(V) then
+      Continue;
+    O := TJSONObject(V);
+    O.RemovePair('seen').Free;
+    O.AddPair('seen', Time);
+    if O.GetValue('items') is TJSONArray then
+      StampSeen(TJSONArray(O.GetValue('items')), Time);
   end;
 end;
 
@@ -348,6 +387,7 @@ begin
       if (Before is TJSONObject) and (TJSONObject(Before).GetValue('items') is TJSONArray) then
         OldItems := TJSONArray(TJSONObject(Before).GetValue('items'));
       Root.AddPair('kind', Kind);
+      StampSeen(Items, UsageTimeNow);   // what this right-click showed: seen now
       Root.AddPair('items', MergeSeen(OldItems, Items, True));
       Lines := TStringList.Create;
       try

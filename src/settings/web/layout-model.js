@@ -285,6 +285,7 @@ const LayoutModel = (() => {
         return field + ": nothing to match";
       if (keys[0] === "regex") { try { new RegExp(m.regex); } catch (e) { return field + ": the regex does not compile"; } }
     }
+    if (rule.latest !== undefined && !(Number.isInteger(rule.latest) && rule.latest >= 1)) return "latest: a whole number from 1";
     return commonProblem(rule);
   }
 
@@ -561,6 +562,28 @@ const LayoutModel = (() => {
     return card;
   }
 
+  // An entry just added (a card, a note, a group or a divider) moved to just after the entry afterId (a card, a
+  // template of one: its card, or a divider) in that one's container, so inside the group or submenu it is in; a
+  // divider after a card in a plain row: after the row. Nothing selected, the menu itself or an id not found: it
+  // stays where it is (the top's end). Says whether it moved.
+  function putAfter(lines, id, afterId) {
+    const base = (afterId || "").replace(/~t\d+$/, "");
+    if (!base || base === id) return false;
+    const c = find(lines, id), d = c ? null : findDivider(lines, id);
+    const entry = c ? c.card : d ? d.entry : null;
+    if (!entry || (c && contains(c.card, base))) return false;
+    if (!find(lines, base) && !findDivider(lines, base)) return false;
+    (c ? c.lines : d.lines).splice(c ? c.lineIndex : d.index, 1);
+    let at = find(lines, base);
+    if (at && d && at.parent && isPlainRow(at.parent)) at = find(lines, at.parent.id);
+    if (at) at.lines.splice(at.lineIndex + 1, 0, entry);
+    else {
+      const ad = findDivider(lines, base);
+      ad.lines.splice(ad.index + 1, 0, entry);
+    }
+    return true;
+  }
+
   // A card made a card with a submenu: its rules go to a new first card in it.
   function makeMenu(layout, lines, id) {
     const t = find(lines, id).card;
@@ -806,7 +829,7 @@ const LayoutModel = (() => {
     return path;
   }
 
-  return { withVariables, canTakeTemplate, isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
+  return { withVariables, canTakeTemplate, isHolder, isRow, isPlainRow, isDividerEntry, rootOf, containerOf, addGroup, putAfter, panelIds, panelNames, defaultArrangement, normalArrangement, arrangePanel, tabName, panelSet, styleOf, applyStyle, clipType, canHold, pasteCard, matchKinds, isRemaining, isNote, addNote, isOwn, cards, find, newId, ensureIds, ruleProblem, rankProblem, statesOf, colorState, colorValue, colorCss, fillState, fillValue,
     ruleType, setRuleType, useless, ruleList, renumber, moveRule, moveCardRule, moveRuleToCard,
     addRule, deleteRule, takeOut, dropOnCard, moveCard, moveCardNext, deleteCard,
     dividers, findDivider, addDivider, addSearch, deleteDivider, moveDivider, moveDividerNext, upToDate, formatVersion, clip, paste, addCard, makeMenu, remainingCount, withoutComments };

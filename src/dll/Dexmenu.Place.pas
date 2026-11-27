@@ -138,12 +138,15 @@ type
     Usage: TDictionary<string, Integer>;
     // The times of last use of this kind (Dexmenu.Usage; not owned, may be nil), for used rules.
     LastUse: TDictionary<string, string>;
+    // The items' last-seen times by Dexmenu.Seen.HintKey (the preview's seen items; not owned, may be nil: a
+    // right-click, where every item is there now), for a rule's "latest".
+    SeenTimes: TDictionary<string, string>;
     function Hides(Node: TNode): Boolean;
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes); overload;
     // With the use counts and times known before the rules are evaluated: used rules rank by them
     // (docs/plans/executed/09-PLAN-used-rules.md).
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes; AUsage: TDictionary<string, Integer>;
-      ALastUse: TDictionary<string, string>); overload;
+      ALastUse: TDictionary<string, string>; ASeenTimes: TDictionary<string, string> = nil); overload;
     destructor Destroy; override;
     function TopLevel: TViewLevel;
     function MenuLevel(Card: TCard): TViewLevel;
@@ -178,7 +181,7 @@ implementation
 
 uses
   System.SysUtils, System.StrUtils, System.Math, System.RegularExpressions, System.Generics.Defaults, Dexmenu.Rules,
-  Dexmenu.Usage;
+  Dexmenu.Usage, Dexmenu.Seen;
 
 function TPlacement.Hides(Node: TNode): Boolean;
 begin
@@ -542,11 +545,12 @@ begin
 end;
 
 constructor TPlacement.Create(const ALayout: ILayout; const AKind: string; ATop: TNodes;
-  AUsage: TDictionary<string, Integer>; ALastUse: TDictionary<string, string>);
+  AUsage: TDictionary<string, Integer>; ALastUse: TDictionary<string, string>; ASeenTimes: TDictionary<string, string>);
 begin
   inherited Create;
   Usage := AUsage;
   LastUse := ALastUse;
+  SeenTimes := ASeenTimes;
   Layout := ALayout;
   Kind := AKind;
   Top := ATop;
@@ -709,8 +713,9 @@ var
       end;
   end;
 
-  // N found by R: shown in R's card (unless a duplicate), taken with its subitems when R consumes
-  procedure Take(N: TNode; R: TRule; Names: TDictionary<string, Boolean>);
+  // N found by R: shown in R's card (unless a duplicate, or Show False: one "latest" leaves out), taken with its
+  // subitems when R consumes
+  procedure Take(N: TNode; R: TRule; Names: TDictionary<string, Boolean>; Show: Boolean = True);
   var
     List: TList<TFound>;
     F: TFound;
@@ -731,7 +736,7 @@ var
     Found.Node := N;
     Found.Rule := R;
     Found.Own := ccNone;
-    if not Twice then
+    if not Twice and Show then
       List.Add(Found);
     if R.Spec.Consume and not FTaken.ContainsKey(KeyOf(N)) then
     begin
@@ -751,6 +756,62 @@ var
         Take(N, R, Names);
       if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
         Visit(N.Children, R, Names);
+    end;
+  end;
+
+  // A rule with "latest": what it finds as Visit would, in the menu's order; only the R.Spec.Latest seen most
+  // recently (SeenTimes; none, or no time: the oldest; a tie: the menu's order) shown, the others taken all the same.
+  procedure VisitLatest(R: TRule; Names: TDictionary<string, Boolean>);
+  var
+    Found: TList<TNode>;
+    Order: TList<Integer>;
+    Shown: TDictionary<TNode, Boolean>;
+    Times: TArray<string>;
+    I: Integer;
+
+    procedure Collect(Nodes: TNodes);
+    var
+      N: TNode;
+    begin
+      for N in Nodes do
+      begin
+        if Accepts(R, N) and (not FTaken.ContainsKey(KeyOf(N)) or R.Spec.Also) then
+          Found.Add(N);
+        if (N.Children <> nil) and (R.Spec.Scope <> scTop) then
+          Collect(N.Children);
+      end;
+    end;
+
+  begin
+    Found := TList<TNode>.Create;
+    Order := TList<Integer>.Create;
+    Shown := TDictionary<TNode, Boolean>.Create;
+    try
+      Collect(Top);
+      SetLength(Times, Found.Count);
+      for I := 0 to Found.Count - 1 do
+      begin
+        Order.Add(I);
+        if (SeenTimes = nil) or not SeenTimes.TryGetValue(HintKey(Found[I]), Times[I]) then
+          Times[I] := '';
+      end;
+      Order.Sort(TComparer<Integer>.Construct(
+        function(const A, B: Integer): Integer
+        begin
+          Result := -CompareStr(Times[A], Times[B]);
+          if Result = 0 then
+            Result := A - B;
+        end));
+      for I := 0 to Min(R.Spec.Latest, Order.Count) - 1 do
+        Shown.Add(Found[Order[I]], True);
+      // taken in the menu's order; one an earlier one took with its subitems stays taken
+      for I := 0 to Found.Count - 1 do
+        if not FTaken.ContainsKey(KeyOf(Found[I])) or R.Spec.Also then
+          Take(Found[I], R, Names, Shown.ContainsKey(Found[I]));
+    finally
+      Shown.Free;
+      Order.Free;
+      Found.Free;
     end;
   end;
 
@@ -906,6 +967,8 @@ begin
           TakeOwn(R)
         else if R.Spec.Used <> ukNone then
           TakeUsed(R, Names)
+        else if R.Spec.Latest > 0 then
+          VisitLatest(R, Names)
         else
           Visit(Top, R, Names);
       finally

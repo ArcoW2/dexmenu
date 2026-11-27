@@ -1438,6 +1438,141 @@ begin
     'skipDuplicates on a card: one per name over all its rules');
 end;
 
+// A rule's "latest": of what it finds only the ones seen most recently show (the preview's seen times), the others
+// taken all the same; without times (a right-click) the first in the menu's order.
+function ShowsLatest(const Rule: string; Times: TDictionary<string, string>): string;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+begin
+  Layout := ParseLayout('{ "default": [ ' + Card('Cmp', Rule) +
+    ', { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  if Layout = nil then
+    Exit('LAYOUT: ' + Error);
+  Menu := CreatePopupMenu;
+  Add(Menu, 'Compare to a.txt');
+  Add(Menu, 'Compare to b.txt');
+  Add(Menu, 'Compare to c.txt');
+  Add(Menu, 'Other');
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top, nil, nil, Times);
+  try
+    Level := P.TopLevel;
+    try
+      Result := Describe(Level);
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+// The height of a wrapping card on a line beside a wide one, so that it gets little room (plan: a word wider than
+// its line is broken over lines, not cut).
+function WrapHeight(const Title: string): Single;
+var
+  Menu: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+  G: TGeometry;
+  B: TBox;
+begin
+  Result := -1;
+  Layout := ParseLayout('{ "default": [ { "line": [ { "card": "Wide", "minWidth": 300, "rules": [ { "name": ' +
+    '{ "equals": "Wide" } } ] }, { "card": "W", "wrap": true, "minWidth": 160, "rules": [ { "name": { "equals": "' +
+    Title + '" } } ] } ] }, { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  if Layout = nil then
+    Exit;
+  Menu := CreatePopupMenu;
+  Add(Menu, 'Wide');
+  Add(Menu, Title);
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      G := Measure(Level);
+      for B in G.Boxes do
+        if (B.Card.Kind = vkItem) and (B.Card.Title = Title) then
+          Result := B.Rect.bottom - B.Rect.top;
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+procedure TestLatest;
+const
+  Rule = '{ "name": { "startsWith": "Compare to" }';
+var
+  Times, Read: TDictionary<string, string>;
+  A, M: TJSONArray;
+  Short, Long: Single;
+begin
+  Check(not Valid('{ "default": [ ' + Card('C', Rule + ', "latest": 0 }') + ' ] }') and
+    not Valid('{ "default": [ ' + Card('C', Rule + ', "latest": 1.5 }') + ' ] }') and
+    not Valid('{ "default": [ ' + Card('C', Rule + ', "latest": "1" }') + ' ] }'),
+    'latest: a whole number from 1');
+  Expect(ShowsLatest(Rule + ' }', nil), 'I:Compare to a.txt / I:Compare to b.txt / I:Compare to c.txt / I:Other',
+    'without latest: all of them');
+  Expect(ShowsLatest(Rule + ', "latest": 1 }', nil), 'I:Compare to a.txt / I:Other',
+    'latest 1 without seen times: the first; the others not in the rest either');
+  Times := TDictionary<string, string>.Create;
+  try
+    Times.Add(#9'Compare to b.txt', '2026-11-20T10:00:00.000Z');
+    Times.Add(#9'Compare to c.txt', '2026-11-25T10:00:00.000Z');
+    Expect(ShowsLatest(Rule + ', "latest": 1 }', Times), 'I:Compare to c.txt / I:Other', 'latest 1: the one seen last');
+    Expect(ShowsLatest(Rule + ', "latest": 2 }', Times), 'I:Compare to b.txt / I:Compare to c.txt / I:Other',
+      'latest 2: the two seen last, in the menu''s order');
+    Expect(ShowsLatest(Rule + ', "latest": 5 }', Times),
+      'I:Compare to a.txt / I:Compare to b.txt / I:Compare to c.txt / I:Other', 'latest more than found: all of them');
+  finally
+    Times.Free;
+  end;
+  // the seen file: what a right-click showed marked seen then, an item not there keeps its time
+  A := Items('[ {"name":"A"}, {"separator":true}, {"name":"S","submenu":true,"items":[ {"name":"x"} ]} ]');
+  try
+    StampSeen(A, '2026-11-27T09:00:00.000Z');
+    Check((TJSONObject(A.Items[0]).GetValue('seen').Value = '2026-11-27T09:00:00.000Z') and
+      (TJSONObject(A.Items[1]).GetValue('seen') = nil) and
+      (TJSONObject(TJSONArray(TJSONObject(A.Items[2]).GetValue('items')).Items[0]).GetValue('seen') <> nil),
+      'seen times: every item stamped, in submenus too, a separator not');
+    M := MergeSeen(Items('[ {"name":"Old","seen":"2026-11-01T00:00:00.000Z"}, {"name":"A","seen":"2026-11-01T00:00:00.000Z"} ]'),
+      A, True);
+    try
+      Read := SeenTimesOf('{ "items": ' + M.ToJSON + ' }');
+      try
+        Check((Read[#9'Old'] = '2026-11-01T00:00:00.000Z') and (Read[#9'A'] = '2026-11-27T09:00:00.000Z') and
+          (Read['S'#9'x'] = '2026-11-27T09:00:00.000Z'), 'seen times: merged (new over old, old kept), read back');
+      finally
+        Read.Free;
+      end;
+    finally
+      M.Free;
+    end;
+  finally
+    A.Free;
+  end;
+  // a word wider than its line: broken over lines (3 here), not cut on the second line
+  Short := WrapHeight('Compare to ab');
+  Long := WrapHeight('Compare to abcdefghijklmnopqrstuvwxyz0123456789.json');
+  Check((Short > 0) and (Long > Short), Format('wrap: a long word broken over more lines (%.1f > %.1f)', [Long, Short]));
+end;
+
 // A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
 procedure TestHints;
 var
@@ -2241,6 +2376,7 @@ begin
   TestEmptyMenuCard;
   TestHints;
   TestDuplicates;
+  TestLatest;
   TestUsage;
   TestUsedRules;
   TestIcons;

@@ -10,6 +10,8 @@ unit Dexmenu.Rules;
 //     "caseSensitive": false, "also": false,       also: shown here even when an earlier rule took it
 //     "consume": true,                              false: the item stays free for later rules and the remaining card
 //     "skipDuplicates": false,                      true: of items of one name it finds, only the first shows
+//     "latest": 1,                                  of the items it finds only the ones seen most recently show,
+//                                                   this many (none: all); the others are taken all the same
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
 // Or by use instead of by name (docs/plans/executed/09-PLAN-used-rules.md 3.1): { "used": "most" | "recent", "rank": 3 | "1-3" }:
@@ -58,6 +60,9 @@ type
     Also: Boolean;
     Consume: Boolean;    // default True
     SkipDuplicates: Boolean;
+    // "latest": of the items found only this many show, the ones seen most recently (Dexmenu.Seen: the preview's
+    // seen items; at a right-click all are there now: the first in the menu's order); 0: all
+    Latest: Integer;
     Priority: Integer;   // -1: none given
     Used: TUsedKind;     // ukNone: a rule by name
     // the ranks a used rule finds, from 1, in the order written ("1,3,5", "1-2,5-6,8-10"; a range from high to low in
@@ -339,6 +344,17 @@ begin
     Result.SkipDuplicates := TJSONBool(Obj.GetValue('skipDuplicates')).AsBoolean;
   if Obj.GetValue('consume') is TJSONBool then
     Result.Consume := TJSONBool(Obj.GetValue('consume')).AsBoolean;
+  V := Obj.GetValue('latest');
+  if V <> nil then
+  begin
+    if not (V is TJSONNumber) or (TJSONNumber(V).AsDouble <> Trunc(TJSONNumber(V).AsDouble)) or
+      (TJSONNumber(V).AsDouble < 1) then
+    begin
+      Result.Problem := '"latest" is a whole number from 1';
+      Exit;
+    end;
+    Result.Latest := TJSONNumber(V).AsInt;
+  end;
   if Obj.GetValue('priority') is TJSONNumber then
     Result.Priority := TJSONNumber(Obj.GetValue('priority')).AsInt;
   // regexes compiled once

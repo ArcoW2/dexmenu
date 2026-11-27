@@ -176,8 +176,9 @@ function withDragged(e, place) {
   const isDivider = e.dataTransfer.types.includes("text/divider");
   let id = e.dataTransfer.getData(isDivider ? "text/divider" : "text/card");
   if (!id) return;
-  const isNew = id === "new" || id === "newnote";   // "+ Card", "+ Divider", "+ Note"
+  const isNew = id === "new" || id === "newnote" || id === "newgroup";   // "+ Card", "+ Divider", "+ Note", "+ Group"
   if (id === "newnote") id = M.addNote(layout, linesOf()).id;
+  else if (id === "newgroup") id = M.addGroup(layout, linesOf()).id;
   else if (isNew) id = isDivider ? M.addDivider(layout, linesOf(), null).id : M.addCard(layout, linesOf(), null).id;
   if (place(id, isDivider)) {
     if (isNew) select(id, -1);
@@ -225,6 +226,9 @@ function focusNew(id) {
   });
 }
 function addAndFocus(card) { select(card.id, -1); changed(); focusNew(card.id); }
+// A card, note, group or divider added by a click on its button above the cards: put after the selected card (inside
+// the group it is in), then selected itself, so the next one follows it.
+function addAfterSelected(card) { M.putAfter(linesOf(), card.id, selectedId); addAndFocus(card); }
 
 // The menu as a card (plan 11 3.9): the fixed outer card holding every other; selected by its heading to set how its
 // cards show (under each other, side by side, in columns), its submenus' default and its style. Not moved, copied or
@@ -1046,6 +1050,23 @@ function ruleEditor(card, rule, index) {
   });
   if (M.ruleType(rule) === "name")
     row("Where", placeSel, ...(rule.path ? matchEditor(rule.path, m => { rule.path = m; changed(); }) : []));
+  if (M.ruleType(rule) === "name") {
+    // "latest": of what it finds only the ones seen most recently (an item whose name changes each time)
+    const latest = el("input");
+    latest.type = "text";
+    latest.className = "rank";
+    latest.placeholder = "all";
+    latest.title = "Empty: all it finds; a number: only that many, the ones seen most recently (an item whose name " +
+      "changes, as \"Compare to <file>\"); the others are taken all the same";
+    latest.value = rule.latest === undefined ? "" : String(rule.latest);
+    latest.addEventListener("change", () => {
+      const v = latest.value.trim();
+      if (v === "") delete rule.latest;
+      else rule.latest = /^\d+$/.test(v) ? +v : v;
+      changed();
+    });
+    row("Latest", latest);
+  }
   // the template the items it finds follow, when its card picks templates by rule (plan 11 3.1)
   if (card.templatesBy === "rule" && Array.isArray(card.templates) && card.templates.length > 0) {
     const tsel = el("select");
@@ -1738,6 +1759,7 @@ function summary(rule) {
   if (rule.also) s += ", also";
   if (rule.consume === false) s += ", not consumed";
   if (rule.skipDuplicates) s += ", skip duplicates";
+  if (rule.latest !== undefined) s += ", latest " + rule.latest;
   return s;
 }
 
@@ -1935,15 +1957,9 @@ $("close").addEventListener("click", () => post({ type: "close" }));
 withIcon($("addTop"), "+ Card");
 $("addDivider").replaceChildren(dividerIcon(), document.createTextNode(" + Divider"));
 $("addNote").replaceChildren(noteIcon(), document.createTextNode(" + Note"));
-$("addNote").addEventListener("click", () => { if (layout) addAndFocus(M.addNote(layout, linesOf())); });
+$("addNote").addEventListener("click", () => { if (layout) addAfterSelected(M.addNote(layout, linesOf())); });
 $("addNote").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "newnote"); e.dataTransfer.effectAllowed = "copy"; });
-$("addDivider").addEventListener("click", () => {
-  if (!layout) return;
-  const d = M.addDivider(layout, linesOf(), null);
-  select(d.id, -1);
-  changed();
-  focusNew(d.id);
-});
+$("addDivider").addEventListener("click", () => { if (layout) addAfterSelected(M.addDivider(layout, linesOf(), null)); });
 $("addSearch").addEventListener("click", () => {
   if (!layout) return;
   const d = M.addSearch(layout, linesOf());
@@ -1952,8 +1968,9 @@ $("addSearch").addEventListener("click", () => {
   focusNew(d.id);
 });
 $("addDivider").addEventListener("dragstart", e => { e.dataTransfer.setData("text/divider", "new"); e.dataTransfer.effectAllowed = "copy"; });
-$("addTop").addEventListener("click", () => { if (layout) addAndFocus(M.addCard(layout, linesOf(), null)); });
-$("addGroup").addEventListener("click", () => { if (layout) addAndFocus(M.addGroup(layout, linesOf())); });
+$("addTop").addEventListener("click", () => { if (layout) addAfterSelected(M.addCard(layout, linesOf(), null)); });
+$("addGroup").addEventListener("click", () => { if (layout) addAfterSelected(M.addGroup(layout, linesOf())); });
+$("addGroup").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "newgroup"); e.dataTransfer.effectAllowed = "copy"; });
 $("addTop").addEventListener("dragstart", e => { e.dataTransfer.setData("text/card", "new"); e.dataTransfer.effectAllowed = "copy"; });
 $("collapseAll").addEventListener("click", () => {
   if (!layout) return;

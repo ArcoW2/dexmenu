@@ -448,24 +448,74 @@ begin
   Result := (V.SizeCard <> nil) and V.SizeCard.Wrap and (V.Kind in [vkItem, vkMenu, vkCommand]);
 end;
 
-// The title laid out wrapping within Width (DIP) and Height (0: as high as it needs); nil when it has none.
-function WrappedTitle(const Title: string; Fmt: IDWriteTextFormat; Width, Height: Single): IDWriteTextLayout;
+const
+  ZeroWidthSpace = #$200B;
+
+// The title laid out wrapping within Width (DIP) and Height (0: as high as it needs); nil when it has none. Access:
+// the index of the letter to underline (the access key), -1 none.
+// A word wider than a line is broken over lines, not cut: DirectWrite cuts it with "..." instead when the layout has
+// a trimming sign (the formats have one). So the title is laid out first without one, and where a line ends inside a
+// word a zero-width space is put in, a place to break; then laid out with the sign, which now cuts only a last line
+// that does not fit in Height.
+function WrappedTitle(const Title: string; Fmt: IDWriteTextFormat; Width, Height: Single;
+  Access: Integer = -1): IDWriteTextLayout;
 var
   Trimming: TDwriteTrimming;
   Sign: IDWriteInlineObject;
+  Plain: IDWriteTextLayout;
+  Lines: array of TDwriteLineMetrics;
+  Count: Cardinal;
+  Text: string;
+  I, At: Integer;
+  Range: TDwriteTextRange;
 begin
   Result := nil;
   if Height <= 0 then
     Height := 10000;
-  if (Title = '') or Failed(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt, Max(1, Width), Height,
-    Result)) then
+  if Title = '' then
+    Exit;
+  Text := Title;
+  FillChar(Trimming, SizeOf(Trimming), 0);
+  if Succeeded(DWrite.CreateTextLayout(PWideChar(Title), Length(Title), Fmt, Max(1, Width), 10000, Plain)) then
+  begin
+    Plain.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+    Plain.SetTrimming(Trimming, nil);   // none: a long word is broken
+    Count := 0;
+    Plain.GetLineMetrics(nil, 0, Count);
+    if Count > 1 then
+    begin
+      SetLength(Lines, Count);
+      if Succeeded(Plain.GetLineMetrics(@Lines[0], Count, Count)) then
+      begin
+        // from the end, so the positions before stay where they are
+        At := Length(Title);
+        for I := Integer(Count) - 1 downto 0 do
+        begin
+          if (I < Integer(Count) - 1) and (At > 0) and (At < Length(Title)) and (Title[At] > ' ') and
+            (Title[At + 1] > ' ') then
+          begin
+            Insert(ZeroWidthSpace, Text, At + 1);
+            if (Access >= At) then
+              Inc(Access);
+          end;
+          At := At - Integer(Lines[I].length);
+        end;
+      end;
+    end;
+  end;
+  if Failed(DWrite.CreateTextLayout(PWideChar(Text), Length(Text), Fmt, Max(1, Width), Height, Result)) then
     Exit(nil);
   Result.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
   // a title longer than its lines: its last line cut at a word with "..."
-  FillChar(Trimming, SizeOf(Trimming), 0);
   Trimming.granularity := DWRITE_TRIMMING_GRANULARITY_WORD;
   DWrite.CreateEllipsisTrimmingSign(Result, Sign);
   Result.SetTrimming(Trimming, Sign);
+  if Access >= 0 then
+  begin
+    Range.startPosition := Access;
+    Range.length := 1;
+    Result.SetUnderline(True, Range);
+  end;
 end;
 
 // One line of the items' text, high (DIP).
@@ -748,10 +798,10 @@ var
   Line: TViewLine;
   Rows: TList<TArray<TViewCard>>;
   Row: TArray<TViewCard>;
-  Widths: TArray<Single>;
+  Widths, Floors: TArray<Single>;
   Fixed: TArray<Boolean>;
   V: TViewCard;
-  Y, H, X, Avail, FreeWeight, OwnH, CardTop: Single;
+  Y, H, X, Avail, FreeWeight, OwnH, CardTop, Sum: Single;
   N, I, J, Per: Integer;
   Changed, First: Boolean;
   Box: TBox;
@@ -788,7 +838,20 @@ begin
       else
       begin
         // the cards share the width by their weights; one whose share is below its minimum gets its minimum, and the
-        // others share the rest
+        // others share the rest. A card whose title wraps has its longest word as its minimum too, when the row has
+        // room for all of them: else its word would be broken while another card has room to spare.
+        SetLength(Floors, N);
+        Sum := CardGap * (N - 1);
+        for J := 0 to N - 1 do
+        begin
+          Floors[J] := CardMin(Row[J]);
+          if Wraps(Row[J]) then
+            Floors[J] := Max(Floors[J], CardNeed(Row[J]));
+          Sum := Sum + Floors[J];
+        end;
+        if Sum > Width then
+          for J := 0 to N - 1 do
+            Floors[J] := CardMin(Row[J]);
         for J := 0 to N - 1 do
           Fixed[J] := False;
         repeat
@@ -804,9 +867,9 @@ begin
             if not Fixed[J] then
             begin
               Widths[J] := Max(0, Avail) * CardWeight(Row[J]) / Max(FreeWeight, 0.0001);
-              if Widths[J] < CardMin(Row[J]) then
+              if Widths[J] < Floors[J] then
               begin
-                Widths[J] := CardMin(Row[J]);
+                Widths[J] := Floors[J];
                 Fixed[J] := True;
                 Changed := True;
               end;
@@ -1715,18 +1778,12 @@ begin
     Access := V.AccessIndex;
     if Wraps(V) then
     begin
-      TitleLayout := WrappedTitle(Title, Fmt, TitleRight - R.left - TextLeft, TitleBottom - TitleTop);
+      TitleLayout := WrappedTitle(Title, Fmt, TitleRight - R.left - TextLeft, TitleBottom - TitleTop, Access);
       if TitleLayout <> nil then
       begin
         // lines centred in their room; more lines than fit: from the top, the last one cut
         if Succeeded(TitleLayout.GetMetrics(Metrics)) and (Metrics.height > TitleBottom - TitleTop + 0.5) then
           TitleLayout.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-        if Access >= 0 then
-        begin
-          Range.startPosition := Access;
-          Range.length := 1;
-          TitleLayout.SetUnderline(True, Range);
-        end;
         T.DrawTextLayout(D2D1PointF(R.left + TextLeft, TitleTop), TitleLayout, Brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
       end;
     end

@@ -248,6 +248,29 @@
     check(!M.moveRuleToCard(L2.default, lex, 0, note, true), "a rule is not put on a note");
   }
 
+  // a card, note, group or divider added by a click: after the selected card, inside the group it is in
+  {
+    const L3 = { format: 2, menu: { content: [
+      { id: "a", card: "A", rules: [] },
+      { id: "g", card: "Group", show: "column", content: [ { id: "b", card: "B", rules: [] }, { id: "c", card: "C", rules: [] } ] },
+      { id: "r", card: "Line", show: "row", shownWhen: "always", content: [ { id: "d", card: "D", rules: [] }, { id: "e", card: "E", rules: [] } ] },
+      { id: "x", divider: "" },
+      { id: "z", card: "Rest", rules: [ "remaining" ] } ] } };
+    const top = L3.menu.content;
+    const ids = list => list.map(e => e.id).join();
+    const n1 = M.addCard(L3, top, null);
+    check(M.putAfter(top, n1.id, "b") && ids(top[1].content) === "b," + n1.id + ",c", "after a card in a group: inside the group, next to it");
+    const n2 = M.addGroup(L3, top);
+    check(M.putAfter(top, n2.id, "a") && ids(top).startsWith("a," + n2.id + ",g"), "a group after a card at the top");
+    const n3 = M.addDivider(L3, top, null);
+    check(M.putAfter(top, n3.id, "d") && ids(top[3].content) === "d,e" && top[4] === n3, "a divider after a card in a plain row: after the row");
+    const n4 = M.addNote(L3, top);
+    check(M.putAfter(top, n4.id, "x") && top[top.indexOf(n4) - 1].id === "x", "after a divider");
+    const n5 = M.addCard(L3, top, null);
+    check(!M.putAfter(top, n5.id, null) && !M.putAfter(top, n5.id, "menu") && top[top.length - 1] === n5, "nothing selected, or the menu: at the end");
+    check(M.putAfter(top, n5.id, "b~t1") && ids(top[2].content).startsWith("b," + n5.id), "a template selected: after its card");
+  }
+
   // the current form (plan 11): format 2 opened as it is; an older form not converted here, not opened
   const cur = M.upToDate({ format: M.formatVersion, menu: { content: [] } });
   check(cur.layout && !cur.changed, "a current file (format 2): opened, unchanged");
@@ -273,6 +296,9 @@
       "a wrong rank outlined red: 0 or lower, a fraction, text, half a range");
     check(M.ruleProblem({ used: "often" }) !== "" && M.ruleProblem({ used: "most", name: { equals: "a" } }) !== "",
       "an unknown use, or both a name and a use: outlined red");
+    const latest = n => M.ruleProblem({ name: { contains: "Compare to" }, latest: n });
+    check([undefined, 1, 3].every(n => latest(n) === "") && [0, -1, 1.5, "1", "x"].every(n => latest(n) !== ""),
+      "latest: none or a whole number from 1; else outlined red");
     check(M.useless({ card: "U", rules: [ { used: "most", rank: 0 } ] }) && !M.useless({ card: "U", rules: [ { used: "most", rank: "3-1" } ] }),
       "a card with a wrong rank outlined red, with a reversed range not");
   }

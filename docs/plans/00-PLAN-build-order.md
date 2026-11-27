@@ -314,6 +314,12 @@ None.
   either. Why: Windows' own menu has some items twice (seen with the test host, Dexmenu off, `--hold 3000`: the
   newer-style Move to OneDrive, Unlock with File Locksmith, Rename with PowerRename beside their older copies).
   Checkboxes on the rule and the card. Tested: unit tests (without, on a rule, on a card).
+- Latest (`latest` on a rule, a whole number from 1): of the items the rule finds only that many show, the ones seen
+  most recently; the others are taken all the same. Why: an item whose name changes each time ("Compare to <file>")
+  piles up in the seen items, so the preview showed every name ever seen. The seen file holds a last-seen time per
+  item (`seen`, UTC); at a right-click every item is there now, so the first in the menu's order show. Field
+  "Latest" in the rule panel (Name rules). Tested: unit tests (valid values; without times, with times, more than
+  found; seen times stamped, merged and read back); the editor's self-test (its check).
 - The test host's `--hold <ms>` with Dexmenu off: Windows' menu kept open that long, then printed as it is (the
   shell's late changes in).
 - Seen by hand: a screenshot of the editor with a layout of rules (a card with a menu, a useless card outlined red, the

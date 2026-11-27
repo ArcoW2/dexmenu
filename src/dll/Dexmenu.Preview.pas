@@ -85,6 +85,7 @@ type
     MarkOn: Boolean;   // the outline's blink: shown now
     Settings: TMenuSettings;   // how submenus open (settings.json "menu"), read at each rebuild
     Hints: TDictionary<string, string>;   // the items' own hints, from the seen items
+    SeenTimes: TDictionary<string, string>;   // the items' last-seen times, from the seen items (a rule's "latest")
     Search: string;                       // typed into the preview's search (plan 02 3.6); '' : none
     Usage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage): used rules
     LastUse: TDictionary<string, string>; // this kind's times of last use: used rules (plan 09)
@@ -145,6 +146,7 @@ begin
   Clear;
   Tip.Free;
   Hints.Free;
+  SeenTimes.Free;
   Usage.Free;
   LastUse.Free;
   Levels.Free;
@@ -242,7 +244,7 @@ begin
   FreeAndNil(LastUse);
   Usage := ReadUsage(Kind);
   LastUse := ReadLastUse(Kind);
-  Placement := TPlacement.Create(Layout, Kind, Top, Usage, LastUse);
+  Placement := TPlacement.Create(Layout, Kind, Top, Usage, LastUse, SeenTimes);
   L := TPreviewLevel.Create;
   L.View := Placement.TopLevel;
   L.Geometry := Measure(L.View);
@@ -761,6 +763,8 @@ begin
         P.Menu := MenuFromSeen(Text, Problem);
         FreeAndNil(P.Hints);
         P.Hints := HintsOf(Text);
+        FreeAndNil(P.SeenTimes);
+        P.SeenTimes := SeenTimesOf(Text);
       end;
       if (P.Layout <> nil) and (P.Menu <> 0) then
       begin
@@ -867,6 +871,7 @@ begin
       ReadDeep(Top);
       SaveIcons(Top);   // the real menu's icons kept for the preview (Dexmenu.Icons)
       Live := SeenJson(Top, HintsById);
+      StampSeen(Live, UsageTimeNow);   // Windows' real menu now: seen now
       Old := nil;
       if (Seen <> nil) and (Seen^ <> #0) then
         Before := ParseWithComments(Seen, Error);
