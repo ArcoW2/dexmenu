@@ -944,18 +944,27 @@ function lookFields(card, note = false) {
     ...(note ? [] : [colorField("Hover background", hover.get, hover.set, true, true)])];
 }
 
+// "any" (every name, no text): written as the wildcard "*"; the kind "any" of the file (equals one of a list) is shown
+// as "one of".
 function matchEditor(match, onChange) {
   const kindSel = el("select");
-  for (const k of M.matchKinds) { const o = el("option", "", k); o.value = k; kindSel.append(o); }
-  const current = match ? Object.keys(match)[0] : "contains";
+  const anyName = m => !!m && Object.keys(m).length === 1 && m.wildcard === "*";
+  for (const k of ["anyName", ...M.matchKinds]) {
+    const o = el("option", "", k === "anyName" ? "any" : k === "any" ? "one of" : k);
+    o.value = k;
+    kindSel.append(o);
+  }
+  const current = anyName(match) ? "anyName" : match ? Object.keys(match)[0] : "contains";
   kindSel.value = current;
   const input = el("input");
   input.type = "text";
-  input.value = match ? (current === "any" ? (match.any || []).join(", ") : match[current]) : "";
+  input.value = current === "anyName" ? "" : match ? (current === "any" ? (match.any || []).join(", ") : match[current]) : "";
   input.placeholder = current === "any" ? "one, two, three" : "text";
+  input.hidden = current === "anyName";
   const update = () => {
     const k = kindSel.value;
-    onChange(k === "any" ? { any: input.value.split(",").map(s => s.trim()).filter(Boolean) } : { [k]: input.value });
+    onChange(k === "anyName" ? { wildcard: "*" }
+      : k === "any" ? { any: input.value.split(",").map(s => s.trim()).filter(Boolean) } : { [k]: input.value });
   };
   kindSel.addEventListener("change", update);
   input.addEventListener("change", update);
@@ -1750,7 +1759,12 @@ document.addEventListener("scroll", closeContextMenu, true);
 // ---- the rules view --------------------------------------------------------------------------------------------
 
 function summary(rule) {
-  const show = m => { const k = Object.keys(m || {})[0]; return k ? k + " " + (k === "any" ? "[" + m.any.join(", ") + "]" : '"' + m[k] + '"') : "?"; };
+  const show = m => {
+    const k = Object.keys(m || {})[0];
+    if (!k) return "?";
+    if (k === "wildcard" && m.wildcard === "*") return "any";
+    return (k === "any" ? "one of" : k) + " " + (k === "any" ? "[" + m.any.join(", ") + "]" : '"' + m[k] + '"');
+  };
   let s;
   if (M.ruleType(rule) === "editMenu" || M.ruleType(rule) === "windowsMenu") {
     s = "Dexmenu: " + (rule.own === "editMenu" ? "Edit menu..." : "Windows' menu");
