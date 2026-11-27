@@ -1573,6 +1573,53 @@ begin
   Check((Short > 0) and (Long > Short), Format('wrap: a long word broken over more lines (%.1f > %.1f)', [Long, Short]));
 end;
 
+// A Windows submenu whose items a rule took into another card, all of them: its item not shown (it would open an
+// empty submenu); with one left, shown, holding that one.
+function ShowsEmptied(const PathRule: string): string;
+var
+  Menu, Sub: HMENU;
+  Top: TNodes;
+  Layout: ILayout;
+  Error: string;
+  P: TPlacement;
+  Level: TViewLevel;
+begin
+  Layout := ParseLayout('{ "default": [ ' + Card('Apps', PathRule) + ', ' +
+    Card('With', '{ "name": { "startsWith": "Open with" } }') +
+    ', { "line": [ { "card": "Rest", "rules": [ "remaining" ] } ] } ] }', 'test', Error);
+  if Layout = nil then
+    Exit('LAYOUT: ' + Error);
+  Sub := CreatePopupMenu;
+  Add(Sub, 'Notepad');
+  Add(Sub, 'Paint');
+  Menu := CreatePopupMenu;
+  Add(Menu, 'Open with', False, Sub);
+  Add(Menu, 'Open with Code');
+  Add(Menu, 'Other');
+  Top := ReadLevel(Menu, '');
+  P := TPlacement.Create(Layout, 'default', Top);
+  try
+    Level := P.TopLevel;
+    try
+      Result := Describe(Level);
+    finally
+      Level.Free;
+    end;
+  finally
+    P.Free;
+    Top.Free;
+    DestroyMenu(Menu);
+  end;
+end;
+
+procedure TestEmptiedSubmenu;
+begin
+  Expect(ShowsEmptied('{ "name": { "wildcard": "*" }, "path": { "equals": "Open with" }, "priority": 1 }'),
+    'I:Notepad / I:Paint / I:Open with Code / I:Other', 'a submenu emptied by a rule: its item not shown');
+  Expect(ShowsEmptied('{ "name": { "equals": "Notepad" }, "path": { "equals": "Open with" }, "priority": 1 }'),
+    'I:Notepad / I:Open with / I:Open with Code / I:Other', 'a submenu with an item left: shown');
+end;
+
 // A card's hint: its text in place of the item's own, or a regex on the item's own (added to).
 procedure TestHints;
 var
@@ -2377,6 +2424,7 @@ begin
   TestHints;
   TestDuplicates;
   TestLatest;
+  TestEmptiedSubmenu;
   TestUsage;
   TestUsedRules;
   TestIcons;

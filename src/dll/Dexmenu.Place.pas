@@ -122,6 +122,7 @@ type
     FDirect: TDictionary<string, Boolean>;   // keys of items a rule took directly
     FTaken: TDictionary<string, Boolean>;    // keys of items taken (directly, or with an item above them)
     FFound: TObjectDictionary<TCard, TList<TFound>>;
+    FEvaluated: Boolean;   // the rules have run: a submenu they emptied can be told
     procedure Evaluate;
   public
     Layout: ILayout;
@@ -141,6 +142,8 @@ type
     // The items' last-seen times by Dexmenu.Seen.HintKey (the preview's seen items; not owned, may be nil: a
     // right-click, where every item is there now), for a rule's "latest".
     SeenTimes: TDictionary<string, string>;
+    // An item not shown: its Windows submenu holds nothing even when opened (Empty), or every item in it was taken by
+    // a rule into another card, so it would open an empty submenu.
     function Hides(Node: TNode): Boolean;
     constructor Create(const ALayout: ILayout; const AKind: string; ATop: TNodes); overload;
     // With the use counts and times known before the rules are evaluated: used rules rank by them
@@ -184,8 +187,27 @@ uses
   Dexmenu.Usage, Dexmenu.Seen;
 
 function TPlacement.Hides(Node: TNode): Boolean;
+var
+  C: TNode;
+  Any: Boolean;
 begin
-  Result := (Node <> nil) and (Empty <> nil) and (Node.SubMenu <> 0) and Empty.ContainsKey(Node.SubMenu);
+  if (Node = nil) or (Node.SubMenu = 0) then
+    Exit(False);
+  if (Empty <> nil) and Empty.ContainsKey(Node.SubMenu) then
+    Exit(True);
+  // emptied by the rules: read, with items, none of them left to show in it (as SubmenuLevel leaves them out)
+  if not FEvaluated or (Node.Children = nil) then
+    Exit(False);
+  Any := False;
+  for C in Node.Children do
+  begin
+    if C.IsSeparator then
+      Continue;
+    Any := True;
+    if not FDirect.ContainsKey(KeyOf(C)) and not Hides(C) then
+      Exit(False);
+  end;
+  Result := Any;
 end;
 
 function SubmenuModeOf(V: TViewCard; const Settings: TMenuSettings): TSubmenuMode;
@@ -978,6 +1000,7 @@ begin
     for I := 0 to Top.Count - 1 do
       if not FTaken.ContainsKey(KeyOf(Top[I])) or Top[I].IsSeparator then
         Remaining.Add(Top[I]);
+    FEvaluated := True;
   finally
     Order.Free;
     Rules.Free;

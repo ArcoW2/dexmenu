@@ -55,6 +55,9 @@ type
     FEmpty: TDictionary<HMENU, Boolean>;     // Windows submenus empty even when opened: their items not shown
     FChecked: TDictionary<HMENU, Boolean>;   // submenus looked at for that
     FEarly: TList<HMENU>;    // submenus opened before the user opened them (FindEmpty): open until the menu closes
+    // a submenu's items as read before it was read again on opening: kept until the menu closes, as a card may still
+    // show one of them (a rule took it out of that submenu)
+    FKept: TObjectList<TNodes>;
     FDeep: Boolean;          // the layout's rules look inside submenus (RulesLookDeeper)
     FHints: TDictionary<string, string>;   // the items' own hints, from the seen items (Dexmenu.Seen.HintsOf)
     FUsage: TDictionary<string, Integer>;  // this kind's use counts (Dexmenu.Usage), for used rules
@@ -96,6 +99,8 @@ type
     procedure ShowSearch;
     procedure Refresh;
     procedure KeepSeen;
+    // A submenu's items read again; those read before kept (FKept), not freed: a card may show one
+    procedure ReadAgain(Node: TNode);
     procedure FindEmpty(Nodes: TNodes);
     procedure Dump;
     function IsOurs(Wnd: HWND): Boolean;
@@ -228,6 +233,7 @@ begin
   FEmpty := TDictionary<HMENU, Boolean>.Create;
   FChecked := TDictionary<HMENU, Boolean>.Create;
   FEarly := TList<HMENU>.Create;
+  FKept := TObjectList<TNodes>.Create;
 end;
 
 destructor TMenuSession.Destroy;
@@ -235,6 +241,7 @@ begin
   FLevels.Free;        // the views first: they point into the nodes
   FPlacement.Free;
   FTop.Free;
+  FKept.Free;
   FSeen.Free;
   FEmpty.Free;
   FChecked.Free;
@@ -598,7 +605,7 @@ begin
         Inc(Index);
       SendMessage(FOwner, WM_INITMENUPOPUP, WPARAM(V.Node.SubMenu), MakeLParam(Index, 0));
     end;
-    ReadChildren(V.Node);
+    ReadAgain(V.Node);
     FindEmpty(V.Node.Children);
     L.View := FPlacement.SubmenuLevel(V.Node);
   end;
@@ -856,16 +863,40 @@ begin
   PostMessage(FLevels[0].Wnd, WM_DEXMENU_REFRESH, 0, 0);
 end;
 
+procedure TMenuSession.ReadAgain(Node: TNode);
+begin
+  if Node.Children <> nil then
+  begin
+    FKept.Add(Node.Children);
+    Node.Children := nil;
+  end;
+  ReadChildren(Node);
+end;
+
 // The Windows submenus of these items that an extension fills only when opened (no items yet) are opened now, as
 // Windows' menu does on hover (WM_INITMENUPOPUP), and stay open until the menu closes; one with items is never opened
-// early. One that holds nothing even then (Bash's on a DLL): its item is not shown. When the layout's rules look
-// inside submenus (FDeep), the levels below are opened too, before the rules run, so a rule with a path or scope
-// anywhere finds what the extension puts there (Send to's targets). Each submenu is looked at once per right-click.
+// early, except, when the rules look inside submenus, one holding only a stand-in (StandIn). One that holds nothing
+// even then (Bash's on a DLL): its item is not shown. When the layout's rules look inside submenus (FDeep), the levels
+// below are opened too, before the rules run, so a rule with a path or scope anywhere finds what the extension puts
+// there (Send to's targets, Open with's programs). Each submenu is looked at once per right-click.
 procedure TMenuSession.FindEmpty(Nodes: TNodes);
 var
   N, C: TNode;
   Index: Integer;
   HasItem: Boolean;
+
+  // A submenu holding only a stand-in until it opens: one item named as the submenu itself (Explorer's "Open with",
+  // replaced by the programs when it opens). With rules that look inside submenus it is opened now, as an empty one.
+  function StandIn(N: TNode): Boolean;
+  begin
+    if GetMenuItemCount(N.SubMenu) <> 1 then
+      Exit(False);
+    if N.Children = nil then
+      ReadChildren(N);
+    Result := (N.Children <> nil) and (N.Children.Count = 1) and (N.Children[0].SubMenu = 0) and
+      not N.Children[0].IsSeparator and SameText(N.Children[0].Name, N.Name);
+  end;
+
 begin
   if Nodes = nil then
     Exit;
@@ -874,7 +905,7 @@ begin
     if (N.SubMenu = 0) or N.IsSeparator or FChecked.ContainsKey(N.SubMenu) then
       Continue;
     FChecked.Add(N.SubMenu, True);
-    if GetMenuItemCount(N.SubMenu) = 0 then
+    if (GetMenuItemCount(N.SubMenu) = 0) or (FDeep and StandIn(N)) then
     begin
       Index := 0;
       while (Index < GetMenuItemCount(N.Menu)) and (GetSubMenu(N.Menu, Index) <> N.SubMenu) do
@@ -1026,7 +1057,7 @@ begin
             L.View := NewPlacement.LevelOf(Found)
           else
           begin
-            ReadChildren(Found.Node);
+            ReadAgain(Found.Node);
             FindEmpty(Found.Node.Children);
             L.View := NewPlacement.SubmenuLevel(Found.Node);
           end;
