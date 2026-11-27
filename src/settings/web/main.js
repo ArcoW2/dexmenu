@@ -154,7 +154,7 @@ $("register").addEventListener("click", () => post({ type: "register" }));
 $("unregister").addEventListener("click", () => post({ type: "unregister" }));
 $("restart").addEventListener("click", () => post({ type: "restart" }));
 
-// ---- Diagnostics (docs/plans/16-PLAN-diagnostics.md) ------------------------------------------------------------------
+// ---- Diagnostics (docs/plans/executed/16-PLAN-diagnostics.md) -------------------------------------------------------
 
 let diag = null;          // the last "diagnostics" message
 let measureFile = "";     // the user's own file to measure a file's right-click with; "": the sample .txt

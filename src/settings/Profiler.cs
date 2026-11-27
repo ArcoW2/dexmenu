@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 namespace Dexmenu.Settings;
 
 /// <summary>A sampling profile of one thread, and of the process's other threads while it waits
-/// (docs/plans/16-PLAN-diagnostics.md 3.7): while it runs, a second thread
+/// (docs/plans/executed/16-PLAN-diagnostics.md 3.7): while it runs, a second thread
 /// pauses it about every millisecond (a high-resolution timer), walks its call stack (x64 unwind data) and notes which DLLs are on it; the time
 /// between samples is counted for each DLL on the stack ("on the stack") and for the function the thread was in
 /// ("running in": the DLL and the nearest exported function before the address; for Windows' system calls, which

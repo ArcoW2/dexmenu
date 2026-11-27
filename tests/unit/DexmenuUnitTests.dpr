@@ -1721,8 +1721,8 @@ begin
     'exclude first in the card''s order, whatever the priorities: every rule after it filtered');
 end;
 
-// The order of what rules find (docs/plans/17-PLAN-order.md): Cherry, Apple, Banana, Damson, Elder in the menu; used
-// Cherry 9 (last 01), Apple 5 (03), Banana 2 (09), Damson and Elder never.
+// The order of what rules find (docs/plans/executed/17-PLAN-order.md): Cherry, Apple, Banana, Damson, Elder in the
+// menu; used Cherry 9 (last 01), Apple 5 (03), Banana 2 (09), Damson and Elder never.
 function ShowsOrdered(const Cards: string): string;
 var
   Menu: HMENU;

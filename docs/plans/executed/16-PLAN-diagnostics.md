@@ -1,11 +1,12 @@
 # Plan 16: Diagnostics: where the time of a right-click goes
 
-Status: partly executed; see Status.
+Status: executed; see Status.
 
 - 2026-11-26: draft.
 - 2026-11-26: partly executed: everything but the check in a real right-click.
 - 2026-11-26: partly executed: the profile of Windows' whole menu; packaged apps' extensions.
 - 2026-11-26: partly executed: the page as a list of programs, the rest under Details.
+- 2026-11-27: executed.
 
 Builds on the timing in the log (the log's times in ms; with tracing on, `menu shown, ms:` with Dexmenu's steps) and
 the test host's `timing:` lines.
@@ -43,12 +44,12 @@ DLL writes these timings to a small file; the page reads it.
 | Tests | all but the real right-click | 3.5; 6.5 |
 | Profile | Windows' whole menu sampled: call paths, other threads, DLLs on the stack; on or off on the page | 3.7; 6.6 |
 | Packaged extensions | packaged apps' menu extensions listed, timed and switched; the processes started for the menu | 3.8; 6.7 |
+| Real right-click check | a right-click in Explorer and Foldex writes its entry, shown on the page | 3.5; 6.5 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| Real right-click check | a right-click in Explorer and Foldex writes its entry, shown on the page | the new DLL installed in C:\Win32App\Dexmenu | 3.5; 6.5 |
 
 ## 3. Details
 
@@ -244,3 +245,4 @@ None.
   again at a later right-click.
 - Switching off: Notepad's on the user's blocked list, then Windows' whole menu built: its process was not started
   (it did not run before); off the list again after.
+- Real right-click check: checked by the user at a real right-click (2026-11-27).

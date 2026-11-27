@@ -130,7 +130,7 @@ type
     FFound: TObjectDictionary<TCard, TList<TFound>>;
     FEvaluated: Boolean;   // the rules have run: a submenu they emptied can be told
     procedure Evaluate;
-    // Each card's found items in the order its rules and the card ask for (docs/plans/17-PLAN-order.md).
+    // Each card's found items in the order its rules and the card ask for (docs/plans/executed/17-PLAN-order.md).
     procedure SortFound;
   public
     Layout: ILayout;

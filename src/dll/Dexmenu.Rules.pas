@@ -14,7 +14,7 @@ unit Dexmenu.Rules;
 //                                                   this many (none: all); the others are taken all the same
 //     "exclude": true,                              finds nothing itself: what it matches, this card's rules after
 //                                                   it (in the card's order) do not take (it stays free)
-//     "order": "recent" | "used" | "name",          the order of what it finds (docs/plans/17-PLAN-order.md):
+//     "order": "recent" | "used" | "name",          the order of what it finds (docs/plans/executed/17-PLAN-order.md):
 //     "descending": true                            most recent, most used first, A to Z; absent: as found
 //     "priority": 3 }                               its place in the priority list (lower first)
 //
@@ -49,8 +49,8 @@ type
   TScope = (scTop, scAnywhere, scPath);
   TStates = set of (stEnabled, stDisabled);
   TUsedKind = (ukNone, ukMost, ukRecent);   // a rule by name; by the most used; by the most recently used
-  // The order of found items (docs/plans/17-PLAN-order.md): as found (a card: by rule), most recently used first, most
-  // used first, by the text as shown
+  // The order of found items (docs/plans/executed/17-PLAN-order.md): as found (a card: by rule), most recently used
+  // first, most used first, by the text as shown
   TOrderBy = (obFound, obRecent, obUsed, obName);
   // one part of a used rule's ranks: a rank (From = To) or a range, From > To in reverse
   TRankRange = record

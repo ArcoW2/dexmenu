@@ -1715,8 +1715,9 @@ function renderPanels(card, groups) {
   return box;
 }
 
-// The order of what is found (docs/plans/17-PLAN-order.md), of a rule or a card (target): a select of the orders
-// ("" the default: as found, or for a card by rule) and "descending" (with a card's default: no function, disabled).
+// The order of what is found (docs/plans/executed/17-PLAN-order.md), of a rule or a card (target): a select of the
+// orders ("" the default: as found, or for a card by rule) and "descending" (with a card's default: no function,
+// disabled).
 function orderFields(target, firstLabel, forCard) {
   const sel = el("select");
   for (const [v, text] of [["", firstLabel], ["recent", "most recent"], ["used", "most used"], ["name", "name"]]) {

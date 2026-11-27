@@ -1,8 +1,8 @@
 unit Dexmenu.Timings;
 
-// The right-clicks' timings (docs/plans/16-PLAN-diagnostics.md 3.2): per right-click Dexmenu handled, one entry in
-// %LOCALAPPDATA%\Dexmenu\timings.json (DEXMENU_TIMINGS_FILE: the tests), the last 10 per program kept. Written after
-// the menu closed, so the write costs the user nothing; several programs write it, one at a time (a named mutex).
+// The right-clicks' timings (docs/plans/executed/16-PLAN-diagnostics.md 3.2): per right-click Dexmenu handled, one
+// entry in %LOCALAPPDATA%\Dexmenu\timings.json (DEXMENU_TIMINGS_FILE: the tests), the last 10 per program kept. Written
+// after the menu closed, so the write costs the user nothing; several programs write it, one at a time (a named mutex).
 //
 //   { "entries": [ { "at": "2026-11-26T08:01:02.123", "program": "C:\\Windows\\explorer.exe", "kind": "file",
 //                    "shown": "dexmenu" | "windows", "why": "<why Windows' menu>", "first": true,

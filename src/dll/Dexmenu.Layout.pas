@@ -105,8 +105,8 @@ type
     // "skipDuplicates": of the items its rules found, one per name (Windows 11 shows some programs' items twice: a
     // newer and an older copy); the others are taken all the same, so they show nowhere
     SkipDuplicates: Boolean;
-    // "order", "descending": the order of everything its rules found together (docs/plans/17-PLAN-order.md); obFound:
-    // by rule (each rule's items in that rule's order, the rules in turn)
+    // "order", "descending": the order of everything its rules found together (docs/plans/executed/17-PLAN-order.md);
+    // obFound: by rule (each rule's items in that rule's order, the rules in turn)
     Order: TOrderBy;
     Descending: Boolean;
     // A note card ({ "note": "<text>" }, plan 02 3.3): no button, no rules or menu; an empty space or a text of
@@ -182,7 +182,7 @@ type
     // "spacer": true: room without a line (its text, when it has one, still shown); no border either, so a group's
     // bottom divider before it stays and it stays after a bordered group (Dexmenu.Draw)
     DividerSpacer: Boolean;
-    // "thickness": its line's width in DIP (docs/plans/18-PLAN-vertical-dividers.md 3.1); 0: the default, 1
+    // "thickness": its line's width in DIP (docs/plans/executed/18-PLAN-vertical-dividers.md 3.1); 0: the default, 1
     DividerThickness: Single;
     // upright (plan 18 3.2): "width" its widest, "minWidth" its narrowest when the cards beside it need the room; 0:
     // not set

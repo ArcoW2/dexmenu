@@ -1,9 +1,10 @@
 # Plan 17: The order of what rules find
 
-Status: partly executed; see Status.
+Status: executed; see Status.
 
 - 2026-11-27: draft.
 - 2026-11-27: partly executed: everything but the check by hand.
+- 2026-11-27: executed.
 
 Builds on plan 02 (rules, the priority list, the use counts), plan 09 (used rules, the times of last use) and plan 11
 (found items shown inside a card or in a submenu).
@@ -34,12 +35,12 @@ editor has an Order row in a rule's panel and in the card's Inside panel.
 | Sorting | each card's found items sorted after the rules ran | 3.2; 6 |
 | Editor | the Order rows (rule panel, card's Inside panel), the rules view's text, the model's checks | 3.3; 6 |
 | Tests | unit tests and the editor's self-test | 3.4; 6 |
+| By hand | the user's layout at a right-click, the Open with card by name | 3.4 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| By hand | the user's layout at a right-click, the Open with card by name | the user | 3.4 |
 
 ## 3. Details
 
@@ -113,4 +114,4 @@ None.
   and on a card); the editor's self-test (ruleProblem on the values, also on a rule by use; dropped on a switch to
   Edit Dexmenu). While at it the unit tests' checks of a wrong `latest`, an exclude rule by use and a wrong `order`
   were made to check the rule itself: they had used a layout without the remaining card, invalid whatever the rule.
-
+- By hand: checked by the user at a real right-click (2026-11-27).

@@ -6,8 +6,8 @@ using Microsoft.Win32;
 
 namespace Dexmenu.Settings;
 
-/// <summary>Diagnostics (docs/plans/16-PLAN-diagnostics.md): the context menu handlers registered for a kind of
-/// right-click, each timed in a measuring process of its own (this app started with --measure-handler, so a handler
+/// <summary>Diagnostics (docs/plans/executed/16-PLAN-diagnostics.md): the context menu handlers registered for a kind
+/// of right-click, each timed in a measuring process of its own (this app started with --measure-handler, so a handler
 /// that crashes or hangs does not take the app with it), Windows' whole menu timed the same way (--measure-menu), a
 /// handler switched off and on (Windows' blocked list for the user), and the right-clicks' timings the DLL keeps
 /// (Dexmenu.Timings).</summary>

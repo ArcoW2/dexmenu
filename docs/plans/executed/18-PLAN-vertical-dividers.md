@@ -1,9 +1,10 @@
 # Plan 18: Vertical dividers and a divider's thickness
 
-Status: partly executed; see Status.
+Status: executed; see Status.
 
 - 2026-11-27: draft.
 - 2026-11-27: partly executed: everything but the check by hand.
+- 2026-11-27: executed.
 
 Builds on plan 03 3.8 (a divider's own look), plan 11 (cards holding cards: rows, columns, grids) and the dividers as a
 group's border and the spacer (plan 00's log).
@@ -32,12 +33,12 @@ edge in a row lands beside it, and the divider's panel has a Thickness field.
 | Grid | a divider in a grid group drawn between every two columns or rows | 3.3; 6 |
 | Editor | Thickness; a divider dropped beside a card in a row; dividers upright in a row in the cards view; a hint for a divider in a grid | 3.4; 6 |
 | Tests | unit tests and the editor's self-test | 3.5; 6 |
+| By hand | the user's layout at a right-click, a divider between two columns | 3.5 |
 
 ### Not yet built
 
 | Part | What | Waits for | Reference |
 |---|---|---|---|
-| By hand | the user's layout at a right-click, a divider between two columns | the user | 3.5 |
 
 ## 3. Details
 
@@ -116,4 +117,4 @@ None.
   upright divider between the columns in each line; a grid by rows: a line between the rows); the editor's self-test
   (a divider beside a card in a row, and beside one not in a row); the user's layout drawn by a probe with a divider
   between two cards of a row.
-
+- By hand: checked by the user at a real right-click (2026-11-27).
