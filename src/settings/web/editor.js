@@ -849,19 +849,30 @@ function partNumber(card, key, name, label, placeholder, min = 0) {
 // border as a lit panel: its width, where the light comes from, the light and dark colours), or none; each style's
 // settings under it with a tree line.
 function borderFields(card) {
+  // dividers in place of a frame: for a card that shows cards inside it (a group, a row, found items inside it)
+  const canDivide = card !== (layout && layout.menu) &&
+    ((M.isHolder(card) && card.show !== "submenu") || (!M.isHolder(card) && ["row", "column"].includes(card.show)));
   const style = card.border3d && ["outset", "inset"].includes(card.border3d.style) ? card.border3d.style
-    : card.border === "none" ? "none" : "flat";
-  const rows = [selectRow("Border", [["flat", "flat"], ["outset", "raised (3D)"], ["inset", "sunk (3D)"], ["none", "none (not drawn)"]], style, v => {
+    : card.border === "none" ? "none" : card.border === "divider" && canDivide ? "divider" : "flat";
+  const options = [["flat", "flat"], ["outset", "raised (3D)"], ["inset", "sunk (3D)"], ["none", "none (not drawn)"]];
+  if (canDivide) options.push(["divider", "dividers (top, bottom)"]);
+  const rows = [selectRow("Border", options, style, v => {
+    if (v !== "divider") { delete card.dividerTop; delete card.dividerBottom; }
     if (v === "outset" || v === "inset") {
       card.border3d = Object.assign(card.border3d || {}, { style: v });
       delete card.border;
     } else {
       delete card.border3d;
-      if (v === "none") card.border = "none"; else if (card.border === "none") delete card.border;
+      if (v === "none" || v === "divider") card.border = v;
+      else if (card.border === "none" || card.border === "divider") delete card.border;
     }
     changed();
-  }, "Flat: a line in a colour; raised or sunk: lit as a panel, light inside the edges facing the light, shadow inside the others")];
-  if (style === "flat")
+  }, "Flat: a line in a colour; raised or sunk: lit as a panel, light inside the edges facing the light, shadow inside the " +
+    "others; dividers: no frame, a divider above what it holds (its title as the divider's text) and one below")];
+  if (style === "divider")
+    rows.push(checkRow("Top divider", card.dividerTop !== false, on => { if (on) delete card.dividerTop; else card.dividerTop = false; changed(); }),
+      checkRow("Bottom divider", card.dividerBottom === true, on => { if (on) card.dividerBottom = true; else delete card.dividerBottom; changed(); }));
+  else if (style === "flat")
     rows.push(colorField("Colour", () => card.border, v => { if (v === undefined) delete card.border; else card.border = v; }));
   else if (style !== "none")
     rows.push(partNumber(card, "border3d", "width", "Width", "2 (DIP)", 0.5),
@@ -1386,8 +1397,9 @@ function cardGroups(card) {
     names.push(row);
   } else names.push(textField("Title", card.title, v => { if (v) card.title = v; else delete card.title; changed(); },
     M.isHolder(card) ? "(its name, shown as its submenu's item; none above what it holds)" : "(the item's own text for one item)"));
-  if (M.isHolder(card) && card.show !== "submenu") {
-    // a holder's title above what it holds: as a title, or as a divider with that text
+  if (M.isHolder(card) && card.show !== "submenu" && card.border !== "divider") {
+    // a holder's title above what it holds: as a title, or as a divider with that text (with dividers as its border:
+    // the top divider's text, no choice)
     const titleAs = el("select");
     for (const [v, label] of [["", "a title"], ["divider", "a divider"]]) { const o = el("option", "", label); o.value = v; titleAs.append(o); }
     titleAs.value = card.titleAs || "";

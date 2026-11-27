@@ -760,8 +760,9 @@ end;
 
 procedure ParseCardLook(Obj: TJSONObject; Card: TCard);
 const
-  Props: array[0..9] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed',
-    'disabled', 'border3d', 'shadow');
+  // "border": "divider" with "dividerTop", "dividerBottom": a card holding cards bordered by dividers (Dexmenu.Draw)
+  Props: array[0..11] of string = ('background', 'foreground', 'border', 'borderWidth', 'radius', 'hover', 'pressed',
+    'disabled', 'border3d', 'shadow', 'dividerTop', 'dividerBottom');
 var
   P: string;
 begin

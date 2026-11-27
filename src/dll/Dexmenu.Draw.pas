@@ -587,16 +587,62 @@ function CardMin(V: TViewCard): Single; forward;
 
 // A card holding cards (plan 11 3.4): the room around what it holds, at its sides and at its top (its padding and its
 // title, as a title or as a divider), none without a frame.
+// A card holding cards whose border is dividers ("border": "divider"): no frame line and no padding; a divider at its
+// top ("dividerTop", on unless false), its title as that divider's text, and one at its bottom ("dividerBottom": true).
+// Its background and hover look stay.
+function DividerBorder(V: TViewCard): Boolean;
+begin
+  Result := (V.Kind = vkGroup) and V.Framed and (V.Card <> nil) and (V.Card.Look <> nil) and
+    (V.Card.Look.GetValue('border') is TJSONString) and (V.Card.Look.GetValue('border').Value = 'divider');
+end;
+
+function DividerTop(V: TViewCard): Boolean;
+begin
+  Result := DividerBorder(V) and not ((V.Card.Look.GetValue('dividerTop') is TJSONBool) and
+    not TJSONBool(V.Card.Look.GetValue('dividerTop')).AsBoolean);
+end;
+
+function DividerBottom(V: TViewCard): Boolean;
+begin
+  Result := DividerBorder(V) and (V.Card.Look.GetValue('dividerBottom') is TJSONBool) and
+    TJSONBool(V.Card.Look.GetValue('dividerBottom')).AsBoolean;
+end;
+
+// The gaps inside it are a frame's (at least ButtonGap) only with a frame line around them.
+function InnerFramed(V: TViewCard): Boolean;
+begin
+  Result := V.Framed and not DividerBorder(V);
+end;
+
 function GroupSide(V: TViewCard): Single;
 begin
-  if V.Framed then
+  if InnerFramed(V) then
     Result := GroupPad
   else
     Result := 0;
 end;
 
+// Its room below what it holds: a frame's padding, or its bottom divider.
+function GroupBottom(V: TViewCard): Single;
+begin
+  if DividerBottom(V) then
+    Result := SeparatorHeight
+  else
+    Result := GroupSide(V);
+end;
+
 function GroupTop(V: TViewCard): Single;
 begin
+  if DividerBorder(V) then
+  begin
+    Result := 0;
+    if DividerTop(V) then
+      if V.BackTitle <> '' then
+        Result := DividerTextHeight
+      else
+        Result := SeparatorHeight;
+    Exit;
+  end;
   if not V.Framed then
     Exit(0);
   Result := GroupPad;
@@ -631,11 +677,13 @@ var
   Sum, CardGap, LineGap: Single;
 begin
   Result := 0;
-  if V.Framed and (V.BackTitle <> '') then
+  if DividerTop(V) and (V.BackTitle <> '') then
+    Result := TextWidth(V.BackTitle, NormalFormat) + 48   // as a divider with a label
+  else if V.Framed and not DividerBorder(V) and (V.BackTitle <> '') then
     Result := TextWidth(V.BackTitle, BoldFormat) + 8;
   if V.Inner = nil then
     Exit(Result + 2 * GroupSide(V));
-  Gaps(V.Framed, CardGap, LineGap);
+  Gaps(InnerFramed(V), CardGap, LineGap);
   for Line in V.Inner.Lines do
   begin
     Sum := 0;
@@ -679,9 +727,9 @@ begin
   if V.Kind = vkGroup then
   begin
     if V.Inner = nil then
-      Exit(GroupTop(V) + GroupSide(V));
-    Exit(GroupTop(V) + LayLines(V.Inner, 0, 0, Max(1, Width - 2 * GroupSide(V)), False, None, -1, V.Framed) +
-      GroupSide(V));
+      Exit(GroupTop(V) + GroupBottom(V));
+    Exit(GroupTop(V) + LayLines(V.Inner, 0, 0, Max(1, Width - 2 * GroupSide(V)), False, None, -1, InnerFramed(V)) +
+      GroupBottom(V));
   end
   else if V.Kind = vkNote then
     Result := NoteHeight(V, Width)
@@ -915,7 +963,7 @@ begin
           // a card holding cards: the boxes inside it follow its own
           if (V.Kind = vkGroup) and (V.Inner <> nil) then
             LayLines(V.Inner, X + GroupSide(V), CardTop + GroupTop(V), Max(1, Widths[J] - 2 * GroupSide(V)), True, Boxes,
-              -1, V.Framed);
+              -1, InnerFramed(V));
         end;
         X := X + Widths[J] + CardGap;
       end;
@@ -1606,10 +1654,41 @@ begin
         GroupState := 'hover';
         FillBackground(T, Theme, Element, 'hover', Inner, CardRadius, Own, True);
       end;
+      Title := V.Title;
+      if DividerBorder(V) then
+      begin
+        // its border as dividers: one at the top with its title as the text (a plain line without one), one at the
+        // bottom when set; in the dividers' look
+        if DividerTop(V) then
+        begin
+          if V.BackTitle <> '' then
+          begin
+            TitleLine := TLine.Create;
+            try
+              TitleLine.DividerText := V.BackTitle;
+              Y := Round(R.top + DividerTextHeight / 2) + 0.5;
+              DrawDividerText(T, TitleLine, D2D1RectF(R.left, R.top, R.right, R.top + DividerTextHeight), Y, Sep,
+                LabelBrush);
+            finally
+              TitleLine.Free;
+            end;
+          end
+          else
+          begin
+            Y := Round(R.top + SeparatorHeight / 2) + 0.5;
+            T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1);
+          end;
+        end;
+        if DividerBottom(V) then
+        begin
+          Y := Round(R.bottom - SeparatorHeight / 2) + 0.5;
+          T.DrawLine(D2D1PointF(R.left + 8, Y), D2D1PointF(R.right - 8, Y), Sep, 1);
+        end;
+        Continue;
+      end;
       // its border (or 3D border); none set: the dividers' colour (so the frame shows); "none": no frame line
       DrawBorder(T, Theme, Element, GroupState, Own, Inner, CardRadius, Sep);
       T.CreateSolidColorBrush(ToD2D(Theme.Color(Element, GroupState, 'foreground', RGBA($1B, $1B, $1B), Own)), nil, Brush);
-      Title := V.Title;
       if (Title <> '') and (V.Card <> nil) and V.Card.TitleAsDivider then
       begin
         // its title as a divider: a line with the text, in the dividers' look

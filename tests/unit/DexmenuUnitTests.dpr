@@ -2058,6 +2058,39 @@ begin
       L.Free;
       P.Free;
     end;
+    // dividers as its border: no padding at the sides; a divider at the top (its title as the text), one at the bottom
+    L := Level('{ "card": "Box", "title": "Edit", "border": "divider", "dividerBottom": true, "content": [ ' +
+      Card('Cut', '{ "name": { "equals": "Cut" } }') + ' ] }', P);
+    try
+      G := Measure(L);
+      Box := -1;
+      for I := 0 to High(G.Boxes) do
+        if G.Boxes[I].Card = L.Lines[0].Cards[0] then
+          Box := I;
+      Check((Box >= 0) and (Box < High(G.Boxes)) and (Abs(G.Boxes[Box + 1].Rect.left - G.Boxes[Box].Rect.left) < 0.5) and
+        (Abs(G.Boxes[Box + 1].Rect.right - G.Boxes[Box].Rect.right) < 0.5) and
+        (Abs(G.Boxes[Box + 1].Rect.top - G.Boxes[Box].Rect.top - DividerTextHeight) < 0.5) and
+        (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom - SeparatorHeight) < 0.5),
+        'dividers as a border: no side padding, the titled divider above, a plain one below');
+    finally
+      L.Free;
+      P.Free;
+    end;
+    L := Level('{ "card": "Box", "border": "divider", "dividerTop": false, "content": [ ' +
+      Card('Cut', '{ "name": { "equals": "Cut" } }') + ' ] }', P);
+    try
+      G := Measure(L);
+      Box := -1;
+      for I := 0 to High(G.Boxes) do
+        if G.Boxes[I].Card = L.Lines[0].Cards[0] then
+          Box := I;
+      Check((Box >= 0) and (Box < High(G.Boxes)) and (Abs(G.Boxes[Box + 1].Rect.top - G.Boxes[Box].Rect.top) < 0.5) and
+        (Abs(G.Boxes[Box].Rect.bottom - G.Boxes[Box + 1].Rect.bottom) < 0.5),
+        'dividers as a border, neither top nor bottom: nothing around what it holds');
+    finally
+      L.Free;
+      P.Free;
+    end;
     // found items inside a card in a row: templates by position, cycling
     L := Level(Card('Lex', '{ "name": { "endsWith": "in LexPen" } }', ', "show": "row", "templates": [ ' +
       '{ "background": "#ff0000" }, { "background": "#00ff00", "rename": { "regex": " in LexPen", "replace": "" } } ]'), P);
